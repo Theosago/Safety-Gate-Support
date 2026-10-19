@@ -11,6 +11,38 @@ internal static class DeviceInfoChecks
         {
             yield return ("device: exact target identity", () => Check(Parse("8WD4613-5JH37").IsSupportedTestColumn));
             yield return ("device: legacy target identity", () => Check(Parse("657.101.55").IsSupportedTestColumn));
+            yield return ("device: compact legacy target string", () => Check(Parse("65710155").IsSupportedTestColumn));
+            yield return ("device: observed numeric target identity", () =>
+            {
+                var device = NumericArticle("65710155");
+                Check(device.IsSupportedTestColumn && device.ArticleNumber == "65710155" && device.Model == "8WD4613-5JH37");
+            });
+            yield return ("device: numeric target still requires variant 21", () =>
+            {
+                foreach (int variant in new[] { 20, 50, 51, 0 })
+                    Check(!NumericArticle("65710155", variant).IsSupportedTestColumn);
+            });
+            yield return ("device: neighboring numeric article is not target", () => Check(!NumericArticle("65711155").IsSupportedTestColumn));
+            yield return ("device: fractional and exponent articles are not normalized", () =>
+            {
+                foreach (string article in new[] { "65710155.0", "65710155.1", "6.5710155e7", "-65710155" })
+                    Check(!NumericArticle(article).IsSupportedTestColumn);
+            });
+            yield return ("device: arbitrary article punctuation is not normalized", () =>
+            {
+                foreach (string article in new[] { "6571.0155", "657-101-55", "065710155", "65710155extra" })
+                    Check(!Parse(article).IsSupportedTestColumn);
+            });
+            yield return ("device: real-shaped chunked identity reply", () =>
+            {
+                var body = Encoding.UTF8.GetBytes("{\"firmwareVersion\":\"v1.0.3\",\"articleNumber\":65710155,\"firstConfig\":false,\"powerMode\":0,\"hardware\":{\"hardwareVariant\":21,\"hardwareRevision\":0,\"mac\":\"00:00:00:00:00:00\"},\"siren\":{\"firmwareVersion\":\"0.0.0\"}}");
+                var header = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nTransfer-Encoding: chunked\r\n\r\n{body.Length:x}\r\n");
+                using var stream = new MemoryStream(header.Concat(body).Concat(Encoding.ASCII.GetBytes("\r\n0\r\n\r\n")).ToArray());
+                var response = SiemensWire.ReadResponse(stream);
+                var device = SiemensDeviceInfo.Parse(response.Body);
+                Check(response.StatusCode == 200 && response.Body.SequenceEqual(body) && device.IsSupportedTestColumn
+                    && device.FirmwareVersion == "v1.0.3" && device.FirstConfig == false);
+            });
             yield return ("device: normalized identity", () => Check(Parse(" 8wd4613-5jh37 ").IsSupportedTestColumn));
             yield return ("device: other variant is not target", () => Check(!Parse("8WD4613-5JH37", 20).IsSupportedTestColumn));
             yield return ("device: other article is not target", () => Check(!Parse("657.111.55").IsSupportedTestColumn));
@@ -37,6 +69,8 @@ internal static class DeviceInfoChecks
             hardware = new { hardwareVariant = variant }
         }));
     private static SiemensDeviceInfo Read(string json) => SiemensDeviceInfo.Parse(Encoding.UTF8.GetBytes(json));
+    private static SiemensDeviceInfo NumericArticle(string literal, int variant = 21) =>
+        Read("{\"articleNumber\":" + literal + ",\"hardware\":{\"hardwareVariant\":" + variant + "}}");
     private static void Check(bool condition) { if (!condition) throw new Exception("Unexpected parsed device identity."); }
     private static void Reject(string json)
     {

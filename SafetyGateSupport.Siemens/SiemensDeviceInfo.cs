@@ -31,7 +31,9 @@ public sealed record SiemensDeviceInfo(
         {
             "657.001.55" => "8WD4613-5HH37",
             "657.011.55" => "8WD4613-5HH47",
-            "657.101.55" => "8WD4613-5JH37",
+            // Firmware v1.0.3 reports this legacy article as the integer 65710155.
+            // Match the observed spelling exactly; never round or strip arbitrary punctuation.
+            "657.101.55" or "65710155" => "8WD4613-5JH37",
             "657.111.55" => "8WD4613-5JH47",
             "657.501.55" => "8WD4615-5HH37",
             "657.511.55" => "8WD4615-5HH47",

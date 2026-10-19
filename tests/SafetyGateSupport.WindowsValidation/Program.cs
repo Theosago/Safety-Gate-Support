@@ -90,7 +90,7 @@ internal static class Program
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
             ("Siemens USB check window renders with read-only controls and idle connection", SiemensWindowStartup),
             ("Siemens USB check saves an exact backup using only the two permitted GETs", SiemensBackupSession),
-            ("Siemens USB check reads the backup when firstConfig is false", SiemensFirstConfigFalse),
+            ("Siemens USB check reads the backup after numeric/chunked identity with firstConfig false", SiemensFirstConfigFalse),
             ("Siemens USB check refuses a different model before requesting configuration", SiemensModelMismatch),
             ("Siemens USB check preserves an HTTP error without retries or reset requests", SiemensHttpFailure),
             ("A canceled Siemens USB check saves its report without sending requests", SiemensCancellation)
@@ -247,13 +247,17 @@ internal static class Program
     }
 
     private static Task SiemensBackupSession() => SiemensBackup(firstConfig: true);
-    private static Task SiemensFirstConfigFalse() => SiemensBackup(firstConfig: false);
+    private static Task SiemensFirstConfigFalse() => SiemensBackup(firstConfig: false, numericChunkedInfo: true);
 
-    private static Task SiemensBackup(bool firstConfig)
+    private static Task SiemensBackup(bool firstConfig, bool numericChunkedInfo = false)
     {
-        var info = SyntheticColumnInfo(firstConfig: firstConfig);
+        var info = numericChunkedInfo ? JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            articleNumber = 65710155, firmwareVersion = "synthetic-test", firstConfig,
+            hardware = new { hardwareVariant = 21, hardwareRevision = 1, mac = "synthetic-device" }
+        }) : SyntheticColumnInfo(firstConfig: firstConfig);
         var backup = SyntheticColumnArchive();
-        using var stream = new ColumnScriptStream(
+        using var stream = new ColumnScriptStream(numericChunkedInfo,
             (SiemensWire.GetInfoRequest(), info, 200),
             (SiemensWire.GetConfigRequest(), backup, 200));
         var reportPath = Path.Combine(NewDirectory(), "usb-report.zip");
@@ -275,7 +279,16 @@ internal static class Program
         Equal(2, root.GetProperty("responses").GetArrayLength(), "Recorded HTTP responses");
         Require(root.GetProperty("responses").EnumerateArray().All(item => item.GetProperty("StatusCode").GetInt32() == 200),
             "The report lost a successful response status.");
-        Equal(firstConfig, root.GetProperty("device").GetProperty("FirstConfig").GetBoolean(), "Preserved firstConfig flag");
+        var device = root.GetProperty("device");
+        Equal(firstConfig, device.GetProperty("FirstConfig").GetBoolean(), "Preserved firstConfig flag");
+        Equal(numericChunkedInfo ? "65710155" : "657.101.55", device.GetProperty("ArticleNumber").GetString(), "Preserved article identifier");
+        Equal("8WD4613-5JH37", device.GetProperty("Model").GetString(), "Normalized column model");
+        if (numericChunkedInfo)
+        {
+            var headers = root.GetProperty("responses")[0].GetProperty("Headers");
+            Equal("chunked", headers.GetProperty("Transfer-Encoding").GetString(), "Preserved observed response framing");
+            Equal("text/html", headers.GetProperty("Content-Type").GetString(), "Preserved observed response content type");
+        }
         return Task.CompletedTask;
     }
 
@@ -655,19 +668,31 @@ internal static class Program
     // This stream acts as a column and exposes a reply only after receiving the
     // exact allowed GET. Unexpected requests, writes before replies are consumed,
     // and retries fail immediately; no USB hardware is accessed by these checks.
-    private sealed class ColumnScriptStream(params (byte[] Request, byte[] Body, int Status)[] exchanges) : Stream
+    private sealed class ColumnScriptStream : Stream
     {
-        private readonly byte[][] _responses = exchanges.Select(exchange =>
-            Encoding.ASCII.GetBytes($"HTTP/1.0 {exchange.Status} Test\r\nContent-Length: {exchange.Body.Length}\r\n\r\n")
-                .Concat(exchange.Body).ToArray()).ToArray();
+        private readonly (byte[] Request, byte[] Body, int Status)[] _exchanges;
+        private readonly byte[][] _responses;
         private readonly List<byte> _sent = [];
         private int _exchange;
         private int _requestOffset;
         private int _responseOffset;
         private bool _replyAvailable;
 
+        public ColumnScriptStream(params (byte[] Request, byte[] Body, int Status)[] exchanges)
+            : this(false, exchanges) { }
+
+        public ColumnScriptStream(bool chunkedFirstResponse, params (byte[] Request, byte[] Body, int Status)[] exchanges)
+        {
+            _exchanges = exchanges;
+            _responses = exchanges.Select((exchange, index) => chunkedFirstResponse && index == 0
+                ? Encoding.ASCII.GetBytes($"HTTP/1.1 {exchange.Status} OK\r\nContent-Type: text/html\r\nTransfer-Encoding: chunked\r\n\r\n{exchange.Body.Length:x}\r\n")
+                    .Concat(exchange.Body).Concat(Encoding.ASCII.GetBytes("\r\n0\r\n\r\n")).ToArray()
+                : Encoding.ASCII.GetBytes($"HTTP/1.0 {exchange.Status} Test\r\nContent-Length: {exchange.Body.Length}\r\n\r\n")
+                    .Concat(exchange.Body).ToArray()).ToArray();
+        }
+
         public byte[] SentBytes => _sent.ToArray();
-        public bool Completed => _exchange == exchanges.Length;
+        public bool Completed => _exchange == _exchanges.Length;
         public override bool CanRead => true;
         public override bool CanWrite => true;
         public override bool CanSeek => false;
@@ -678,11 +703,11 @@ internal static class Program
         {
             for (var index = 0; index < count; index++)
             {
-                Require(_exchange < exchanges.Length && !_replyAvailable, "The session sent an unexpected request, retry, or command before reading its reply.");
+                Require(_exchange < _exchanges.Length && !_replyAvailable, "The session sent an unexpected request, retry, or command before reading its reply.");
                 byte value = buffer[offset + index];
-                Require(value == exchanges[_exchange].Request[_requestOffset], "The session sent bytes other than the exact permitted read-only request.");
+                Require(value == _exchanges[_exchange].Request[_requestOffset], "The session sent bytes other than the exact permitted read-only request.");
                 _sent.Add(value);
-                if (++_requestOffset == exchanges[_exchange].Request.Length)
+                if (++_requestOffset == _exchanges[_exchange].Request.Length)
                     _replyAvailable = true;
             }
         }

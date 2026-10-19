@@ -34,7 +34,8 @@ Connection: keep-alive\r\n
 ```
 
 The second request uses `/api/v1/config` with identical headers. A configuration
-read is gated on model `8WD4613-5JH37` (including legacy article `657.101.55`) and
+read is gated on model `8WD4613-5JH37` (including legacy article `657.101.55` and
+the exact compact legacy article `65710155`) and
 hardware variant 21. `firstConfig` is retained without using it as a gate: the
 vendor's read flow requests configuration regardless of that flag.
 
@@ -42,7 +43,18 @@ The observed vendor upload sequence uses PUT `/api/v1/config`, followed by an
 application reset after a delay. Those requests are deliberately absent from the
 diagnostic API. Before implementing them, validate identity, real response framing,
 backup contents, and firmware behavior with the spare column and a known-good
-configuration. No real USB session has been exercised by cloud or CI tests.
+configuration. Cloud and CI tests do not connect physical USB hardware.
+
+The first user-run hardware report on October 19, 2026 confirmed a real identity
+read: firmware v1.0.3, hardware variant 21, numeric article `65710155`, and an
+HTTP/1.1 200 reply with chunked transfer encoding. Its content type was `text/html`
+even though the body was JSON. Version 0.1.0 rejected that compact article before
+requesting configuration. Version 0.1.1 recognizes this exact spelling, as a number
+or string, while retaining the article-plus-variant gate. There is no rounding,
+exponent conversion, or arbitrary punctuation stripping. That report contained
+`firstConfig: false`; without a configuration read it does not establish whether
+the column has been programmed. No real configuration backup or upload has yet
+been verified.
 
 ## Configuration format
 

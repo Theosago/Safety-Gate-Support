@@ -1,4 +1,4 @@
-# Siemens USB Check — 0.1.0
+# Siemens USB Check — 0.1.1
 
 This standalone Windows test tool reads a Siemens **8WD4613-5JH37** light column
 over USB and saves a diagnostic ZIP, including the original configuration backup
@@ -20,6 +20,8 @@ DTR/RTS and restart the column even though the requests only read data.
 
 The tool identifies the normal USB interface (VID 303A, PID 80F7) and verifies the
 reported article number and hardware variant before requesting configuration.
+Version 0.1.1 recognizes the exact numeric legacy article `65710155` returned by
+firmware v1.0.3, as well as the original dotted article and Siemens model strings.
 Other models and the bootloader interface are excluded from backup. If Windows
 does not enumerate a COM port, check Device Manager and use the manufacturer's
 driver instructions; the tool does not install drivers or try arbitrary ports.
