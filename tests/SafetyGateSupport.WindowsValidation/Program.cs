@@ -42,7 +42,10 @@ internal static class Program
         {
             var app = new App();
             app.InitializeComponent();
-            app.StartupUri = null;
+            // WPF rejects setting StartupUri to null and queues startup even without
+            // Application.Run. Cancel that navigation through its public event so
+            // loading the real styles cannot create a window using the user's settings.
+            app.Navigating += (_, navigation) => navigation.Cancel = true;
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
             _ = RunChecksAsync();
@@ -190,6 +193,7 @@ internal static class Program
 
     private static async Task MainWindowStartup()
     {
+        Require(Application.Current.Windows.Count == 0, "Application startup unexpectedly opened a window outside the isolated fixtures.");
         var fixture = NewFixture();
         var categoryCount = fixture.Data.LoadCategories().Count;
         var watch = Stopwatch.StartNew();
