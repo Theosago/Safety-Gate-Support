@@ -31,7 +31,15 @@ jobs:
       - name: Build Windows desktop app
         run: dotnet build SafetyGateSupport/SafetyGateSupport.csproj -c Release
       - name: Run Windows desktop regression checks
-        run: dotnet run --project tests/SafetyGateSupport.WindowsValidation/SafetyGateSupport.WindowsValidation.csproj -c Release
+        shell: pwsh
+        run: |
+          dotnet run --project tests/SafetyGateSupport.WindowsValidation/SafetyGateSupport.WindowsValidation.csproj -c Release 2>&1 | Tee-Object -FilePath windows-validation.log
+          $validationExitCode = $LASTEXITCODE
+          '### Native Windows validation' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```text' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Get-Content windows-validation.log | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $validationExitCode
       - name: Publish self-contained Windows x64 app
         run: dotnet publish SafetyGateSupport/SafetyGateSupport.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/win-x64
       - name: Record executable checksum
