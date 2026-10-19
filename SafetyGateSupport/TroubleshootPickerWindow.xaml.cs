@@ -114,6 +114,7 @@ public partial class TroubleshootPickerWindow : Window
             return;
         }
 
+        StartButton.IsEnabled = false;
         PreviewPlaceholderText.Visibility = Visibility.Visible;
         PreviewPlaceholderText.Text = "Loading identification photo…";
         PreviewStatusText.Text = "Confirm the asset and unit number before starting troubleshooting.";
@@ -141,6 +142,12 @@ public partial class TroubleshootPickerWindow : Window
             PreviewPlaceholderText.Visibility = Visibility.Visible;
             PreviewPlaceholderText.Text = "The identification photo could not be previewed.";
             PreviewStatusText.Text = "Confirm the asset and unit number before starting troubleshooting.";
+        }
+        finally
+        {
+            // Keep the explicit confirmation step: a slow photo must finish (or show its
+            // missing/unreadable message) before the selected unit can be started.
+            if (!_isClosed && !cancellationToken.IsCancellationRequested) StartButton.IsEnabled = true;
         }
     }
 
@@ -174,7 +181,7 @@ public partial class TroubleshootPickerWindow : Window
 
     private void StartTroubleshooting()
     {
-        if (SelectedUnit is not { } unit) return;
+        if (!StartButton.IsEnabled || SelectedUnit is not { } unit) return;
         ChosenSystem = unit;
         DialogResult = true;
         Close();

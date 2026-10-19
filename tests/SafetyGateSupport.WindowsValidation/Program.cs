@@ -52,6 +52,7 @@ internal static class Program
         catch (Exception exception)
         {
             Console.Error.WriteLine($"SETUP FAILED: {exception}");
+            ReportWorkflowError("Windows validation setup", exception);
             return 2;
         }
         finally
@@ -95,6 +96,7 @@ internal static class Program
                 catch (Exception exception)
                 {
                     Console.Error.WriteLine($"FAIL {name}: {exception}");
+                    ReportWorkflowError(name, exception);
                 }
                 finally
                 {
@@ -109,6 +111,7 @@ internal static class Program
         catch (Exception exception)
         {
             Console.Error.WriteLine($"VALIDATION FAILED: {exception}");
+            ReportWorkflowError("Windows validation runner", exception);
             _exitCode = 1;
         }
         finally
@@ -274,6 +277,7 @@ internal static class Program
         var units = Control<ListBox>(window, "UnitList");
         RapidSelect(units, fixture.RedUnit.Id, fixture.BlueUnit.Id);
         var photo = Control<Image>(window, "PreviewImage");
+        Require(photo.Source is not null || !Control<Button>(window, "StartButton").IsEnabled, "Troubleshooting must wait for the selected preview to load or display an error.");
         await WaitUntil(() => HasColor(photo.Source, Colors.Blue), "Picker did not keep the final selected unit's blue photo.");
         Require(Control<Button>(window, "StartButton").IsEnabled, "Picker should allow troubleshooting for the selected unit.");
         Equal(Visibility.Collapsed, Control<TextBlock>(window, "PreviewPlaceholderText").Visibility, "Loaded-photo placeholder visibility");
@@ -449,6 +453,13 @@ internal static class Program
             if (child is T match) yield return match;
             foreach (var descendant in Descendants<T>(child)) yield return descendant;
         }
+    }
+
+    private static void ReportWorkflowError(string name, Exception exception)
+    {
+        if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") != "true") return;
+        var message = $"{name}: {exception}".Replace("%", "%25").Replace("\r", "%0D").Replace("\n", "%0A");
+        Console.WriteLine($"::error title=Windows validation::{message}");
     }
 
     private static void Equal<T>(T expected, T actual, string label) => Require(EqualityComparer<T>.Default.Equals(expected, actual), $"{label}: expected {expected}; got {actual}.");
