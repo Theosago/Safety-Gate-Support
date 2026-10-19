@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../SafetyGateSupport/Models/*.cs" Link="Models/%(Filename)%(Extension)" />
+    <Compile Include="../../SafetyGateSupport/Services/DataService.cs" Link="Services/DataService.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/SearchService.cs" Link="Services/SearchService.cs" />
+    <EmbeddedResource Include="../../SafetyGateSupport/SeedData.zip" LogicalName="SafetyGateSupport.Validation.SeedData.zip" />
+  </ItemGroup>
+</Project>

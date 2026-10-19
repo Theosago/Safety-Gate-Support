@@ -1,0 +1,23 @@
+SafetyGateSupport V6.4.2 — Responsiveness improvements
+
+- Load shared inventory/migrations after the main window opens, on a worker thread.
+- Remove shared-drive readiness probes from each search keystroke.
+- Tokenize each search once and retain/sort only the best results, preserving prior ranking and stable ties.
+- Load identification photos on worker threads and limit decoded previews to 1280 pixels on the long edge.
+- Cancel obsolete previews and index scans so old work cannot overwrite a new selection or reload.
+- Keep newly saved notes in the search index if a background scan began before the save.
+- Reuse each shared resource folder listing within a scan; reload file metadata for subsequent scans.
+- Reduce redundant setup reads and repeated photo/note loads during navigation.
+- Fix partial legacy migration so newly discovered gates are saved before their units reference them.
+- Add isolated data/search tests, native Windows regression checks, and downloadable GitHub Actions builds.
+- Retain shared-data formats, note saving, troubleshooting content, and vendor launch behavior.
+
+SafetyGateSupport V6.4.1 — Troubleshooting Unit Preview
+
+- Adds a Selected Unit Preview to the Home > Troubleshoot a System picker.
+- After choosing an asset and unit, the picker shows that unit's identification photo before Start Troubleshooting is clicked.
+- Shows the selected asset/unit plus available manufacturer, model, location, and equipment-type details for confirmation.
+- Shows a clear message when a unit has no saved identification photo or the photo cannot be found.
+- Removes the unit-list double-click shortcut so troubleshooting starts only from the explicit Start Troubleshooting button after the preview is visible.
+- Loads preview images from a file stream with BitmapCacheOption.OnLoad to avoid stale WPF image caching.
+- Retains all V6.3 photo-refresh, V6.2 clipboard/drag-drop, and V6.0 Foundation behavior.

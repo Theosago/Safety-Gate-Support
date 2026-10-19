@@ -1,0 +1,225 @@
+<Window x:Class="SafetyGateSupport.AdminWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Safety Gate Support - Setup Mode" Height="860" Width="1260" MinHeight="720" MinWidth="1050" WindowStartupLocation="CenterOwner">
+ <Grid Margin="16">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel>
+   <TextBlock Text="Setup Mode" FontSize="26" FontWeight="Bold"/>
+   <TextBlock Text="Gate structure, buttons, troubleshooting, manuals, parts, and home content are stored on the shared drive. Changing them does not require rebuilding the EXE." Foreground="#555" TextWrapping="Wrap"/>
+  </StackPanel>
+  <TabControl Grid.Row="1" Margin="0,14,0,10">
+
+   <TabItem Header="Gates &amp; Units">
+    <Grid Margin="12">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="160"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Grid Grid.Column="0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <ComboBox x:Name="GateAreaFilterBox" Height="34" SelectionChanged="GateAreaFilterBox_SelectionChanged"/>
+      <WrapPanel Grid.Row="1" Margin="0,6,0,6"><Button Content="+ New Gate" Click="NewGate_Click"/><Button Content="Delete Gate" Click="DeleteGate_Click"/></WrapPanel>
+      <ListBox x:Name="GateList" Grid.Row="2" DisplayMemberPath="Display" SelectionChanged="GateList_SelectionChanged"/>
+     </Grid>
+     <Grid Grid.Column="1" Margin="10,0,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <WrapPanel><Button Content="+ Unit" Click="NewUnit_Click"/><Button Content="Delete" Click="DeleteUnit_Click"/></WrapPanel>
+      <ListBox x:Name="UnitListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="UnitDisplay" SelectionChanged="UnitListAdmin_SelectionChanged"/>
+     </Grid>
+     <ScrollViewer Grid.Column="3"><StackPanel>
+      <GroupBox Header="Safety gate information — shared by every unit under this gate"><Grid Margin="10">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+       <TextBlock Text="Area" VerticalAlignment="Center"/><ComboBox x:Name="GateAreaBox" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="1" Text="Asset Number" VerticalAlignment="Center"/><TextBox x:Name="GateAssetBox" Grid.Row="1" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="2" Text="Manufacturer / System" VerticalAlignment="Center"/><TextBox x:Name="GateManufacturerBox" Grid.Row="2" Grid.Column="1" Margin="3" ToolTip="Examples: Safe2Cross, LiftMaster, LifeMaster"/>
+       <TextBlock Grid.Row="3" Text="Model" VerticalAlignment="Center"/><TextBox x:Name="GateModelBox" Grid.Row="3" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="4" Text="Location / Description" VerticalAlignment="Center"/><TextBox x:Name="GateLocationBox" Grid.Row="4" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="5" Text="Equipment Type" VerticalAlignment="Center"/><TextBox x:Name="GateTypeBox" Grid.Row="5" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="6" Text="Search Keywords" VerticalAlignment="Center"/><TextBox x:Name="GateKeywordsBox" Grid.Row="6" Grid.Column="1" Margin="3"/>
+      </Grid></GroupBox>
+      <Button Content="Save Gate Information" Click="SaveGate_Click" HorizontalAlignment="Left" Padding="18,8"/>
+      <GroupBox Header="Selected unit" Margin="0,14,0,0"><Grid Margin="10">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+       <TextBlock Text="Unit Number" VerticalAlignment="Center"/><TextBox x:Name="UnitNumberBox" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="1" Text="Identification Photo" VerticalAlignment="Center"/><WrapPanel Grid.Row="1" Grid.Column="1"><Button Content="Choose Photo..." Click="ChoosePhoto_Click"/><Button Content="Paste Image" Click="PastePhoto_Click" Margin="6,0,0,0"/><TextBlock x:Name="UnitPhotoText" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,0,0,0"/></WrapPanel>
+       <Border x:Name="UnitPhotoPreviewBorder" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="10" Background="#F7F9FB" BorderBrush="#D6DCE2" BorderThickness="1" CornerRadius="4" Focusable="True" AllowDrop="True" PreviewKeyDown="UnitPhotoPreviewBorder_PreviewKeyDown" MouseLeftButtonDown="UnitPhotoPreviewBorder_MouseLeftButtonDown" DragOver="UnitPhotoPreviewBorder_DragOver" Drop="UnitPhotoPreviewBorder_Drop" ToolTip="Click this preview and press Ctrl+V to paste an image, or drag an image file here.">
+        <StackPanel>
+         <TextBlock Text="Identification photo preview" FontWeight="SemiBold" Margin="0,0,0,2"/>
+         <TextBlock Text="Click the preview and press Ctrl+V, use Paste Image, or drag and drop an image file." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"/>
+         <Border Height="260" Background="#ECEFF2" BorderBrush="#CDD3D9" BorderThickness="1">
+          <Image x:Name="UnitPhotoPreview" Stretch="Uniform"/>
+         </Border>
+         <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Foreground="#666" TextWrapping="Wrap" Margin="0,6,0,0"/>
+        </StackPanel>
+       </Border>
+      </Grid></GroupBox>
+      <Button Content="Save Unit" Click="SaveUnit_Click" HorizontalAlignment="Left" Padding="18,8"/>
+      <Border Background="#F4F7FA" BorderBrush="#D6DCE2" BorderThickness="1" Padding="10" Margin="0,14,0,0">
+       <TextBlock Text="Drawings and other resources are configured on the Buttons / Resources tab. A single resource can be linked to multiple units, so paired units can share the exact same drawing and archive." TextWrapping="Wrap" Foreground="#444"/>
+      </Border>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Buttons / Resources">
+    <Grid Margin="12">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <ComboBox x:Name="ResourceGateBox" Height="34" DisplayMemberPath="Display" SelectionChanged="ResourceGateBox_SelectionChanged"/>
+      <WrapPanel Grid.Row="1" Margin="0,6"><Button Content="+ New Button" Click="NewResource_Click"/><Button Content="Delete" Click="DeleteResource_Click"/></WrapPanel>
+      <ListBox x:Name="ResourceList" Grid.Row="2" DisplayMemberPath="AdminDisplay" SelectionChanged="ResourceList_SelectionChanged"/>
+     </Grid>
+     <ScrollViewer Grid.Column="2"><StackPanel>
+      <TextBlock Text="Button / resource" FontSize="20" FontWeight="SemiBold"/>
+      <TextBlock Text="Button label" Margin="0,8,0,3"/><TextBox x:Name="ResourceLabelBox" Height="34"/>
+      <TextBlock Text="Type" Margin="0,8,0,3"/><ComboBox x:Name="ResourceKindBox" Height="34" SelectionChanged="ResourceKindBox_SelectionChanged"/>
+      <TextBlock Text="Show on these units" Margin="0,10,0,3"/>
+      <ListBox x:Name="ResourceUnitsList" Height="120" DisplayMemberPath="UnitDisplay" SelectionMode="Multiple"/>
+      <TextBlock Text="Select more than one unit to make one shared button/resource. Example: Units 4 and 5 can both point to one Electrical Drawings folder. Leave all units unselected to show the button on every unit under the gate." Foreground="#666" TextWrapping="Wrap" Margin="0,4,0,0"/>
+      <WrapPanel Margin="0,8,0,0"><CheckBox x:Name="ResourceVisibleCheck" Content="Visible" IsChecked="True" Margin="4,5,18,5"/><CheckBox x:Name="ResourceUploadCheck" Content="Regular users can upload / update files" Margin="4,5,18,5"/></WrapPanel>
+      <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <StackPanel><TextBlock Text="Archive rule"/><ComboBox x:Name="ResourceArchiveBox" Height="34"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Launch software"/><ComboBox x:Name="ResourceLaunchBox" Height="34"/></StackPanel>
+      </Grid>
+      <TextBlock Text="Managed folder / target" Margin="0,8,0,3"/><TextBox x:Name="ResourceTargetBox" Height="34" ToolTip="Managed Files: relative folder (leave blank for automatic). Folder: path. URL: http://..."/>
+      <TextBlock Text="Description" Margin="0,8,0,3"/><TextBox x:Name="ResourceDescriptionBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70"/>
+      <TextBlock Text="Search keywords" Margin="0,8,0,3"/><TextBox x:Name="ResourceKeywordsBox" Height="34"/>
+      <TextBlock Text="Sort order" Margin="0,8,0,3"/><TextBox x:Name="ResourceSortBox" Width="100" Height="34" HorizontalAlignment="Left"/>
+      <WrapPanel Margin="0,10,0,0"><Button Content="Save Button / Resource" Click="SaveResource_Click"/><Button Content="Open Current Folder" Click="OpenResourceCurrent_Click"/><Button Content="Open Archive" Click="OpenResourceArchive_Click"/></WrapPanel>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Troubleshooting">
+    <Grid Margin="12">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="280"/><ColumnDefinition Width="240"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <WrapPanel><Button Content="+ Flow" Click="NewFlow_Click"/><Button Content="Delete" Click="DeleteFlow_Click"/></WrapPanel>
+      <ListBox x:Name="FlowListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="AdminDisplay" SelectionChanged="FlowListAdmin_SelectionChanged"/>
+     </Grid>
+     <Grid Grid.Column="1" Margin="10,0,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <WrapPanel><Button Content="+ Step" Click="NewNode_Click"/><Button Content="Delete" Click="DeleteNode_Click"/></WrapPanel>
+      <ListBox x:Name="NodeListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="AdminDisplay" SelectionChanged="NodeListAdmin_SelectionChanged"/>
+     </Grid>
+     <ScrollViewer Grid.Column="3"><StackPanel>
+      <TextBlock Text="Troubleshooting flow" FontSize="19" FontWeight="SemiBold"/>
+      <TextBlock Text="Title" Margin="0,6,0,3"/><TextBox x:Name="FlowTitleBox" Height="34"/>
+      <TextBlock Text="Keywords" Margin="0,6,0,3"/><TextBox x:Name="FlowKeywordsBox" Height="34"/>
+      <TextBlock Text="Manufacturer filter (optional)" Margin="0,6,0,3"/><TextBox x:Name="FlowManufacturerBox" Height="34"/>
+      <TextBlock Text="Specific gate (optional)" Margin="0,6,0,3"/><ComboBox x:Name="FlowGateBox" Height="34" DisplayMemberPath="Display" SelectionChanged="FlowGateBox_SelectionChanged"/>
+      <Button Content="Save Flow" Click="SaveFlow_Click" HorizontalAlignment="Left" Margin="0,8,0,12"/>
+      <Separator/>
+      <TextBlock Text="Selected step" FontSize="19" FontWeight="SemiBold" Margin="0,12,0,0"/>
+      <TextBlock x:Name="NodeIdText" Foreground="#777" Margin="0,3,0,5"/>
+      <TextBlock Text="Question / heading"/><TextBox x:Name="NodePromptBox" Height="34"/>
+      <TextBlock Text="Instructions" Margin="0,6,0,3"/><TextBox x:Name="NodeBodyBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"/>
+      <WrapPanel Margin="0,6,0,0"><CheckBox x:Name="NodeTerminalCheck" Content="End of path" Margin="4"/><CheckBox x:Name="NodeStartCheck" Content="Starting step" Margin="16,4,4,4"/></WrapPanel>
+      <TextBlock Text="Answer buttons" FontWeight="SemiBold" Margin="0,8,0,3"/>
+      <TextBlock Text="One per line: Button text => next-step-ID. The step IDs are shown under each selected step." Foreground="#666" TextWrapping="Wrap"/>
+      <TextBox x:Name="NodeChoicesBox" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="90" VerticalScrollBarVisibility="Auto"/>
+      <TextBlock Text="Linked resource buttons" FontWeight="SemiBold" Margin="0,8,0,3"/>
+      <ListBox x:Name="NodeResourceList" Height="110" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
+      <Button Content="Save Step" Click="SaveNode_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Home / Help">
+    <Grid Margin="14"><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <WrapPanel><Button Content="+ New Topic" Click="NewHelp_Click"/><Button Content="Delete" Click="DeleteHelp_Click"/></WrapPanel>
+      <ListBox x:Name="HelpList" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="AdminDisplay" SelectionChanged="HelpList_SelectionChanged"/>
+     </Grid>
+     <ScrollViewer Grid.Column="2"><StackPanel>
+      <TextBlock Text="Home text" FontSize="18" FontWeight="SemiBold"/>
+      <TextBlock Text="Home subtitle" Margin="0,8,0,3"/><TextBox x:Name="HomeSubtitleBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="58"/>
+      <TextBlock Text="Manuals intro" Margin="0,8,0,3"/><TextBox x:Name="ManualsIntroBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50"/>
+      <TextBlock Text="Parts intro" Margin="0,8,0,3"/><TextBox x:Name="PartsIntroBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50"/>
+      <Button Content="Save Home Text" Click="SaveSharedContent_Click" HorizontalAlignment="Left" Margin="0,8,0,16"/>
+      <Separator/>
+      <TextBlock Text="Quick help topic" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,6"/>
+      <TextBlock Text="Section"/><ComboBox x:Name="HelpSectionBox" Height="34"><ComboBoxItem Content="Quick Help"/><ComboBoxItem Content="Troubleshooting"/></ComboBox>
+      <TextBlock Text="Title" Margin="0,8,0,3"/><TextBox x:Name="HelpTitleBox" Height="34"/>
+      <TextBlock Text="Body" Margin="0,8,0,3"/><TextBox x:Name="HelpBodyBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="120"/>
+      <TextBlock Text="Keywords" Margin="0,8,0,3"/><TextBox x:Name="HelpKeywordsBox" Height="34"/>
+      <TextBlock Text="Sort order" Margin="0,8,0,3"/><TextBox x:Name="HelpSortBox" Height="34" Width="100" HorizontalAlignment="Left"/>
+      <Button Content="Save Topic" Click="SaveHelp_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Manuals">
+    <Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <WrapPanel><Button Content="+ Manual" Click="NewManual_Click"/><Button Content="Delete" Click="DeleteManual_Click"/></WrapPanel>
+      <ListBox x:Name="ManualListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="Display" SelectionChanged="ManualListAdmin_SelectionChanged"/>
+     </Grid>
+     <ScrollViewer Grid.Column="2"><StackPanel>
+      <TextBlock Text="Title"/><TextBox x:Name="ManualTitleBox" Height="34"/>
+      <TextBlock Text="Manufacturer" Margin="0,7,0,3"/><TextBox x:Name="ManualManufacturerBox" Height="34"/>
+      <TextBlock Text="Model" Margin="0,7,0,3"/><TextBox x:Name="ManualModelBox" Height="34"/>
+      <TextBlock Text="Keywords" Margin="0,7,0,3"/><TextBox x:Name="ManualKeywordsBox" Height="34"/>
+      <TextBlock Text="Document" Margin="0,7,0,3"/><WrapPanel><Button Content="Choose / Replace File..." Click="ChooseManualFile_Click"/><TextBlock x:Name="ManualFileText" VerticalAlignment="Center" TextWrapping="Wrap"/></WrapPanel>
+      <TextBlock Text="Applies to gates" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="ManualGateAssignments" Height="120" DisplayMemberPath="Display" SelectionMode="Multiple"/>
+      <TextBlock Text="Applies to specific units (optional)" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="ManualUnitAssignments" Height="110" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
+      <TextBlock Text="Leave both assignment lists empty to make the manual global. Gate assignment applies it to every unit under that gate; unit assignment can be used for exceptions." Foreground="#666" TextWrapping="Wrap" Margin="0,4,0,0"/>
+      <WrapPanel Margin="0,10,0,0"><Button Content="Save Manual" Click="SaveManual_Click"/><Button Content="Open Document" Click="OpenManualAdmin_Click"/></WrapPanel>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Parts">
+    <Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <WrapPanel><Button Content="+ Part" Click="NewPart_Click"/><Button Content="Delete" Click="DeletePart_Click"/></WrapPanel>
+      <ListBox x:Name="AdminPartList" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="Display" SelectionChanged="AdminPartList_SelectionChanged"/>
+     </Grid>
+     <ScrollViewer Grid.Column="2"><StackPanel>
+      <TextBlock Text="Part Number"/><TextBox x:Name="PartNumberBox" Height="34"/>
+      <TextBlock Text="Description" Margin="0,7,0,3"/><TextBox x:Name="PartDescriptionBox" Height="34"/>
+      <TextBlock Text="Manufacturer" Margin="0,7,0,3"/><TextBox x:Name="PartManufacturerBox" Height="34"/>
+      <TextBlock Text="Keywords" Margin="0,7,0,3"/><TextBox x:Name="PartKeywordsBox" Height="34"/>
+      <TextBlock Text="Legacy / freeform related assets" Margin="0,7,0,3"/><TextBox x:Name="PartAssetsBox" Height="34"/>
+      <TextBlock Text="Notes" Margin="0,7,0,3"/><TextBox x:Name="PartNotesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="75"/>
+      <TextBlock Text="Document" Margin="0,7,0,3"/><WrapPanel><Button Content="Choose / Replace Document..." Click="ChoosePartDocument_Click"/><TextBlock x:Name="PartDocumentText" VerticalAlignment="Center" TextWrapping="Wrap"/></WrapPanel>
+      <TextBlock Text="Applies to gates" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="PartGateAssignments" Height="110" DisplayMemberPath="Display" SelectionMode="Multiple"/>
+      <TextBlock Text="Applies to specific units (optional)" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="PartUnitAssignments" Height="100" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
+      <TextBlock Text="Leave both assignment lists empty to make the part global." Foreground="#666"/>
+      <Button Content="Save Part" Click="SavePart_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Areas">
+    <Grid Margin="14"><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <ListBox x:Name="AreaList" SelectionChanged="AreaList_SelectionChanged"/>
+     <StackPanel Grid.Column="2"><TextBlock Text="Area name"/><TextBox x:Name="AreaNameBox" Height="34" Margin="0,4,0,8"/><WrapPanel><Button Content="Add" Click="AddArea_Click"/><Button Content="Rename" Click="RenameArea_Click"/><Button Content="Delete" Click="DeleteArea_Click"/></WrapPanel><TextBlock Text="An area cannot be deleted while gates are assigned to it." Foreground="#666" TextWrapping="Wrap" Margin="4,12,0,0"/></StackPanel>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Shared Data / Software">
+    <ScrollViewer><StackPanel Margin="18" MaxWidth="820" HorizontalAlignment="Left">
+     <TextBlock Text="Shared data location" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Every computer should point to the same shared folder. Default: Q:\SafetyGateSupport" Foreground="#555" Margin="0,4,0,6"/>
+     <TextBox x:Name="SharedRootBox" Height="34"/><WrapPanel><Button Content="Choose Folder..." Click="ChooseSharedRoot_Click"/><Button Content="Initialize Starter Data" Click="Initialize_Click"/></WrapPanel>
+     <Separator Margin="0,16"/>
+     <TextBlock Text="Application distribution" FontWeight="SemiBold" FontSize="17"/>
+     <TextBlock Text="Recommended: keep the published SafetyGateSupport.exe in Q:\SafetyGateSupport\Application and give users a shortcut to that master copy. This build does not self-modify or auto-update." Foreground="#555" TextWrapping="Wrap" Margin="0,4,0,6"/>
+     <Separator Margin="0,16"/>
+     <TextBlock Text="Storeroom database" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Shared URL used by the Parts page." Foreground="#555" Margin="0,3,0,4"/><TextBox x:Name="StoreroomUrlBox" Height="34"/><Button Content="Save Shared Content Settings" Click="SaveSharedContent_Click" HorizontalAlignment="Left"/>
+     <Separator Margin="0,16"/>
+     <TextBlock Text="Programming software on this computer" FontWeight="SemiBold" FontSize="17"/>
+     <TextBlock Text="Siemens 8WD46 Configurator" Margin="0,10,0,3"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="SiemensBox" Height="34"/><Button Grid.Column="1" Content="Browse..." Click="BrowseSiemens_Click"/></Grid>
+     <TextBlock Text="UAM Project Designer" Margin="0,10,0,3"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="UamBox" Height="34"/><Button Grid.Column="1" Content="Browse..." Click="BrowseUam_Click"/></Grid>
+     <Button Content="Save Local Software Paths" Click="SaveLocalSettings_Click" HorizontalAlignment="Left" Padding="18,8" Margin="0,12,0,0"/>
+    </StackPanel></ScrollViewer>
+   </TabItem>
+
+   <TabItem Header="Audit / History">
+    <Grid Margin="14"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <WrapPanel><Button Content="Refresh" Click="RefreshAudit_Click"/><TextBlock Text="Recent setup and file changes. Shared notes are intentionally not logged on every autosave." VerticalAlignment="Center" Foreground="#666" Margin="10,0,0,0"/></WrapPanel>
+     <ListBox x:Name="AuditList" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="Display"/>
+    </Grid>
+   </TabItem>
+
+  </TabControl>
+  <TextBlock x:Name="AdminStatusText" Grid.Row="2" Foreground="#555" TextWrapping="Wrap"/>
+ </Grid>
+</Window>

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SafetyGateSupport</AssemblyName>
+    <RootNamespace>SafetyGateSupport</RootNamespace>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Version>6.4.2</Version>
+    <AssemblyVersion>6.4.2.0</AssemblyVersion>
+    <FileVersion>6.4.2.0</FileVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="SeedData.zip" />
+  </ItemGroup>
+</Project>

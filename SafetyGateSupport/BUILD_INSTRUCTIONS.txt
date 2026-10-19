@@ -1,0 +1,15 @@
+SafetyGateSupport V6.4.1 - build instructions
+
+This package intentionally contains no executable files and no batch/PowerShell scripts.
+
+1. Open Command Prompt or PowerShell in this SafetyGateSupport folder.
+2. Run:
+
+   dotnet publish SafetyGateSupport.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
+
+3. The finished program will be:
+
+   publish\SafetyGateSupport.exe
+
+Recommended distribution:
+Place the published EXE at Q:\SafetyGateSupport\Application\SafetyGateSupport.exe and give users a shortcut to that file, if your company permits running programs from the Q: drive.

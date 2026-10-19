@@ -1,0 +1,48 @@
+name: Build and validate Windows app
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Compile WPF and validate isolated data workflows
+        run: bash scripts/validate.sh
+
+  windows-build:
+    needs: linux-validation
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build Windows desktop app
+        run: dotnet build SafetyGateSupport/SafetyGateSupport.csproj -c Release
+      - name: Run Windows desktop regression checks
+        run: dotnet run --project tests/SafetyGateSupport.WindowsValidation/SafetyGateSupport.WindowsValidation.csproj -c Release
+      - name: Publish self-contained Windows x64 app
+        run: dotnet publish SafetyGateSupport/SafetyGateSupport.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/win-x64
+      - name: Record executable checksum
+        shell: pwsh
+        run: |
+          $artifactHash = (Get-FileHash artifacts/win-x64/SafetyGateSupport.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$artifactHash  SafetyGateSupport.exe" | Set-Content artifacts/win-x64/SafetyGateSupport.exe.sha256 -Encoding ascii
+      - name: Upload downloadable Windows app
+        uses: actions/upload-artifact@v4
+        with:
+          name: SafetyGateSupport-Windows-x64
+          path: artifacts/win-x64/
+          if-no-files-found: error
+          retention-days: 30

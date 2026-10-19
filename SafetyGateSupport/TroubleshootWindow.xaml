@@ -1,0 +1,40 @@
+<Window x:Class="SafetyGateSupport.TroubleshootWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Troubleshoot This System" Height="680" Width="980" MinHeight="560" MinWidth="820"
+ WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+ <Grid Margin="20">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel>
+   <TextBlock Text="Troubleshoot This System" FontSize="25" FontWeight="Bold"/>
+   <TextBlock x:Name="SystemText" Foreground="#555" Margin="0,3,0,14" TextWrapping="Wrap"/>
+  </StackPanel>
+  <Grid Grid.Row="1">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <GroupBox Header="Choose a problem">
+    <ListBox x:Name="FlowList" Margin="6" DisplayMemberPath="Title" SelectionChanged="FlowList_SelectionChanged"/>
+   </GroupBox>
+   <GroupBox Header="Guided troubleshooting" Grid.Column="2">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+     <StackPanel Margin="14">
+      <TextBlock x:Name="StepPromptText" FontSize="21" FontWeight="SemiBold" Text="Select a problem to begin." TextWrapping="Wrap"/>
+      <TextBlock x:Name="StepBodyText" Margin="0,10,0,0" FontSize="14" LineHeight="22" TextWrapping="Wrap" Foreground="#333"/>
+      <StackPanel x:Name="ChoicePanel" Margin="0,14,0,0"/>
+      <TextBlock x:Name="LinkedResourcesTitle" Text="Useful resources" FontWeight="SemiBold" Margin="0,18,0,5" Visibility="Collapsed"/>
+      <WrapPanel x:Name="LinkedResourcesPanel"/>
+      <Border Background="#FFF8E6" BorderBrush="#E1C36A" BorderThickness="1" Padding="10" Margin="0,18,0,0">
+       <TextBlock Text="Do not bypass, jumper, defeat, or force a safety device while troubleshooting. Use the linked documentation and qualified personnel for safety-circuit work." TextWrapping="Wrap"/>
+      </Border>
+     </StackPanel>
+    </ScrollViewer>
+   </GroupBox>
+  </Grid>
+  <Grid Grid.Row="2" Margin="0,14,0,0">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <TextBlock x:Name="StatusText" Foreground="#666" VerticalAlignment="Center"/>
+   <Button x:Name="BackButton" Grid.Column="1" Content="Back" Click="Back_Click" IsEnabled="False"/>
+   <Button Grid.Column="2" Content="Restart" Click="Restart_Click"/>
+   <Button Grid.Column="3" Content="Close" Click="Close_Click" Padding="24,8"/>
+  </Grid>
+ </Grid>
+</Window>
