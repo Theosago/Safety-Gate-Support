@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -8,6 +11,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using SafetyGateSupport.Models;
 using SafetyGateSupport.Services;
+using SafetyGateSupport.Siemens;
+using UsbColumnPort = SiemensUsbCheck.Services.UsbColumnPort;
+using UsbSession = SiemensUsbCheck.Services.UsbCheckSession;
 
 namespace SafetyGateSupport.WindowsValidation;
 
@@ -81,7 +87,13 @@ internal static class Program
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview rapid selection and deselection stay correct", AdminPhotoSelection),
-            ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation)
+            ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
+            ("Siemens USB check window renders with read-only controls and idle connection", SiemensWindowStartup),
+            ("Siemens USB check saves an exact backup using only the two permitted GETs", SiemensBackupSession),
+            ("Siemens USB check reads the backup when firstConfig is false", SiemensFirstConfigFalse),
+            ("Siemens USB check refuses a different model before requesting configuration", SiemensModelMismatch),
+            ("Siemens USB check preserves an HTTP error without retries or reset requests", SiemensHttpFailure),
+            ("A canceled Siemens USB check saves its report without sending requests", SiemensCancellation)
         ];
 
         var passed = 0;
@@ -212,6 +224,139 @@ internal static class Program
         var results = Control<ListBox>(window, "GlobalSearchResults");
         await WaitUntil(() => results.Items.Count > 0, "Searching a seeded asset number returned no results.");
         Require(results.Items.Cast<GlobalSearchResult>().Any(result => result.Kind == "System" && result.Title.Contains(fixture.Gate.AssetNumber, StringComparison.OrdinalIgnoreCase)), "Search omitted the seeded gate/unit.");
+    }
+
+    private static async Task SiemensWindowStartup()
+    {
+        var window = Track(new global::SiemensUsbCheck.MainWindow());
+        Require(!Control<ComboBox>(window, "DeviceCombo").IsEditable, "The USB selector must not accept arbitrary COM ports.");
+        Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "CancelButton").IsEnabled,
+            "The tool must start idle, without opening a column.");
+        Require(Control<TextBox>(window, "ResultText").IsReadOnly, "The report preview must not be an editable command field.");
+        var rendered = false;
+        window.ContentRendered += (_, _) => rendered = true;
+        ShowOffscreen(window);
+        await WaitUntil(() => rendered && Control<Button>(window, "RefreshButton").IsEnabled,
+            "The USB check window did not render and finish passive device discovery.");
+        Require(!Control<Button>(window, "CancelButton").IsEnabled, "Passive discovery unexpectedly started a USB session.");
+        Require(Control<TextBlock>(window, "StatusText").Text.Contains("does not open USB", StringComparison.Ordinal),
+            "The idle tool should explain that detection has not opened USB.");
+        var actions = Descendants<Button>(window).Select(button => button.Name).Order().ToArray();
+        Require(actions.SequenceEqual(new[] { "CancelButton", "ReadButton", "RefreshButton" }),
+            "The diagnostic window exposed an unexpected action.");
+    }
+
+    private static Task SiemensBackupSession() => SiemensBackup(firstConfig: true);
+    private static Task SiemensFirstConfigFalse() => SiemensBackup(firstConfig: false);
+
+    private static Task SiemensBackup(bool firstConfig)
+    {
+        var info = SyntheticColumnInfo(firstConfig: firstConfig);
+        var backup = SyntheticColumnArchive();
+        using var stream = new ColumnScriptStream(
+            (SiemensWire.GetInfoRequest(), info, 200),
+            (SiemensWire.GetConfigRequest(), backup, 200));
+        var reportPath = Path.Combine(NewDirectory(), "usb-report.zip");
+        var result = UsbSession.RunOnStream(stream, TestColumnPort(), reportPath);
+        Require(result.Success, $"The synthetic backup failed: {result.Summary}");
+        Require(stream.Completed, "The session did not consume both expected responses.");
+        Require(stream.SentBytes.SequenceEqual(SiemensWire.GetInfoRequest().Concat(SiemensWire.GetConfigRequest())),
+            "The backup session sent something besides the two exact GET requests.");
+        using var report = ZipFile.OpenRead(reportPath);
+        Require(report.Entries.Select(entry => entry.FullName).Order().SequenceEqual(
+            new[] { "column-backup.signal", "device-info.json", "report.json" }), "The successful report has unexpected files.");
+        Require(ReportBytes(report, "column-backup.signal").SequenceEqual(backup), "The saved configuration differs from the original response bytes.");
+        Require(ReportBytes(report, "device-info.json").SequenceEqual(info), "The saved identity differs from the original response bytes.");
+        using var json = JsonDocument.Parse(ReportBytes(report, "report.json"));
+        var root = json.RootElement;
+        Require(root.GetProperty("success").GetBoolean(), "The report incorrectly marks a successful backup as failed.");
+        Require(root.GetProperty("requests").EnumerateArray().Select(item => item.GetString())
+            .SequenceEqual(new[] { "GET /api/v1/info", "GET /api/v1/config" }), "The report request list differs from the wire exchanges.");
+        Equal(2, root.GetProperty("responses").GetArrayLength(), "Recorded HTTP responses");
+        Require(root.GetProperty("responses").EnumerateArray().All(item => item.GetProperty("StatusCode").GetInt32() == 200),
+            "The report lost a successful response status.");
+        Equal(firstConfig, root.GetProperty("device").GetProperty("FirstConfig").GetBoolean(), "Preserved firstConfig flag");
+        return Task.CompletedTask;
+    }
+
+    private static Task SiemensModelMismatch()
+    {
+        var info = SyntheticColumnInfo(article: "8WD4615-5JH37", variant: 51);
+        using var stream = new ColumnScriptStream((SiemensWire.GetInfoRequest(), info, 200));
+        var reportPath = Path.Combine(NewDirectory(), "usb-model-mismatch.zip");
+        var result = UsbSession.RunOnStream(stream, TestColumnPort(), reportPath);
+        Require(!result.Success, "A different column model was incorrectly accepted.");
+        Require(stream.Completed && stream.SentBytes.SequenceEqual(SiemensWire.GetInfoRequest()),
+            "A mismatched identity must not trigger a configuration request.");
+        using var report = ZipFile.OpenRead(reportPath);
+        Require(report.GetEntry("column-backup.signal") is null && report.GetEntry("config-response.bin") is null,
+            "A mismatched column unexpectedly produced a configuration backup.");
+        Require(ReportBytes(report, "device-info.json").SequenceEqual(info), "The mismatch report lost the device identity.");
+        Require(ReportBytes(report, "received-prefix.bin").Length > 0, "The mismatch report lost the received diagnostic bytes.");
+        using var json = JsonDocument.Parse(ReportBytes(report, "report.json"));
+        Require(!json.RootElement.GetProperty("success").GetBoolean(), "The mismatch report incorrectly indicates success.");
+        Require(json.RootElement.GetProperty("error").GetString()!.Contains("8WD4615-5JH37", StringComparison.Ordinal),
+            "The mismatch report does not identify the incompatible model.");
+        return Task.CompletedTask;
+    }
+
+    private static Task SiemensHttpFailure()
+    {
+        var failure = Encoding.UTF8.GetBytes("{\"error\":\"synthetic column busy\"}");
+        using var stream = new ColumnScriptStream(
+            (SiemensWire.GetInfoRequest(), SyntheticColumnInfo(), 200),
+            (SiemensWire.GetConfigRequest(), failure, 503));
+        var reportPath = Path.Combine(NewDirectory(), "usb-http-error.zip");
+        var result = UsbSession.RunOnStream(stream, TestColumnPort(), reportPath);
+        Require(!result.Success && stream.Completed, "An HTTP error was incorrectly accepted or its response was left unread.");
+        Require(stream.SentBytes.SequenceEqual(SiemensWire.GetInfoRequest().Concat(SiemensWire.GetConfigRequest())),
+            "An HTTP failure triggered an extra request, retry, or reset.");
+        using var report = ZipFile.OpenRead(reportPath);
+        Require(report.GetEntry("column-backup.signal") is null, "An HTTP error response was labeled as a valid configuration backup.");
+        Require(ReportBytes(report, "config-response.bin").SequenceEqual(failure), "The report lost or altered the full HTTP error body.");
+        Require(ReportBytes(report, "received-prefix.bin").Length > 0, "The HTTP failure report lost the raw response prefix.");
+        using var json = JsonDocument.Parse(ReportBytes(report, "report.json"));
+        var responses = json.RootElement.GetProperty("responses");
+        Equal(503, responses[1].GetProperty("StatusCode").GetInt32(), "Preserved HTTP failure status");
+        Require(json.RootElement.GetProperty("error").GetString()!.Contains("503", StringComparison.Ordinal),
+            "The failure report does not explain the HTTP status.");
+        return Task.CompletedTask;
+    }
+
+    private static Task SiemensCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        using var stream = new ColumnScriptStream();
+        var reportPath = Path.Combine(NewDirectory(), "usb-canceled.zip");
+        var result = UsbSession.RunOnStream(stream, TestColumnPort(), reportPath, cancellation.Token);
+        Require(!result.Success && stream.SentBytes.Length == 0, "A canceled check sent a USB request or incorrectly succeeded.");
+        using var report = ZipFile.OpenRead(reportPath);
+        Require(report.Entries.Select(entry => entry.FullName).SequenceEqual(new[] { "report.json" }),
+            "A pre-canceled session should only save the diagnostic summary.");
+        using var json = JsonDocument.Parse(ReportBytes(report, "report.json"));
+        Equal(0, json.RootElement.GetProperty("requests").GetArrayLength(), "Canceled request count");
+        Require(json.RootElement.GetProperty("error").GetString()!.Contains("cancel", StringComparison.OrdinalIgnoreCase),
+            "The diagnostic report does not explain cancellation.");
+        return Task.CompletedTask;
+    }
+
+    private static UsbColumnPort TestColumnPort() => new("COM99", @"USB\VID_303A&PID_80F7\CI-FAKE", "Synthetic column (COM99)");
+
+    private static byte[] SyntheticColumnInfo(string article = "657.101.55", int variant = 21, bool firstConfig = true) =>
+        JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            articleNumber = article, firmwareVersion = "synthetic-test", firstConfig,
+            hardware = new { hardwareVariant = variant, hardwareRevision = 1, mac = "synthetic-device" }
+        });
+
+    private static byte[] ReportBytes(ZipArchive archive, string name)
+    {
+        var entry = archive.GetEntry(name) ?? throw new InvalidOperationException($"Diagnostic report is missing {name}.");
+        using var source = entry.Open();
+        using var bytes = new MemoryStream();
+        source.CopyTo(bytes);
+        return bytes.ToArray();
     }
 
     private static async Task MainWindowPhotoSelection()
@@ -464,6 +609,104 @@ internal static class Program
         if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") != "true") return;
         var message = $"{name}: {exception}".Replace("%", "%25").Replace("\r", "%0D").Replace("\n", "%0A");
         Console.WriteLine($"::error title=Windows validation::{message}");
+    }
+
+    private static byte[] SyntheticColumnArchive()
+    {
+        using var bytes = new MemoryStream();
+        using (var archive = new ZipArchive(bytes, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            WriteJson("configurator.conf", new
+            {
+                version = 5,
+                device = new { Variant = 21, SegmentCount = 9, HasSound = true },
+                mode = 4,
+                stages = Array.Empty<object>(),
+                states = Array.Empty<object>()
+            });
+            for (var state = 0; state < 64; state++)
+                WriteJson($"state_config_{state}.json", new
+                {
+                    Segments = Enumerable.Range(0, 9).Select(segment => new
+                    {
+                        r = state == 7 && segment == 0 ? 255 : 0,
+                        g = 0,
+                        b = 0,
+                        brightness = 255,
+                        lightEffect = 10
+                    }).ToArray(),
+                    Sound = new
+                    {
+                        mode = 0, volume = 0, frequency01 = 0, frequency02 = 0,
+                        frequency03 = 0, repeatCount = 0, repeatPause = 0,
+                        cyclePause = 0, holdTime = 0
+                    }
+                });
+
+            void WriteJson(string name, object value)
+            {
+                using var output = archive.CreateEntry(name).Open();
+                JsonSerializer.Serialize(output, value);
+            }
+        }
+        return bytes.ToArray();
+    }
+
+    // This stream acts as a column and exposes a reply only after receiving the
+    // exact allowed GET. Unexpected requests, writes before replies are consumed,
+    // and retries fail immediately; no USB hardware is accessed by these checks.
+    private sealed class ColumnScriptStream(params (byte[] Request, byte[] Body, int Status)[] exchanges) : Stream
+    {
+        private readonly byte[][] _responses = exchanges.Select(exchange =>
+            Encoding.ASCII.GetBytes($"HTTP/1.0 {exchange.Status} Test\r\nContent-Length: {exchange.Body.Length}\r\n\r\n")
+                .Concat(exchange.Body).ToArray()).ToArray();
+        private readonly List<byte> _sent = [];
+        private int _exchange;
+        private int _requestOffset;
+        private int _responseOffset;
+        private bool _replyAvailable;
+
+        public byte[] SentBytes => _sent.ToArray();
+        public bool Completed => _exchange == exchanges.Length;
+        public override bool CanRead => true;
+        public override bool CanWrite => true;
+        public override bool CanSeek => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                Require(_exchange < exchanges.Length && !_replyAvailable, "The session sent an unexpected request, retry, or command before reading its reply.");
+                byte value = buffer[offset + index];
+                Require(value == exchanges[_exchange].Request[_requestOffset], "The session sent bytes other than the exact permitted read-only request.");
+                _sent.Add(value);
+                if (++_requestOffset == exchanges[_exchange].Request.Length)
+                    _replyAvailable = true;
+            }
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (count == 0) return 0;
+            Require(_replyAvailable && _exchange < _responses.Length, "The session attempted to read without sending the expected GET.");
+            var response = _responses[_exchange];
+            int copied = Math.Min(3, Math.Min(count, response.Length - _responseOffset));
+            response.AsSpan(_responseOffset, copied).CopyTo(buffer.AsSpan(offset, copied));
+            _responseOffset += copied;
+            if (_responseOffset == response.Length)
+            {
+                _exchange++;
+                _requestOffset = _responseOffset = 0;
+                _replyAvailable = false;
+            }
+            return copied;
+        }
+
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
     }
 
     private static void Equal<T>(T expected, T actual, string label) => Require(EqualityComparer<T>.Default.Equals(expected, actual), $"{label}: expected {expected}; got {actual}.");

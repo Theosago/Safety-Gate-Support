@@ -33,6 +33,12 @@ launch actions require their Windows applications and configured executable path
 The storeroom lookup requires the configured plant-network service. Those live
 integrations still need validation in the plant environment.
 
+For the separate Siemens 8WD4613-5JH37 USB investigation, download
+**SiemensUsbCheck-Windows-x64** from a successful workflow run. This diagnostic
+reads identity and a configuration backup on a spare column; it does not upload
+configuration. Follow [its instructions](tools/SiemensUsbCheck/README.md) and see
+[protocol evidence and validation limits](docs/SIEMENS_USB.md).
+
 ## Develop and run on Windows
 
 Install the .NET 10 SDK specified in [global.json](global.json). From the repository
@@ -66,7 +72,8 @@ CLI/NuGet caches also remain outside the checkout. Source `scripts/dotnet-env.sh
 to activate the SDK in a shell. Use the existing checkout; cloud tasks are already
 isolated and do not need another Git worktree.
 
-Validation cross-compiles the actual WPF project and runs **26** data/search
+Validation cross-compiles both WPF projects, runs the Siemens protocol/archive
+checks, and runs **26** data/search
 checks. These cover seed initialization, migrations, repeat initialization,
 assignments, notes, resource archives, photo storage/reselection, backups, audits,
 troubleshooting persistence, cancellation, snapshots, and exact search equivalence

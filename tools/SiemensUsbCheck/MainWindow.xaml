@@ -1,0 +1,69 @@
+<Window x:Class="SiemensUsbCheck.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Siemens 8WD46 USB Check — v0.1.0"
+        Width="800" Height="650" MinWidth="640" MinHeight="550"
+        WindowStartupLocation="CenterScreen" Background="#F5F7FA"
+        FontFamily="Segoe UI" FontSize="14"
+        Loaded="Window_Loaded">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,18">
+            <TextBlock Text="Siemens 8WD46 USB check" FontSize="25" FontWeight="SemiBold" Foreground="#14263D" />
+            <TextBlock Text="Read device information and configuration into a local diagnostic report."
+                       Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#394C60" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Padding="14" Background="White" BorderBrush="#D6DEE8" BorderThickness="1" CornerRadius="6">
+            <StackPanel>
+                <TextBlock Text="Use your spare 8WD4613-5JH37, disconnected from operating equipment."
+                           FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Margin="0,7,0,0" TextWrapping="Wrap"
+                           Text="Close Siemens Configurator first. Connect the column directly using a USB-C data cable. Windows must recognize its serial port." />
+                <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="#88520A"
+                           Text="Opening USB can restart the column. This tool only requests information and configuration; it sends no configuration changes, reset requests, or firmware commands." />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,20,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <Label Target="{Binding ElementName=DeviceCombo}" Padding="0,0,0,6" Content="_USB column" FontWeight="SemiBold" />
+                <ComboBox x:Name="DeviceCombo" IsEditable="False" MinHeight="36" Padding="8,5"
+                          SelectionChanged="DeviceCombo_SelectionChanged" />
+            </StackPanel>
+            <Button x:Name="RefreshButton" Grid.Column="1" Content="_Refresh" Margin="10,0,0,0"
+                    VerticalAlignment="Bottom" Click="RefreshButton_Click" />
+        </Grid>
+
+        <TextBlock x:Name="DetectionText" Grid.Row="3" Margin="0,7,0,0" Foreground="#394C60"
+                   TextWrapping="Wrap" Text="Checking connected devices…" />
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,18,0,14">
+            <Button x:Name="ReadButton" Content="_Read device and save report…" FontWeight="SemiBold"
+                    IsEnabled="False" Click="ReadButton_Click" />
+            <Button x:Name="CancelButton" Content="_Cancel" Margin="10,0,0,0" IsEnabled="False"
+                    Click="CancelButton_Click" />
+        </StackPanel>
+
+        <TextBox x:Name="ResultText" Grid.Row="5" IsReadOnly="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                 Padding="12" BorderBrush="#D6DEE8" Background="White"
+                 Text="Select the connected column, then choose where to save the ZIP report. No device is opened until you click Read and choose a destination." />
+
+        <TextBlock x:Name="StatusText" Grid.Row="6" Margin="0,12,0,0" Foreground="#394C60"
+                   TextWrapping="Wrap" Text="Ready. Device detection does not open USB." />
+    </Grid>
+</Window>

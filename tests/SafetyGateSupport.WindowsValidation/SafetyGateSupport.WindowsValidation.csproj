@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../SafetyGateSupport/SafetyGateSupport.csproj" />
+    <ProjectReference Include="../../tools/SiemensUsbCheck/SiemensUsbCheck.csproj" />
   </ItemGroup>
 </Project>

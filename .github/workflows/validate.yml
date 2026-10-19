@@ -42,15 +42,27 @@ jobs:
           exit $validationExitCode
       - name: Publish self-contained Windows x64 app
         run: dotnet publish SafetyGateSupport/SafetyGateSupport.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/win-x64
+      - name: Publish Siemens USB check tool
+        run: dotnet publish tools/SiemensUsbCheck/SiemensUsbCheck.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/siemens-usb-check
       - name: Record executable checksum
         shell: pwsh
         run: |
           $artifactHash = (Get-FileHash artifacts/win-x64/SafetyGateSupport.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$artifactHash  SafetyGateSupport.exe" | Set-Content artifacts/win-x64/SafetyGateSupport.exe.sha256 -Encoding ascii
+          $usbCheckHash = (Get-FileHash artifacts/siemens-usb-check/SiemensUsbCheck.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$usbCheckHash  SiemensUsbCheck.exe" | Set-Content artifacts/siemens-usb-check/SiemensUsbCheck.exe.sha256 -Encoding ascii
+          Copy-Item tools/SiemensUsbCheck/README.md artifacts/siemens-usb-check/README.md
       - name: Upload downloadable Windows app
         uses: actions/upload-artifact@v4
         with:
           name: SafetyGateSupport-Windows-x64
           path: artifacts/win-x64/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Siemens USB check tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: SiemensUsbCheck-Windows-x64
+          path: artifacts/siemens-usb-check/
           if-no-files-found: error
           retention-days: 30
