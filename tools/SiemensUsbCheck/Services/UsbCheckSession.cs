@@ -77,7 +77,7 @@ public static class UsbCheckSession
                 "The check reached its 60-second limit. A partial diagnostic report was saved.";
             failure = summary;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or
             InvalidOperationException or ArgumentException or NotSupportedException or TimeoutException or JsonException or System.Security.SecurityException)
         {
             failure = $"{error.GetType().Name}: {error.Message}";
