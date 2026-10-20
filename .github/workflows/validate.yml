@@ -55,6 +55,37 @@ jobs:
           "$usbCheckHash  SiemensUsbCheck.exe" | Set-Content artifacts/siemens-usb-check/SiemensUsbCheck.exe.sha256 -Encoding ascii
           Copy-Item tools/SiemensUsbCheck/README.md artifacts/siemens-usb-check/README.md
           Copy-Item docs/WINDOWS_QUICK_START.md artifacts/win-x64/README.md
+      - name: Package and smoke-test home preview
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/home-preview -Force | Out-Null
+          Copy-Item artifacts/win-x64/* artifacts/home-preview/ -Recurse
+          Rename-Item artifacts/home-preview/SafetyGateSupport.exe SafetyGateSupportPreview.exe
+          Remove-Item artifacts/home-preview/SafetyGateSupport.exe.sha256
+          Copy-Item docs/HOME_PREVIEW.md artifacts/home-preview/README.md -Force
+          $previewHash = (Get-FileHash artifacts/home-preview/SafetyGateSupportPreview.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$previewHash  SafetyGateSupportPreview.exe" | Set-Content artifacts/home-preview/SafetyGateSupportPreview.exe.sha256 -Encoding ascii
+          $normalSettings = Join-Path $env:LOCALAPPDATA 'SafetyGateSupport/settings.json'
+          $normalHash = if (Test-Path $normalSettings) { (Get-FileHash $normalSettings).Hash } else { $null }
+          $preview = Start-Process -FilePath (Resolve-Path artifacts/home-preview/SafetyGateSupportPreview.exe) -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(45)
+            $sample = Join-Path $env:LOCALAPPDATA 'SafetyGateSupport/HomePreview/Data/HomePreview/SampleUnit/LightConfig/Current/DEMO ONLY - not for equipment.signal'
+            do {
+              Start-Sleep -Milliseconds 250
+              $preview.Refresh()
+              if ($preview.HasExited) { throw 'Published home preview exited before startup completed.' }
+            } until (($preview.MainWindowTitle -like '*Home Preview*' -and (Test-Path $sample)) -or (Get-Date) -gt $deadline)
+            if ($preview.MainWindowTitle -notlike '*Home Preview*' -or !(Test-Path $sample)) { throw 'Published home preview did not open its local sample profile.' }
+            $afterHash = if (Test-Path $normalSettings) { (Get-FileHash $normalSettings).Hash } else { $null }
+            if ($afterHash -ne $normalHash) { throw 'Home preview modified normal app settings.' }
+            Write-Host 'Published preview executable opened the local profile and sample without changing normal settings.'
+          } finally {
+            if (!$preview.HasExited) {
+              $null = $preview.CloseMainWindow()
+              if (!$preview.WaitForExit(10000)) { $preview.Kill(); $preview.WaitForExit() }
+            }
+          }
       - name: Upload downloadable Windows app
         uses: actions/upload-artifact@v4
         with:
@@ -67,5 +98,12 @@ jobs:
         with:
           name: SiemensUsbCheck-Windows-x64
           path: artifacts/siemens-usb-check/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload home preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: SafetyGateSupport-Home-Preview-Windows-x64
+          path: artifacts/home-preview/
           if-no-files-found: error
           retention-days: 30

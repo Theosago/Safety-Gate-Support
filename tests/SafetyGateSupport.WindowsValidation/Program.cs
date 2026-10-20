@@ -83,6 +83,8 @@ internal static class Program
             ("Missing and corrupt photos return distinct nonfatal results", PhotoFailures),
             ("Pre-canceled photo requests cannot return a photo or a missing-file result", PhotoCancellation),
             ("Main window loads the real inventory after construction and searches it", MainWindowStartup),
+            ("Home preview boots local starter inventory and identifies its isolated profile", HomePreviewStartup),
+            ("Home preview signal window permits previews while keeping USB operations disabled", HomePreviewColumnWindow),
             ("An invalid resource folder cannot discard indexed shared notes", NotesIndexSurvivesInvalidResource),
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
@@ -227,6 +229,33 @@ internal static class Program
         var results = Control<ListBox>(window, "GlobalSearchResults");
         await WaitUntil(() => results.Items.Count > 0, "Searching a seeded asset number returned no results.");
         Require(results.Items.Cast<GlobalSearchResult>().Any(result => result.Kind == "System" && result.Title.Contains(fixture.Gate.AssetNumber, StringComparison.OrdinalIgnoreCase)), "Search omitted the seeded gate/unit.");
+    }
+
+    private static async Task HomePreviewStartup()
+    {
+        var data = HomePreviewService.Create(NewDirectory());
+        Require(!data.IsReady, "Preview data unexpectedly initialized before the window loaded.");
+        var window = Track(new MainWindow(data)); ShowOffscreen(window);
+        await WaitUntil(() => window.IsEnabled && Control<ComboBox>(window, "AreaBox").Items.Count == 4, "Home preview failed to initialize local data.");
+        Require(window.Title.Contains("Home Preview") && Control<TextBlock>(window, "ConnectionText").Text.Contains("HOME PREVIEW"), "Preview profile is not visibly identified.");
+        Require(Control<TextBlock>(window, "HomeSubtitleText").Text.Contains("Asset DEMO"), "Home preview lacks a starting point.");
+        Require(!Control<Button>(window, "SetupButton").IsVisible, "Preview still requires shared-drive setup.");
+        Require(data.LoadSystems().Any(u => u.Id == "home-preview-unit"), "Demo unit missing after actual window startup.");
+    }
+
+    private static async Task HomePreviewColumnWindow()
+    {
+        string path = Path.Combine(NewDirectory(), "DEMO ONLY.signal"); File.WriteAllBytes(path, HomePreviewService.SampleConfiguration());
+        var window = Track(new global::SiemensUsbCheck.MainWindow("Asset DEMO / Unit 1", new[] { path }, previewOnly: true));
+        ShowOffscreen(window); await DispatcherSettled();
+        Require(!Control<Button>(window, "RefreshButton").IsEnabled, "Preview attempted device discovery.");
+        Control<ComboBox>(window, "AssignedFilesCombo").SelectedIndex = 0;
+        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(path), "Preview sample did not load.");
+        Control<ComboBox>(window, "StateCombo").SelectedIndex = 2;
+        Require(Control<TextBox>(window, "PreviewText").Text.Contains("RGB 255, 180, 0"), "Preview sample's amber state did not render.");
+        Control<ComboBox>(window, "DeviceCombo").ItemsSource = new[] { TestColumnPort() };
+        Control<ComboBox>(window, "DeviceCombo").SelectedIndex = 0;
+        Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "UploadButton").IsEnabled && !Control<ComboBox>(window, "DeviceCombo").IsEnabled, "Home preview enabled USB operations after file/port selection.");
     }
 
     private static async Task IntegratedColumnWindow()

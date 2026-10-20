@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console, version **6.5.0**, based on the supplied
+Windows WPF support console, version **6.5.1**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,
@@ -8,6 +8,10 @@ drawings/configuration resources, manuals, parts, global search, and guided
 troubleshooting. Version 6.5.0 integrates Siemens USB backup, configuration comparison and upload, adds expected-output previews and documented troubleshooting, and imports local support libraries. Startup, photo loading and search retain the earlier performance improvements.
 
 See the [Windows quick start](docs/WINDOWS_QUICK_START.md) for upgrading, importing the supplied files, and checking a signal column.
+
+## Preview at home without Q
+
+Download **SafetyGateSupport-Home-Preview-Windows-x64** from a successful workflow run, extract the whole ZIP, and open **SafetyGateSupportPreview.exe**. It automatically creates an isolated local profile with starter inventory/photos and a clearly labeled sample light configuration. USB operations are disabled. See the [home preview guide](docs/HOME_PREVIEW.md).
 
 ## Get the Windows app
 

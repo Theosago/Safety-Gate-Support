@@ -18,6 +18,7 @@ public class DataService
     private readonly string _localSettingsPath;
     private AppSettings _settings;
 
+    public bool IsHomePreview { get; init; }
     public string SharedRoot => _settings.SharedRoot;
     public string SystemsFile => Path.Combine(SharedRoot, "Data", "systems.json"); // unit records
     public string GatesFile => Path.Combine(SharedRoot, "Data", "gates.json");

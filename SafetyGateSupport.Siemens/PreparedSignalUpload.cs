@@ -11,6 +11,7 @@ public sealed class PreparedSignalUpload
     // schema-5 configurations are under 20 KiB; bound transfer time and memory.
     public const int MaxUploadBytes = 1024 * 1024;
     private readonly byte[] _bytes;
+    public bool IsPreviewOnly { get; }
     public string FileName { get; }
     public string Sha256 { get; }
     public SignalArchiveInfo Archive { get; }
@@ -23,6 +24,10 @@ public sealed class PreparedSignalUpload
         Archive = SignalArchive.Inspect(_bytes);
         if (Archive.HardwareVariant != 21 || Archive.SegmentCount != 9 || !Archive.HasSound)
             throw new NotSupportedException("Choose a nine-segment, sound-capable variant-21 configuration for 8WD4613-5JH37.");
+        using (var zip = new ZipArchive(new MemoryStream(_bytes, false), ZipArchiveMode.Read))
+        using (var entry = zip.GetEntry("configurator.conf")!.Open())
+        using (var metadata = JsonDocument.Parse(entry))
+            IsPreviewOnly = metadata.RootElement.TryGetProperty("previewOnly", out var marker) && marker.ValueKind == JsonValueKind.True;
         FileName = Path.GetFileName(fileName);
         Sha256 = Convert.ToHexStringLower(SHA256.HashData(_bytes));
     }

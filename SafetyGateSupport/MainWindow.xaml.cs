@@ -46,12 +46,14 @@ public partial class MainWindow : Window
     private bool _isClosed;
     private int _dataGeneration;
 
-    public MainWindow() : this(new DataService(initializeSharedDefaults: false)) { }
+    public MainWindow() : this(HomePreviewService.IsRequested(Environment.GetCommandLineArgs(), Environment.ProcessPath)
+        ? HomePreviewService.Create() : new DataService(initializeSharedDefaults: false)) { }
 
     public MainWindow(DataService data)
     {
         InitializeComponent();
         _data = data;
+        if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
         _notesRefreshTimer.Tick += NotesRefreshTimer_Tick;
         _searchDebounceTimer.Tick += (_, _) => { _searchDebounceTimer.Stop(); RunGlobalSearch(); };
@@ -96,6 +98,7 @@ public partial class MainWindow : Window
             // Network-drive probes, migrations and JSON reads must not hold up the WPF dispatcher.
             var snapshot = await Task.Run(() =>
             {
+                if (_data.IsHomePreview) HomePreviewService.Initialize(_data);
                 if (!_data.IsReady) return null;
                 _data.EnsureSharedDefaults();
                 var gates = _data.LoadGates();
@@ -147,7 +150,7 @@ public partial class MainWindow : Window
     {
         if (_sharedDataReady)
         {
-            ConnectionText.Text = "● Connected\n" + _data.SharedRoot;
+            ConnectionText.Text = (_data.IsHomePreview ? "● HOME PREVIEW • local data\n" : "● Connected\n") + _data.SharedRoot;
             ConnectionText.Foreground = System.Windows.Media.Brushes.ForestGreen;
             SetupButton.Visibility = Visibility.Collapsed;
         }

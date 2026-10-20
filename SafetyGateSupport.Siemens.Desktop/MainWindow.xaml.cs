@@ -14,15 +14,17 @@ public partial class MainWindow : Window
     private bool _closeWhenFinished;
     private PreparedSignalUpload? _selectedUpload;
 
+    private readonly bool _previewOnly;
     private readonly string _context;
     private string _comparison = "Stored configuration has not been checked against the selected file.";
     private sealed record AssignedFile(string Path, string Label);
 
     public MainWindow() : this("", Array.Empty<string>()) { }
-    public MainWindow(string context, IEnumerable<string> assignedFiles)
+    public MainWindow(string context, IEnumerable<string> assignedFiles, bool previewOnly = false)
     {
         InitializeComponent();
         _context = context;
+        _previewOnly = previewOnly;
         if (context.Length > 0)
         {
             Title = "Safety Gate Support — Signal column";
@@ -54,7 +56,7 @@ public partial class MainWindow : Window
             _selectedUpload = await Task.Run(() => PreparedSignalUpload.Load(path));
             SelectedSignalText.Text = $"{_selectedUpload.FileName} • {_selectedUpload.Archive.ActiveStates.Count} active states\n{path}";
             ResultText.Text = _comparison + "\nConfirm this file's asset/unit assignment before upload.";
-            StatusText.Text = "File checked. Read the column to compare; upload saves a backup before writing.";
+            StatusText.Text = _previewOnly || _selectedUpload.IsPreviewOnly ? "Preview only: explore the expected output below. This sample cannot be uploaded." : "File checked. Read the column to compare; upload saves a backup before writing.";
         }
         catch (Exception error)
         {
@@ -84,6 +86,15 @@ public partial class MainWindow : Window
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         MaxHeight = SystemParameters.WorkArea.Height;
+        if (_previewOnly)
+        {
+            Title = "Safety Gate Support — Home Preview • Signal column";
+            DetectionText.Text = "Home preview: device discovery, USB reads, and uploads are disabled. Explore a selected file and expected output below.";
+            ResultText.Text = "Preview only. Choose the assigned DEMO ONLY file, then expand Expected output and select state 1 (red), 2 (amber), 4 (green), or 8 (sound). No hardware is required.";
+            StatusText.Text = "Local preview • no USB access • illustrative configuration only";
+            UpdateControls();
+            return;
+        }
         await RefreshDevicesAsync();
     }
 
@@ -91,7 +102,7 @@ public partial class MainWindow : Window
 
     private async Task RefreshDevicesAsync()
     {
-        if (_isRefreshing || _operationCancellation is not null)
+        if (_previewOnly || _isRefreshing || _operationCancellation is not null)
             return;
 
         var previous = DeviceCombo.SelectedItem as UsbColumnPort;
@@ -143,7 +154,7 @@ public partial class MainWindow : Window
 
     private async void ReadButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_isRefreshing || _operationCancellation is not null || DeviceCombo.SelectedItem is not UsbColumnPort port)
+        if (_previewOnly || _isRefreshing || _operationCancellation is not null || DeviceCombo.SelectedItem is not UsbColumnPort port)
             return;
 
         var destination = new SaveFileDialog
@@ -230,7 +241,7 @@ public partial class MainWindow : Window
 
     private async void UploadButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_isRefreshing || _operationCancellation is not null || _selectedUpload is not { } selected ||
+        if (_previewOnly || _isRefreshing || _operationCancellation is not null || _selectedUpload is not { } selected ||
             DeviceCombo.SelectedItem is not UsbColumnPort port) return;
         string reportPath;
         try
@@ -308,14 +319,14 @@ public partial class MainWindow : Window
     private void UpdateControls()
     {
         bool running = _operationCancellation is not null;
-        DeviceCombo.IsEnabled = !running && !_isRefreshing;
+        DeviceCombo.IsEnabled = !_previewOnly && !running && !_isRefreshing;
         if (AssignedFilesCombo is not null) AssignedFilesCombo.IsEnabled = !running && !_isRefreshing;
         if (ObservationCombo is not null) ObservationCombo.IsEnabled = !running && !_isRefreshing && _selectedUpload is not null;
-        RefreshButton.IsEnabled = !running && !_isRefreshing;
-        ReadButton.IsEnabled = !running && !_isRefreshing && DeviceCombo.SelectedItem is UsbColumnPort;
+        RefreshButton.IsEnabled = !_previewOnly && !running && !_isRefreshing;
+        ReadButton.IsEnabled = !_previewOnly && !running && !_isRefreshing && DeviceCombo.SelectedItem is UsbColumnPort;
         CancelButton.IsEnabled = running && !_operationCancellation!.IsCancellationRequested;
         if (BrowseButton is not null) BrowseButton.IsEnabled = !running && !_isRefreshing;
-        if (UploadButton is not null) UploadButton.IsEnabled = !running && !_isRefreshing &&
-            DeviceCombo.SelectedItem is UsbColumnPort && _selectedUpload is not null;
+        if (UploadButton is not null) UploadButton.IsEnabled = !_previewOnly && !running && !_isRefreshing &&
+            DeviceCombo.SelectedItem is UsbColumnPort && _selectedUpload is { IsPreviewOnly: false };
     }
 }

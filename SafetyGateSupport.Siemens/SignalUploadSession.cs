@@ -21,6 +21,7 @@ public static class SignalUploadSession
         Action<string>? progress = null, Action<TimeSpan, CancellationToken>? delay = null)
     {
         ArgumentNullException.ThrowIfNull(selected);
+        if (selected.IsPreviewOnly) throw new InvalidDataException("The sample configuration is marked preview-only and cannot be uploaded to equipment.");
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(connect);
         progress ??= _ => { };

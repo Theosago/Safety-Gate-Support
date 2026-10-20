@@ -18,7 +18,7 @@ public static class SignalColumnService
             var paths = await Task.Run(() => assigned.Select(r => data.ResourceCurrentFolder(r, gate)).Distinct(StringComparer.OrdinalIgnoreCase)
                 .Where(Directory.Exists).SelectMany(f => Directory.EnumerateFiles(f, "*", SearchOption.TopDirectoryOnly))
                 .Where(p => Path.GetExtension(p).Equals(".signal", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToArray());
-            new SiemensUsbCheck.MainWindow($"{gate.Display} / {unit.UnitDisplay}", paths) { Owner = owner, WindowStartupLocation = WindowStartupLocation.CenterOwner }.ShowDialog();
+            new SiemensUsbCheck.MainWindow($"{gate.Display} / {unit.UnitDisplay}", paths, previewOnly: data.IsHomePreview) { Owner = owner, WindowStartupLocation = WindowStartupLocation.CenterOwner }.ShowDialog();
         }
         catch (Exception error) { MessageBox.Show(owner, error.Message, "Unable to open signal column tools", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }

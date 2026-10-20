@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../SafetyGateSupport/Models/*.cs" Link="Models/%(Filename)%(Extension)" />
+    <Compile Include="../../SafetyGateSupport/Services/HomePreviewService.cs" Link="Services/HomePreviewService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/GuidedTroubleshooting.cs" Link="Services/GuidedTroubleshooting.cs" />
     <Compile Include="../../SafetyGateSupport/Services/SupportLibraryService.cs" Link="Services/SupportLibraryService.cs" />
     <ProjectReference Include="../../SafetyGateSupport.Siemens/SafetyGateSupport.Siemens.csproj" />
