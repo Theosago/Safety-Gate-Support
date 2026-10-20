@@ -14,9 +14,78 @@ public partial class MainWindow : Window
     private bool _closeWhenFinished;
     private PreparedSignalUpload? _selectedUpload;
 
-    public MainWindow() => InitializeComponent();
+    private readonly string _context;
+    private string _comparison = "Stored configuration has not been checked against the selected file.";
+    private sealed record AssignedFile(string Path, string Label);
 
-    private async void Window_Loaded(object sender, RoutedEventArgs e) => await RefreshDevicesAsync();
+    public MainWindow() : this("", Array.Empty<string>()) { }
+    public MainWindow(string context, IEnumerable<string> assignedFiles)
+    {
+        InitializeComponent();
+        _context = context;
+        if (context.Length > 0)
+        {
+            Title = "Safety Gate Support — Signal column";
+            ContextText.Text = context + " • confirm the connected column belongs to this unit";
+            ContextText.Visibility = Visibility.Visible;
+            AssignedFilesCombo.ItemsSource = assignedFiles.Select(p => new AssignedFile(p, System.IO.Path.GetFileName(p))).ToList();
+            AssignedFilesCombo.Visibility = Visibility.Visible;
+            AssignedFilesCombo.Text = "Select this unit's approved configuration";
+            SelectedSignalText.Text = "Select an assigned file above, or browse for an approved .signal file. No file is selected automatically.";
+        }
+        StateCombo.ItemsSource = Enumerable.Range(0, 64).Select(n => $"State {n} — inputs: {string.Join(", ", Enumerable.Range(1, 6).Where(i => (n & (1 << (i - 1))) != 0))}");
+        StateCombo.SelectedIndex = 0;
+    }
+
+    private async void AssignedFiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (AssignedFilesCombo.SelectedItem is AssignedFile file) await SelectFileAsync(file.Path);
+    }
+
+    private async Task SelectFileAsync(string path)
+    {
+        if (_isRefreshing || _operationCancellation is not null) return;
+        _selectedUpload = null;
+        ResetObservation();
+        _comparison = "Stored configuration has not been checked against the selected file.";
+        try
+        {
+            _isRefreshing = true; UpdateControls();
+            _selectedUpload = await Task.Run(() => PreparedSignalUpload.Load(path));
+            SelectedSignalText.Text = $"{_selectedUpload.FileName} • {_selectedUpload.Archive.ActiveStates.Count} active states\n{path}";
+            ResultText.Text = _comparison + "\nConfirm this file's asset/unit assignment before upload.";
+            StatusText.Text = "File checked. Read the column to compare; upload saves a backup before writing.";
+        }
+        catch (Exception error)
+        {
+            SelectedSignalText.Text = "No valid configuration selected.";
+            ResultText.Text = error.Message;
+        }
+        finally { _isRefreshing = false; UpdateControls(); UpdatePreview(); }
+    }
+
+    private void StateCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) { UpdatePreview(); ResetObservation(); }
+    private void UpdatePreview()
+    {
+        if (PreviewText is not null) PreviewText.Text = _selectedUpload is null ? "Choose a configuration to view expected outputs." : SignalStatePreview.Describe(_selectedUpload, Math.Max(0, StateCombo.SelectedIndex));
+    }
+    private void ResetObservation() { if (ObservationCombo is not null) ObservationCombo.SelectedIndex = 0; if (ObservationText is not null) ObservationText.Text = "Physical function is unverified. Check all applicable states using the approved site test procedure."; }
+    private void Observation_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ObservationText is null) return;
+        ObservationText.Text = ObservationCombo.SelectedIndex switch
+        {
+            1 when _selectedUpload is not null => "You recorded a match for this input state only. " + _comparison + " Check the remaining applicable states before returning the equipment to service.",
+            2 when _selectedUpload is not null => "Physical mismatch recorded. Review supply, wiring, actual input signals, and the assigned configuration using the drawings. USB matching alone does not establish function.",
+            _ => "Physical function is unverified. Choose a file and inspect the real light and sound before recording an observation."
+        };
+    }
+
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        MaxHeight = SystemParameters.WorkArea.Height;
+        await RefreshDevicesAsync();
+    }
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await RefreshDevicesAsync();
 
@@ -64,7 +133,12 @@ public partial class MainWindow : Window
     {
         // SelectionChanged can fire while InitializeComponent is still running.
         if (ReadButton is not null)
+        {
+            _comparison = "Stored configuration has not been checked for this USB selection.";
+            ResetObservation();
+            if (ResultText is not null) ResultText.Text = _comparison + "\nRead the selected column to compare. Detection does not open USB.";
             UpdateControls();
+        }
     }
 
     private async void ReadButton_Click(object sender, RoutedEventArgs e)
@@ -95,6 +169,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        ResetObservation();
+        _comparison = "Stored configuration has not been verified in this session.";
         using var cancellation = new CancellationTokenSource();
         _operationCancellation = cancellation;
         UpdateControls();
@@ -106,7 +182,11 @@ public partial class MainWindow : Window
         {
             var result = await Task.Run(() => UsbCheckSession.Run(
                 port, destination.FileName, cancellation.Token, ((IProgress<string>)progress).Report));
-            ResultText.Text = $"{result.Summary}\n\nReport:\n{destination.FileName}";
+            if (result.Success && result.Configuration is not null && _selectedUpload is not null)
+                _comparison = SignalConfiguration.Equivalent(result.Configuration, _selectedUpload.GetBytes())
+                    ? "MATCH: stored settings match the selected file. Physical operation is unverified."
+                    : "DIFFERENT: stored settings differ from the selected file. Confirm the file assignment before changing the column.";
+            ResultText.Text = $"{result.Summary}\n\n{_comparison}\n\nReport:\n{destination.FileName}";
             StatusText.Text = result.Success ? "USB read completed. Report saved." : "USB check finished. Review the report for details.";
         }
         catch (OperationCanceledException)
@@ -135,12 +215,8 @@ public partial class MainWindow : Window
         {
             var source = new OpenFileDialog { Title = "Choose a column configuration", Filter = "Siemens configuration (*.signal)|*.signal", CheckFileExists = true };
             if (source.ShowDialog(this) != true) return;
-            _isRefreshing = true;
-            UpdateControls();
-            StatusText.Text = "Checking the selected configuration…";
-            _selectedUpload = await Task.Run(() => PreparedSignalUpload.Load(source.FileName));
-            SelectedSignalText.Text = $"{_selectedUpload.FileName}\n9 segments with sound; {_selectedUpload.Archive.ActiveStates.Count} active states. Ready for the selected spare column.";
-            StatusText.Text = "File checked. Upload will save the original settings before writing.";
+            AssignedFilesCombo.SelectedIndex = -1;
+            await SelectFileAsync(source.FileName);
         }
         catch (Exception error)
         {
@@ -172,11 +248,13 @@ public partial class MainWindow : Window
             if (System.IO.File.Exists(reportPath) || System.IO.File.Exists(System.IO.Path.ChangeExtension(reportPath, ".before.signal")))
                 throw new System.IO.IOException("Choose a new filename so existing reports and backups are preserved.");
             if (MessageBox.Show(this,
-                $"Replace the settings on {port.DisplayName} with '{selected.FileName}'?\n\nUse only your spare column, disconnected from operating equipment.\n\nThe tool will save the current configuration first, upload the selected file, request a restart, and verify the stored settings.\n\nContinue?",
+                $"Replace the settings on {port.DisplayName} with '{selected.FileName}'?\n{_context}\n\nIsolate equipment for servicing. Confirm this is the intended column and approved file.\n\nThe tool will save the current configuration first, upload the selected file, request a restart, and verify the stored settings.\n\nContinue?",
                 "Upload column configuration", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         }
         catch (Exception error) { ResultText.Text = error.Message; StatusText.Text = "No upload was started."; return; }
 
+        ResetObservation();
+        _comparison = "Stored configuration has not been verified in this session.";
         using var cancellation = new CancellationTokenSource();
         _operationCancellation = cancellation;
         UpdateControls();
@@ -186,6 +264,7 @@ public partial class MainWindow : Window
         {
             var result = await Task.Run(() => UsbUploadSession.Run(port, selected, reportPath,
                 cancellation.Token, ((IProgress<string>)progress).Report));
+            _comparison = result.Success ? "MATCH: selected settings were verified. Physical operation is unverified." : "Stored configuration is not fully verified; review the upload report.";
             ResultText.Text = $"{result.Summary}\n\nOriginal backup:\n{(result.BackupPath.Length == 0 ? "Not created; no upload was sent." : result.BackupPath)}\n\nReport:\n{result.ReportPath}";
             StatusText.Text = result.Success ? "Settings verified. Keep the backup and check the spare column's behavior." :
                 result.ReadbackVerified ? "Stored settings matched, but the session did not finish cleanly. Keep the backup and report." :
@@ -230,6 +309,8 @@ public partial class MainWindow : Window
     {
         bool running = _operationCancellation is not null;
         DeviceCombo.IsEnabled = !running && !_isRefreshing;
+        if (AssignedFilesCombo is not null) AssignedFilesCombo.IsEnabled = !running && !_isRefreshing;
+        if (ObservationCombo is not null) ObservationCombo.IsEnabled = !running && !_isRefreshing && _selectedUpload is not null;
         RefreshButton.IsEnabled = !running && !_isRefreshing;
         ReadButton.IsEnabled = !running && !_isRefreshing && DeviceCombo.SelectedItem is UsbColumnPort;
         CancelButton.IsEnabled = running && !_operationCancellation!.IsCancellationRequested;

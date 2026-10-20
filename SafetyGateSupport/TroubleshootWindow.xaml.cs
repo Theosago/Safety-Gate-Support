@@ -62,7 +62,19 @@ public partial class TroubleshootWindow : Window
             ChoicePanel.Children.Add(new TextBlock { Text = "End of this troubleshooting path.", Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(4, 8, 4, 0) });
         }
 
-        foreach (var id in node.ResourceIds)
+        if (node.Action == "SignalColumn")
+        {
+            var tool = new Button { Content = "Check / configure signal column…", MinHeight = 42 };
+            tool.Click += async (_, _) => await SignalColumnService.OpenAsync(this, _data, _gate, _unit, _resources);
+            ChoicePanel.Children.Add(tool);
+        }
+        if (node.Action == "Library")
+        {
+            var library = new Button { Content = "Open support library…", MinHeight = 42 };
+            library.Click += (_, _) => new SupportLibraryWindow(_data, _gate, _unit) { Owner = this }.ShowDialog();
+            ChoicePanel.Children.Add(library);
+        }
+        foreach (var id in node.ResourceIds.Concat(_resources.Where(r => r.IsVisible && r.GateId == _gate.Id && r.AppliesTo(_unit.Id)).Select(r => r.Id)).Distinct())
         {
             var resource = _resources.FirstOrDefault(r => r.Id == id && r.IsVisible && r.GateId == _gate.Id && r.AppliesTo(_unit.Id));
             if (resource is null) continue;

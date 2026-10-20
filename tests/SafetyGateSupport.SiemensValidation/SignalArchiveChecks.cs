@@ -13,6 +13,7 @@ internal static class SignalArchiveChecks
     [
         ("signal: schema-5 summary and active states", ValidSummary),
         ("signal: preserves caller's archive bytes", PreservesBytes),
+        ("signal: preview maps the six input bits without altering configuration", StatePreview),
         ("signal: all four known hardware variants", KnownHardware),
         ("signal: deflated ZIP is supported", DeflatedArchive),
         ("signal: unknown editor metadata is ignored", UnknownEditorMetadata),
@@ -55,6 +56,22 @@ internal static class SignalArchiveChecks
         Check(result.SchemaVersion == 5 && result.HardwareVariant == 21 && result.SegmentCount == 9
             && result.HasSound && result.StateCount == 64, "Incorrect archive summary.");
         Check(result.ActiveStates.SequenceEqual([7, 11]), "Expected a visible state and an audible-only state.");
+    }
+
+    private static void StatePreview()
+    {
+        byte[] bytes = Archive(); var prepared = PreparedSignalUpload.FromBytes(bytes, "expected.signal");
+        for (int state = 0; state < 64; state++)
+        {
+            string preview = SignalStatePreview.Describe(prepared, state);
+            string inputs = string.Join(", ", Enumerable.Range(1, 6).Where(n => (state & (1 << (n - 1))) != 0));
+            Check(preview.Contains($"State {state}: active inputs {inputs} (none if blank)."), "Input-mask preview mismatch.");
+            Check(preview.Contains("never") || preview.Contains("does not"), "Preview omitted its physical-verification limitation.");
+        }
+        Check(SignalStatePreview.Describe(prepared, 7).Contains("RGB 255, 0, 0"), "Expected segment color missing.");
+        Check(SignalStatePreview.Describe(prepared, 11).Contains("mode 1, volume 5"), "Expected sound missing.");
+        Check(prepared.GetBytes().SequenceEqual(bytes), "Preview modified the prepared configuration.");
+        Throws<ArgumentOutOfRangeException>(() => SignalStatePreview.Describe(prepared, 64));
     }
 
     private static void PreservesBytes()

@@ -88,6 +88,9 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview rapid selection and deselection stay correct", AdminPhotoSelection),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
+            ("Integrated column tool requires explicit assigned file selection and keeps observation state accurate", IntegratedColumnWindow),
+            ("Unit light resource exposes the built-in USB action", IntegratedLightResource),
+            ("Support library loads imported documentation on demand and filters filenames", SupportLibraryWindowStartup),
             ("Siemens USB check window renders with read-only controls and idle connection", SiemensWindowStartup),
             ("Siemens USB check saves an exact backup using only the two permitted GETs", SiemensBackupSession),
             ("Siemens USB check reads the backup after numeric/chunked identity with firstConfig false", SiemensFirstConfigFalse),
@@ -226,6 +229,54 @@ internal static class Program
         Require(results.Items.Cast<GlobalSearchResult>().Any(result => result.Kind == "System" && result.Title.Contains(fixture.Gate.AssetNumber, StringComparison.OrdinalIgnoreCase)), "Search omitted the seeded gate/unit.");
     }
 
+    private static async Task IntegratedColumnWindow()
+    {
+        var root = NewDirectory();
+        string first = Path.Combine(root, "Unit 1.signal"), second = Path.Combine(root, "Unit 2.signal");
+        File.WriteAllBytes(first, SyntheticColumnArchive()); File.Copy(first, second);
+        var window = Track(new global::SiemensUsbCheck.MainWindow("Asset validation / Unit 2", new[] { first, second }));
+        ShowOffscreen(window);
+        await WaitUntil(() => Control<Button>(window, "RefreshButton").IsEnabled, "Integrated column detection did not settle.");
+        Require(Control<TextBlock>(window, "ContextText").Text.Contains("Unit 2"), "Unit identity missing from tool.");
+        var assigned = Control<ComboBox>(window, "AssignedFilesCombo");
+        Require(assigned.Items.Count == 2 && assigned.SelectedIndex == -1, "Assigned configuration was selected automatically.");
+        Require(!Control<Button>(window, "UploadButton").IsEnabled, "Upload enabled before an explicit file choice.");
+        assigned.SelectedIndex = 1;
+        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(second), "Explicit unit configuration did not load.");
+        Require(Control<TextBox>(window, "ResultText").Text.Contains("not been checked"), "File choice incorrectly reported a device configuration match.");
+        Control<ComboBox>(window, "StateCombo").SelectedIndex = 7;
+        Require(Control<TextBox>(window, "PreviewText").Text.Contains("RGB 255, 0, 0"), "Expected output did not use the selected state's stored values.");
+        Control<ComboBox>(window, "ObservationCombo").SelectedIndex = 1;
+        Require(Control<TextBlock>(window, "ObservationText").Text.Contains("this input state only"), "Observation implied complete functional validation.");
+        Control<ComboBox>(window, "StateCombo").SelectedIndex = 0;
+        Equal(0, Control<ComboBox>(window, "ObservationCombo").SelectedIndex, "Changing the state must clear an obsolete observation");
+        Require(!Control<Button>(window, "UploadButton").IsEnabled, "A valid file alone enabled upload without a port.");
+    }
+
+    private static Task IntegratedLightResource()
+    {
+        var fixture = NewFixture();
+        var resource = fixture.Data.ResourcesFor(fixture.Gate, fixture.BlueUnit).First(SignalColumnService.IsLightResource);
+        var window = Track(new ResourceWindow(fixture.Data, fixture.Gate, fixture.BlueUnit, resource));
+        Require(Control<Button>(window, "SignalColumnButton").Visibility == Visibility.Visible, "Unit light resource has no integrated USB action.");
+        return Task.CompletedTask;
+    }
+
+    private static async Task SupportLibraryWindowStartup()
+    {
+        var fixture = NewFixture();
+        string manual = Path.Combine(NewDirectory(), "scanner-manual.pdf"); File.WriteAllText(manual, "not opened by this test");
+        await Task.Run(() => SupportLibraryService.Import(SupportLibraryService.Root(fixture.Data), manual));
+        var window = Track(new SupportLibraryWindow(fixture.Data, fixture.Gate, fixture.BlueUnit));
+        ShowOffscreen(window);
+        await WaitUntil(() => Descendants<ListBox>(window).Any(l => l.Items.Count == 1), "Imported manual did not appear in library.");
+        var list = Descendants<ListBox>(window).Single();
+        var search = Descendants<TextBox>(window).Single(); search.Text = "unmatched filename";
+        Equal(0, list.Items.Count, "Library filename filter");
+        search.Text = "scanner"; Equal(1, list.Items.Count, "Library matching filename filter");
+        Require(Descendants<ComboBox>(window).Single().SelectedItem is SafetySystem unit && unit.Id == fixture.BlueUnit.Id, "Library lost the selected unit context.");
+    }
+
     private static async Task SiemensWindowStartup()
     {
         var window = Track(new global::SiemensUsbCheck.MainWindow());
@@ -233,7 +284,7 @@ internal static class Program
         Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "CancelButton").IsEnabled,
             "The tool must start idle, without opening a column.");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Upload must require a selected device and validated file.");
-        Require(window.Title.Contains("v0.2.1", StringComparison.Ordinal), "The upload tool version was not updated.");
+        Require(window.Title.Contains("v0.3.0", StringComparison.Ordinal), "The upload tool version was not updated.");
         Require(Control<TextBox>(window, "ResultText").IsReadOnly, "The report preview must not be an editable command field.");
         var rendered = false;
         window.ContentRendered += (_, _) => rendered = true;

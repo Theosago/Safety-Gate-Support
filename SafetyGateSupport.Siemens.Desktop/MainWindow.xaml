@@ -1,11 +1,12 @@
 <Window x:Class="SiemensUsbCheck.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Siemens 8WD46 USB Configuration — v0.2.1"
-        Width="860" Height="800" MinWidth="720" MinHeight="650"
+        Title="Siemens 8WD46 USB Configuration — v0.3.0"
+        Width="940" Height="850" MinWidth="720" MinHeight="650"
         WindowStartupLocation="CenterScreen" Background="#F5F7FA"
         FontFamily="Segoe UI" FontSize="14"
         Loaded="Window_Loaded">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -18,6 +19,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,18">
+            <TextBlock x:Name="ContextText" TextWrapping="Wrap" FontWeight="Bold" Margin="0,0,0,8" Visibility="Collapsed"/>
             <TextBlock Text="Siemens 8WD46 USB configuration" FontSize="25" FontWeight="SemiBold" Foreground="#14263D" />
             <TextBlock Text="Back up or upload a .signal file without Siemens Configurator."
                        Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#394C60" />
@@ -25,12 +27,12 @@
 
         <Border Grid.Row="1" Padding="14" Background="White" BorderBrush="#D6DEE8" BorderThickness="1" CornerRadius="6">
             <StackPanel>
-                <TextBlock Text="Use your spare 8WD4613-5JH37, disconnected from operating equipment."
+                <TextBlock Text="8WD4613-5JH37 • isolate the equipment for servicing before USB connection."
                            FontWeight="SemiBold" TextWrapping="Wrap" />
                 <TextBlock Margin="0,7,0,0" TextWrapping="Wrap"
                            Text="Close Siemens Configurator first. Connect the column directly using a USB-C data cable. Windows must recognize its serial port." />
                 <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="#88520A"
-                           Text="Opening USB can restart the column. Upload replaces its settings and requests a restart. This first upload version is for spare-column testing; it saves a backup and verifies the stored settings." />
+                           Text="Opening USB can restart the column. Upload replaces its settings and requests a restart. A backup is saved before uploading, and stored settings are checked after restart. Physical operation must be checked separately." />
             </StackPanel>
         </Border>
 
@@ -52,6 +54,7 @@
                    TextWrapping="Wrap" Text="Checking connected devices…" />
 
         <StackPanel Grid.Row="4" Margin="0,16,0,14">
+            <ComboBox x:Name="AssignedFilesCombo" DisplayMemberPath="Label" SelectionChanged="AssignedFiles_SelectionChanged" MinHeight="32" Margin="0,0,0,8" Visibility="Collapsed" ToolTip="Explicitly select the approved file for this asset and unit. Multiple files require review."/>
             <DockPanel>
                 <Button x:Name="BrowseButton" Content="Choose .signal file…" DockPanel.Dock="Left"
                         Click="BrowseButton_Click" Margin="0,0,12,0" />
@@ -64,9 +67,22 @@
                         IsEnabled="False" Click="UploadButton_Click" />
                 <Button x:Name="CancelButton" Content="_Cancel" Margin="10,0,0,0" IsEnabled="False" Click="CancelButton_Click" />
             </StackPanel>
+            <Expander Header="Expected output and physical observation" Margin="0,10,0,0">
+                <StackPanel>
+                    <TextBlock Text="Select the input state observed on the equipment. This does not activate inputs or outputs." TextWrapping="Wrap"/>
+                    <ComboBox x:Name="StateCombo" SelectionChanged="StateCombo_SelectionChanged" Margin="0,5"/>
+                    <TextBox x:Name="PreviewText" IsReadOnly="True" TextWrapping="Wrap" Height="135" VerticalScrollBarVisibility="Auto"/>
+                    <ComboBox x:Name="ObservationCombo" SelectionChanged="Observation_SelectionChanged" Margin="0,5">
+                        <ComboBoxItem Content="Physical operation has not been checked" IsSelected="True"/>
+                        <ComboBoxItem Content="Observed lights / sound match this state"/>
+                        <ComboBoxItem Content="Observed lights / sound differ from this state"/>
+                    </ComboBox>
+                    <TextBlock x:Name="ObservationText" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Expander>
         </StackPanel>
 
-        <TextBox x:Name="ResultText" Grid.Row="5" IsReadOnly="True" TextWrapping="Wrap"
+        <TextBox x:Name="ResultText" Grid.Row="5" Height="180" IsReadOnly="True" TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                  Padding="12" BorderBrush="#D6DEE8" Background="White"
                  Text="Select the spare column. Read saves a backup report; Upload uses the selected .signal file. No device opens until you start a read or confirm an upload." />
@@ -74,4 +90,5 @@
         <TextBlock x:Name="StatusText" Grid.Row="6" Margin="0,12,0,0" Foreground="#394C60"
                    TextWrapping="Wrap" Text="Ready. Device detection does not open USB." />
     </Grid>
+    </ScrollViewer>
 </Window>

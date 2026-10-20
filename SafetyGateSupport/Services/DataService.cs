@@ -236,7 +236,7 @@ public class DataService
     public List<HelpItem> LoadHelpItems() => LoadList<HelpItem>(HelpFile);
     public List<PartRecord> LoadParts() => LoadList<PartRecord>(PartsFile);
     public List<ManualRecord> LoadManualRecords() => LoadList<ManualRecord>(ManualsIndexFile);
-    public List<TroubleshootingFlow> LoadTroubleshootingFlows() => LoadList<TroubleshootingFlow>(TroubleshootingFile);
+    public List<TroubleshootingFlow> LoadTroubleshootingFlows() => GuidedTroubleshooting.Merge(LoadList<TroubleshootingFlow>(TroubleshootingFile));
 
     public SharedContent LoadSharedContent()
     {

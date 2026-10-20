@@ -54,6 +54,7 @@ jobs:
           $usbCheckHash = (Get-FileHash artifacts/siemens-usb-check/SiemensUsbCheck.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$usbCheckHash  SiemensUsbCheck.exe" | Set-Content artifacts/siemens-usb-check/SiemensUsbCheck.exe.sha256 -Encoding ascii
           Copy-Item tools/SiemensUsbCheck/README.md artifacts/siemens-usb-check/README.md
+          Copy-Item docs/WINDOWS_QUICK_START.md artifacts/win-x64/README.md
       - name: Upload downloadable Windows app
         uses: actions/upload-artifact@v4
         with:

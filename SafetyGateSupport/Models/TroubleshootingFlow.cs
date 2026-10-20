@@ -27,6 +27,7 @@ public class TroubleshootingNode
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Prompt { get; set; } = "";
     public string Body { get; set; } = "";
+    public string Action { get; set; } = "";
     public bool IsTerminal { get; set; }
     public List<string> ResourceIds { get; set; } = new();
     public List<TroubleshootingChoice> Choices { get; set; } = new();

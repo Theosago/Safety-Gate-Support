@@ -16,7 +16,7 @@ public static class FileLauncherService
         }
         try
         {
-            Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true });
+            Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true, WorkingDirectory = !isUrl && File.Exists(target) ? Path.GetDirectoryName(Path.GetFullPath(target))! : "" });
         }
         catch (Exception ex)
         {

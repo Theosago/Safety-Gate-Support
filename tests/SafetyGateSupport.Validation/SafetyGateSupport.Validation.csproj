@@ -7,6 +7,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../SafetyGateSupport/Models/*.cs" Link="Models/%(Filename)%(Extension)" />
+    <Compile Include="../../SafetyGateSupport/Services/GuidedTroubleshooting.cs" Link="Services/GuidedTroubleshooting.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/SupportLibraryService.cs" Link="Services/SupportLibraryService.cs" />
+    <ProjectReference Include="../../SafetyGateSupport.Siemens/SafetyGateSupport.Siemens.csproj" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.cs" Link="Services/DataService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/SearchService.cs" Link="Services/SearchService.cs" />
     <EmbeddedResource Include="../../SafetyGateSupport/SeedData.zip" LogicalName="SafetyGateSupport.Validation.SeedData.zip" />

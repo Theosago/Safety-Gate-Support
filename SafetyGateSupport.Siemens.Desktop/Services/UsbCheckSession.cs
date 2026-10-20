@@ -6,7 +6,10 @@ using SafetyGateSupport.Siemens;
 
 namespace SiemensUsbCheck.Services;
 
-public sealed record UsbCheckResult(bool Success, string Summary);
+public sealed record UsbCheckResult(bool Success, string Summary)
+{
+    public byte[]? Configuration { get; init; }
+}
 
 /// <summary>One diagnostic session. Only the two fixed GET requests are available.</summary>
 public static class UsbCheckSession
@@ -73,6 +76,7 @@ public static class UsbCheckSession
         }
         catch (OperationCanceledException)
         {
+            success = false;
             summary = token.IsCancellationRequested ? "The check was cancelled. A partial diagnostic report was saved." :
                 "The check reached its 60-second limit. A partial diagnostic report was saved.";
             failure = summary;
@@ -80,6 +84,7 @@ public static class UsbCheckSession
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or
             InvalidOperationException or ArgumentException or NotSupportedException or TimeoutException or JsonException or System.Security.SecurityException)
         {
+            success = false;
             failure = $"{error.GetType().Name}: {error.Message}";
             summary = $"The check stopped: {error.Message}";
         }
@@ -87,16 +92,16 @@ public static class UsbCheckSession
         progress("Saving the diagnostic report…");
         WriteReport(reportPath, new
         {
-            tool = "SiemensUsbCheck", version = "0.2.1",
+            tool = "SiemensUsbCheck", version = "0.3.0",
             startedUtc = started, finishedUtc = DateTimeOffset.UtcNow,
             success, summary, error = failure,
             devicePort = port, usbVendorId = "303A", usbProductId = "80F7",
             serial = new { baudRate = 576000, dataBits = 8, parity = "None", stopBits = 1, dtr = true, rts = true },
             requests, responses, device, archive,
             operation = "Identity and backup GET requests only; no configuration, reset, or firmware requests.",
-            hardwareValidation = "Unverified independent client; opening the COM port can toggle DTR/RTS and restart firmware."
+            hardwareValidation = "Independent client; model and configuration must be verified separately from physical operation. Opening the COM port can toggle DTR/RTS and restart firmware."
         }, infoBytes, configBytes, receivedPrefix, success);
-        return new UsbCheckResult(success, summary);
+        return new UsbCheckResult(success, summary) { Configuration = success ? configBytes : null };
 
         SiemensHttpResponse Exchange(Stream stream, string requestName, byte[] request, int maximumBody)
         {

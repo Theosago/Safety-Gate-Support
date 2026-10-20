@@ -1,12 +1,13 @@
 # Safety Gate Support
 
-Windows WPF support console, version **6.4.2**, based on the supplied
+Windows WPF support console, version **6.5.0**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,
 drawings/configuration resources, manuals, parts, global search, and guided
-troubleshooting. Version 6.4.2 improves startup, photo loading and search
-responsiveness while retaining the existing shared-data format and workflow.
+troubleshooting. Version 6.5.0 integrates Siemens USB backup, configuration comparison and upload, adds expected-output previews and documented troubleshooting, and imports local support libraries. Startup, photo loading and search retain the earlier performance improvements.
+
+See the [Windows quick start](docs/WINDOWS_QUICK_START.md) for upgrading, importing the supplied files, and checking a signal column.
 
 ## Get the Windows app
 
@@ -28,16 +29,15 @@ Software**, choose an empty local folder, and click **Initialize Starter Data**.
 The default production path is `Q:\SafetyGateSupport`. Settings live in
 `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
 
-Production use requires access to the configured shared folder. Siemens/UAM
-launch actions require their Windows applications and configured executable paths.
+Production use requires access to the configured shared folder. Built-in Siemens USB configuration needs no vendor configurator. Optional Siemens/UAM/BusLink launch actions require their Windows applications; each PC saves its own executable paths.
 The storeroom lookup requires the configured plant-network service. Those live
 integrations still need validation in the plant environment.
 
-For the separate Siemens 8WD4613-5JH37 USB investigation, download
+For a standalone Siemens 8WD4613-5JH37 USB utility, download
 **SiemensUsbCheck-Windows-x64** from a successful workflow run. This diagnostic
 backs up a spare column and, from version 0.2.0, uploads compatible `.signal`
 files with a saved original and readback verification. Hardware upload and a later
-readback have succeeded; version 0.2.1's reconnect recovery still needs retesting.
+readback and physical behavior were confirmed by the user. Version 6.5.0 reuses that protocol and the report-access recovery fix; the integrated UI still needs a site check on a spare column.
 Follow [its instructions](tools/SiemensUsbCheck/README.md) and see
 [protocol evidence and validation limits](docs/SIEMENS_USB.md).
 

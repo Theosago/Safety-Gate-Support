@@ -65,6 +65,7 @@ internal static class Program
                 ("Resource filtering excludes hidden, other-gate, and other-unit content", ResourceFiltering)
             ];
             checks.AddRange(SearchChecks.Cases);
+            checks.AddRange(SupportLibraryChecks.Cases);
             checks.Add(("Current-file snapshots retain shared-unit links and refresh files", CurrentFileSnapshots));
             checks.Add(("Cancelled file indexing stops before enumeration", CancelledFileIndexing));
             checks.Add(("Deferred data-service initialization leaves shared data untouched", DeferredInitialization));
@@ -164,7 +165,8 @@ internal static class Program
         Equal(28, data.LoadGates().Count, "Migrated gate count");
         Equal(3, data.LoadCategories().Count, "Seeded area count");
         Equal(360, data.LoadResources().Count, "Migrated resource count");
-        Equal(3, data.LoadTroubleshootingFlows().Count, "Migrated troubleshooting flow count");
+        Equal(3, data.LoadTroubleshootingFlows().Count(f => !f.Id.StartsWith("builtin-")), "Migrated troubleshooting flow count");
+        Equal(4, data.LoadTroubleshootingFlows().Count(f => f.Id.StartsWith("builtin-")), "Curated troubleshooting flow count");
         Require(data.LoadSystems().All(unit => File.Exists(data.Resolve(unit.PrimaryPhoto))), "Every seeded identification photo should be present.");
     }
 
@@ -189,7 +191,7 @@ internal static class Program
         }
         foreach (var resource in resources)
             Require(gates.Any(g => g.Id == resource.GateId) && resource.AppliesToUnitIds.All(id => units.Any(u => u.Id == id && u.GateId == resource.GateId)), "Resource gate and unit assignments must be consistent.");
-        Require(data.LoadTroubleshootingFlows().All(f => f.Nodes.Any(n => n.Id == f.StartNodeId && n.IsTerminal)), "Migrated help topics should have valid terminal start nodes.");
+        Require(data.LoadTroubleshootingFlows().Where(f => !f.Id.StartsWith("builtin-")).All(f => f.Nodes.Any(n => n.Id == f.StartNodeId && n.IsTerminal)), "Migrated help topics should have valid terminal start nodes.");
     }
 
     private static void InitializationIdempotency()
@@ -342,7 +344,7 @@ internal static class Program
             ]
         };
         fixture.Data.SaveTroubleshootingFlows([flow]);
-        var loaded = fixture.Data.LoadTroubleshootingFlows().Single();
+        var loaded = fixture.Data.LoadTroubleshootingFlows().Single(f => f.Id == flow.Id);
         Equal(JsonSerializer.Serialize(flow), JsonSerializer.Serialize(loaded), "Troubleshooting tree JSON round-trip");
         Require(loaded.Nodes.Any(n => n.Id == loaded.StartNodeId), "Start node should resolve.");
         Require(loaded.Nodes.SelectMany(n => n.Choices).All(c => loaded.Nodes.Any(n => n.Id == c.NextNodeId)), "Every choice target should resolve, including cycles.");

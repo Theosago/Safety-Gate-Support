@@ -478,6 +478,12 @@ public partial class MainWindow : Window
             SystemResourcePanel.Children.Add(new TextBlock { Text = "No resource buttons are configured for this unit.", Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(6) });
     }
 
+    private async void SupportLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        new SupportLibraryWindow(_data, SelectedGate, SelectedUnit) { Owner = this }.ShowDialog();
+        await ReloadDataAsync();
+    }
+
     private void ResourceButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button b || b.Tag is not string id || SelectedGate is not { } gate || SelectedUnit is not { } unit) return;

@@ -1,4 +1,4 @@
-# Siemens USB Configuration — 0.2.1
+# Siemens USB Configuration — 0.3.0
 
 Upload a `.signal` file to a Siemens **8WD4613-5JH37** over USB without opening
 Siemens Configurator. The standalone `SiemensUsbCheck.exe` includes its .NET
@@ -11,13 +11,15 @@ hardware retesting. Use your spare column disconnected from operating equipment.
 Opening USB can restart the column; uploading replaces its settings and requests
 a normal application restart. No firmware update or bootloader commands exist.
 
+Version 0.3.0 shares its desktop component with Safety Gate Support 6.5.0. Choose a file, read the column to compare settings, and expand Expected output to inspect any of the 64 input states. Previewing states does not change inputs or outputs. Recorded physical observations apply only to the selected state and are cleared when the state, file, or USB target changes.
+
 ## Upload a configuration
 
 1. Download `SiemensUsbCheck-Windows-x64` from the successful GitHub Actions run
-   for version 0.2.1. Extract the complete ZIP into a new folder.
+   for version 0.3.0. Extract the complete ZIP into a new folder.
 2. Close Siemens Configurator and other programs using the column. Connect the
    spare with a USB data cable, following the manufacturer's power instructions.
-3. Run `SiemensUsbCheck.exe` and confirm **v0.2.1** in its title. Select the column;
+3. Run `SiemensUsbCheck.exe` and confirm **v0.3.0** in its title. Select the column;
    use Refresh if needed.
 4. Click **Choose .signal file**, then select the actual configuration file.
    A report ZIP is not a configuration file. A backup named `column-backup.signal`
@@ -28,7 +30,7 @@ a normal application restart. No firmware update or bootloader commands exist.
    avoids shared-drive locks; you can copy the completed files to a share afterward.
 6. Wait for verification. Keep the report and the separate `.before.signal` file
    beside it. Check the actual light and sound behavior on the spare.
-7. Send back the upload report ZIP, whether it succeeds or fails.
+7. Keep the upload report ZIP for maintenance records or troubleshooting.
 
 The tool checks model, hardware variant 21, firmware v1.0.3, schema 5, nine
 segments and sound support. The file limit is 1 MiB for this tool, not a claimed

@@ -239,7 +239,7 @@ public static class SignalUploadSession
             {
                 files["report.json"] = JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    tool = "SiemensUsbCheck", version = "0.2.1", operation = "Configuration upload",
+                    tool = "SiemensUsbCheck", version = "0.3.0", operation = "Configuration upload",
                     startedUtc = started, updatedUtc = DateTimeOffset.UtcNow, stage, success, summary, error,
                     uploadAttempted, writeMayHaveStarted = writeIntent || uploadAttempted,
                     backupSaved, preResetVerified, restartSent, readbackVerified,
