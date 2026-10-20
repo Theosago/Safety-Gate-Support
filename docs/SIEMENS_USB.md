@@ -1,8 +1,9 @@
 # Siemens 8WD46 USB investigation
 
 The standalone `tools/SiemensUsbCheck` diagnostic is the first hardware-validation
-step toward independent configuration transfer. Production upload support is not
-implemented. The main console's existing Siemens application launcher is unchanged.
+step toward independent configuration transfer. Version 0.2.0 adds experimental
+upload with durable backup and verification. Physical upload validation is still
+pending. The main console's existing Siemens application launcher is unchanged.
 
 ## Evidence and limits
 
@@ -41,9 +42,9 @@ vendor's read flow requests configuration regardless of that flag.
 
 The observed vendor upload sequence uses PUT `/api/v1/config`, followed by an
 application reset after a delay. Those requests are deliberately absent from the
-diagnostic API. Before implementing them, validate identity, real response framing,
-backup contents, and firmware behavior with the spare column and a known-good
-configuration. Cloud and CI tests do not connect physical USB hardware.
+read-only diagnostic API. The separate upload session implements the observed
+configuration PUT and normal application restart only. Cloud and CI tests do not
+connect physical USB hardware.
 
 The first user-run hardware report on October 19, 2026 confirmed a real identity
 read: firmware v1.0.3, hardware variant 21, numeric article `65710155`, and an
@@ -53,8 +54,42 @@ requesting configuration. Version 0.1.1 recognizes this exact spelling, as a num
 or string, while retaining the article-plus-variant gate. There is no rounding,
 exponent conversion, or arbitrary punctuation stripping. That report contained
 `firstConfig: false`; without a configuration read it does not establish whether
-the column has been programmed. No real configuration backup or upload has yet
-been verified.
+the column has been programmed. Subsequent user-run reads verified complete
+schema-5 backups from two different units. Their initial 65 JSON files were
+identical; only ZIP timestamps differed. A later known-programmed configuration
+on the second unit contained five active states and still reported `firstConfig:
+false`. It must not be used to identify a blank column. Physical upload remains
+unverified.
+
+## Version 0.2.0 upload flow
+
+The upload file is an immutable, validated snapshot. This initial tool limits
+upload archives to 1 MiB and supports the observed model/variant and firmware
+v1.0.3. It rejects incompatible files, unknown firmware and missing stable device
+identity before writing.
+
+The session reads identity and configuration, validates the recovery archive,
+persists a standalone `.before.signal` with `Flush(true)`, and atomically saves
+the report. Only then can it send PUT `/api/v1/config` with the selected ZIP bytes
+unchanged. A durable write-intent checkpoint marks an interrupted session as
+potentially changed, including when an acknowledgement is lost. Writes are never
+automatically retried and no automatic rollback is attempted.
+
+After a successful reply and one-second settling delay, it verifies a configuration
+GET against every JSON entry, ignoring archive timestamps/compression and JSON
+object ordering. Only matching settings proceed to PUT
+`/api/v1/system/reset/app`. That request expects no HTTP response; synchronous write
+completion alone is not treated as verified upload. The port is closed, the same
+normal USB instance is reopened (its COM name may change), and identity including
+hardware MAC is checked before another configuration GET. Final success requires
+matching settings after reconnect. Application restart is requested; there is no
+uptime field proving a reboot or physical output validation.
+
+Reports and existing recovery files are never overwritten. A disk/checkpoint
+failure before PUT blocks writing. The separate backup remains untouched even if
+later report updates fail. Cancellation, malformed/non-success replies, unexpected
+readback or device changes return an unverified result with available evidence.
+The user can explicitly select the recovery `.before.signal` for a later restore.
 
 ## Configuration format
 
@@ -76,7 +111,10 @@ unknown schemas are reported as unsupported while preserving the response bytes.
 existing data/search checks plus dependency-free protocol, identity and archive
 checks. These cover fragmented replies, exact request bytes, malformed framing,
 length/chunk limits, cancellation, preserved error statuses, ZIP traversal and CRC
-failures, model mismatches, and synthetic configuration states.
+failures, model mismatches, and synthetic configuration states. Upload checks use
+strict fragmented duplex streams to verify exact request bytes, backup persistence
+before the first PUT byte, pre/post-restart readback, same-device verification,
+disk failures, lost acknowledgements, cancellations, and absence of write retries.
 
 Native Windows checks additionally render the tool and run its actual session and
 report writer against a strict scripted stream. They do not connect physical USB

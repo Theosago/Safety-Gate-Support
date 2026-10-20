@@ -1,42 +1,65 @@
-# Siemens USB Check — 0.1.1
+# Siemens USB Configuration — 0.2.0
 
-This standalone Windows test tool reads a Siemens **8WD4613-5JH37** light column
-over USB and saves a diagnostic ZIP, including the original configuration backup
-when the read succeeds. It sends only identity/configuration GET requests. It has
-no upload, reset, or firmware commands. It does not require the Siemens
-Configurator application or a separately installed .NET runtime.
+Upload a `.signal` file to a Siemens **8WD4613-5JH37** over USB without opening
+Siemens Configurator. The standalone `SiemensUsbCheck.exe` includes its .NET
+runtime. It also retains the Read device and save report action.
 
-The independent USB client needs validation on real hardware. Use your spare
-column disconnected from operating equipment: opening the COM port can toggle
-DTR/RTS and restart the column even though the requests only read data.
+USB identity and backup reads have been verified on real columns. This first
+upload version has software regression coverage but still needs physical upload
+validation. Use your spare column disconnected from operating equipment.
+Opening USB can restart the column; uploading replaces its settings and requests
+a normal application restart. No firmware update or bootloader commands exist.
 
-1. Extract the entire downloaded ZIP to a folder on your Windows PC.
-2. Close Siemens Configurator and any other program using the column's COM port.
-3. Connect the spare column using a USB data cable. Follow the manufacturer's
-   normal power/connection instructions.
-4. Run **SiemensUsbCheck.exe**. Click **Refresh** if needed and select the column.
-5. Click **Read device and save report**, then choose where to save the report ZIP.
-6. Send that report ZIP back for analysis, whether the check succeeds or fails.
+## Upload a configuration
 
-The tool identifies the normal USB interface (VID 303A, PID 80F7) and verifies the
-reported article number and hardware variant before requesting configuration.
-Version 0.1.1 recognizes the exact numeric legacy article `65710155` returned by
-firmware v1.0.3, as well as the original dotted article and Siemens model strings.
-Other models and the bootloader interface are excluded from backup. If Windows
-does not enumerate a COM port, check Device Manager and use the manufacturer's
-driver instructions; the tool does not install drivers or try arbitrary ports.
+1. Download `SiemensUsbCheck-Windows-x64` from the successful GitHub Actions run
+   for version 0.2.0. Extract the complete ZIP into a new folder.
+2. Close Siemens Configurator and other programs using the column. Connect the
+   spare with a USB data cable, following the manufacturer's power instructions.
+3. Run `SiemensUsbCheck.exe` and confirm **v0.2.0** in its title. Select the column;
+   use Refresh if needed.
+4. Click **Choose .signal file**, then select the actual configuration file.
+   A report ZIP is not a configuration file. A backup named `column-backup.signal`
+   extracted from an earlier report can also be selected to restore those settings.
+5. Click **Upload selected file**. Choose a new report ZIP filename in a writable
+   folder, then confirm the displayed target and file.
+6. Wait for verification. Keep the report and the separate `.before.signal` file
+   beside it. Check the actual light and sound behavior on the spare.
+7. Send back the upload report ZIP, whether it succeeds or fails.
 
-The report contains device identification, firmware/version fields, serial-port
-details, HTTP response headers/statuses, and the configuration or diagnostic
-response bytes. It does not collect your Safety Gate Support shared data or PC
-credentials. Review it before sharing. A successful backup is stored as
-`column-backup.signal` inside the report; unsuccessful replies use
-`config-response.bin` and/or a bounded `received-prefix.bin`.
+The tool checks model, hardware variant 21, firmware v1.0.3, schema 5, nine
+segments and sound support. The file limit is 1 MiB for this tool, not a claimed
+firmware limit. Unknown formats and incompatible targets are rejected before
+uploading. Detection selects normal USB VID 303A / PID 80F7; bootloaders are excluded.
+Windows must already expose the serial COM port; the tool does not install drivers.
 
-Cancel is cooperative: a serial driver write can take up to ten seconds to return.
-Reads time out after ten seconds without incoming bytes; the complete USB session
-also has a sixty-second deadline. There are no automatic retries.
+## Backup and verification
 
-The tool is distributed separately from SafetyGateSupport.exe. It does not edit
-the main application's settings or shared folder. Windows builds are currently
-unsigned; no publisher signature is supplied.
+Before sending a PUT, the tool downloads and validates the existing configuration,
+saves its exact bytes to **`<report-name>.before.signal`**, flushes that backup to
+disk, and saves a report containing both the original and selected configuration.
+Existing reports and backups are never overwritten. Failure to save either blocks
+upload. If the selected settings already match, it saves the backup and skips
+upload and restart.
+
+For a changed configuration it sends the original selected ZIP bytes, waits for
+a successful reply, then reads back all 65 JSON configuration files and compares
+them with the selection. ZIP timestamps, compression and JSON property ordering
+are ignored; actual settings are compared. It requests a normal application
+restart, reconnects only to the original USB instance, checks the hardware address,
+and verifies the settings again. A successful message means stored settings were
+verified; it does not replace checking the actual physical outputs.
+
+There is no automatic write retry or automatic rollback. Cancellation cannot undo
+data already sent. A failed/lost reply, cancellation or verification mismatch means
+the column may already have changed settings. Keep the backup and report. Restoring
+is an explicit upload of the saved `.before.signal` file using the same checks;
+first resolve any reported communication or compatibility failure.
+
+Driver calls may take up to ten seconds to return; the session also uses a
+120-second deadline. Upload reports contain selected/original/readback configurations,
+device identification, response statuses and diagnostic bytes. Review before sharing.
+
+The Read device and save report button remains read-only. This tool is separate
+from SafetyGateSupport.exe and does not edit its shared data or settings. Windows
+builds are unsigned; no publisher signature is supplied.

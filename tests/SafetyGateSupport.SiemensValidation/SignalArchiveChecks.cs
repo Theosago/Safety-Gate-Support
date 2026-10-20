@@ -173,14 +173,14 @@ internal static class SignalArchiveChecks
         files[name] = root.ToJsonString();
     }
 
-    private static byte[] Archive(Action<Dictionary<string, string>>? mutation = null)
+    internal static byte[] Archive(Action<Dictionary<string, string>>? mutation = null)
     {
         var files = Files();
         mutation?.Invoke(files);
         return Zip(files);
     }
 
-    private static Dictionary<string, string> Files(int variant = 21, int segments = 9, bool sound = true)
+    internal static Dictionary<string, string> Files(int variant = 21, int segments = 9, bool sound = true)
     {
         var files = new Dictionary<string, string>
         {
@@ -223,7 +223,7 @@ internal static class SignalArchiveChecks
         return files;
     }
 
-    private static byte[] Zip(IEnumerable<KeyValuePair<string, string>> files, CompressionLevel compression = CompressionLevel.NoCompression)
+    internal static byte[] Zip(IEnumerable<KeyValuePair<string, string>> files, CompressionLevel compression = CompressionLevel.NoCompression)
     {
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))

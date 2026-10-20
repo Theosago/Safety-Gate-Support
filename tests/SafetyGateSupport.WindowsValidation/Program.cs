@@ -232,6 +232,8 @@ internal static class Program
         Require(!Control<ComboBox>(window, "DeviceCombo").IsEditable, "The USB selector must not accept arbitrary COM ports.");
         Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "CancelButton").IsEnabled,
             "The tool must start idle, without opening a column.");
+        Require(!Control<Button>(window, "UploadButton").IsEnabled, "Upload must require a selected device and validated file.");
+        Require(window.Title.Contains("v0.2.0", StringComparison.Ordinal), "The upload tool version was not updated.");
         Require(Control<TextBox>(window, "ResultText").IsReadOnly, "The report preview must not be an editable command field.");
         var rendered = false;
         window.ContentRendered += (_, _) => rendered = true;
@@ -242,8 +244,11 @@ internal static class Program
         Require(Control<TextBlock>(window, "StatusText").Text.Contains("does not open USB", StringComparison.Ordinal),
             "The idle tool should explain that detection has not opened USB.");
         var actions = Descendants<Button>(window).Select(button => button.Name).Order().ToArray();
-        Require(actions.SequenceEqual(new[] { "CancelButton", "ReadButton", "RefreshButton" }),
-            "The diagnostic window exposed an unexpected action.");
+        Require(actions.SequenceEqual(new[] { "BrowseButton", "CancelButton", "ReadButton", "RefreshButton", "UploadButton" }),
+            "The configuration window exposed an unexpected action.");
+        Control<ComboBox>(window, "DeviceCombo").ItemsSource = new[] { TestColumnPort() };
+        Control<ComboBox>(window, "DeviceCombo").SelectedIndex = 0;
+        Require(!Control<Button>(window, "UploadButton").IsEnabled, "Selecting a port without a valid file enabled upload.");
     }
 
     private static Task SiemensBackupSession() => SiemensBackup(firstConfig: true);

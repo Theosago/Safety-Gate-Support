@@ -11,12 +11,15 @@ image dimensions, frozen cross-thread image access, file release, replacement pi
 missing/corrupt images, cancellation, and preserving searchable notes when a malformed
 managed-resource folder interrupts file enumeration.
 
-Six checks cover the separate Siemens USB diagnostic: rendering its idle window,
+Six checks cover the separate Siemens USB tool: rendering its idle window with
+upload disabled until a device and validated file are selected,
 exact backup bytes and GET sequence, reading regardless of `firstConfig`, rejecting
 a different model before requesting configuration, preserving HTTP errors without
 retry, and cancellation before sending a request. They use scripted fragmented
 streams and synthetic archives. No physical USB device is accessed; passive device
 discovery during the window check only enumerates Windows registry/PnP data.
+The dependency-free Siemens validation runner separately exercises the complete
+upload/backup/reconnect session with strict simulated columns and disk failures.
 
 All settings and shared data live in newly created temporary directories. The runner
 never loads the user's local settings or the default shared drive. Windows are shown

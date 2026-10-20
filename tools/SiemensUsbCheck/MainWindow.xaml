@@ -1,8 +1,8 @@
 <Window x:Class="SiemensUsbCheck.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Siemens 8WD46 USB Check — v0.1.1"
-        Width="800" Height="650" MinWidth="640" MinHeight="550"
+        Title="Siemens 8WD46 USB Configuration — v0.2.0"
+        Width="860" Height="800" MinWidth="720" MinHeight="650"
         WindowStartupLocation="CenterScreen" Background="#F5F7FA"
         FontFamily="Segoe UI" FontSize="14"
         Loaded="Window_Loaded">
@@ -18,8 +18,8 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,18">
-            <TextBlock Text="Siemens 8WD46 USB check" FontSize="25" FontWeight="SemiBold" Foreground="#14263D" />
-            <TextBlock Text="Read device information and configuration into a local diagnostic report."
+            <TextBlock Text="Siemens 8WD46 USB configuration" FontSize="25" FontWeight="SemiBold" Foreground="#14263D" />
+            <TextBlock Text="Back up or upload a .signal file without Siemens Configurator."
                        Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#394C60" />
         </StackPanel>
 
@@ -30,7 +30,7 @@
                 <TextBlock Margin="0,7,0,0" TextWrapping="Wrap"
                            Text="Close Siemens Configurator first. Connect the column directly using a USB-C data cable. Windows must recognize its serial port." />
                 <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="#88520A"
-                           Text="Opening USB can restart the column. This tool only requests information and configuration; it sends no configuration changes, reset requests, or firmware commands." />
+                           Text="Opening USB can restart the column. Upload replaces its settings and requests a restart. This first upload version is for spare-column testing; it saves a backup and verifies the stored settings." />
             </StackPanel>
         </Border>
 
@@ -51,17 +51,25 @@
         <TextBlock x:Name="DetectionText" Grid.Row="3" Margin="0,7,0,0" Foreground="#394C60"
                    TextWrapping="Wrap" Text="Checking connected devices…" />
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,18,0,14">
-            <Button x:Name="ReadButton" Content="_Read device and save report…" FontWeight="SemiBold"
-                    IsEnabled="False" Click="ReadButton_Click" />
-            <Button x:Name="CancelButton" Content="_Cancel" Margin="10,0,0,0" IsEnabled="False"
-                    Click="CancelButton_Click" />
+        <StackPanel Grid.Row="4" Margin="0,16,0,14">
+            <DockPanel>
+                <Button x:Name="BrowseButton" Content="Choose .signal file…" DockPanel.Dock="Left"
+                        Click="BrowseButton_Click" Margin="0,0,12,0" />
+                <TextBlock x:Name="SelectedSignalText" VerticalAlignment="Center" TextWrapping="Wrap"
+                           Text="Choose a compatible file to enable Upload. Reading a backup does not need a file." />
+            </DockPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <Button x:Name="ReadButton" Content="_Read device and save report…" IsEnabled="False" Click="ReadButton_Click" />
+                <Button x:Name="UploadButton" Content="_Upload selected file…" FontWeight="SemiBold" Margin="10,0,0,0"
+                        IsEnabled="False" Click="UploadButton_Click" />
+                <Button x:Name="CancelButton" Content="_Cancel" Margin="10,0,0,0" IsEnabled="False" Click="CancelButton_Click" />
+            </StackPanel>
         </StackPanel>
 
         <TextBox x:Name="ResultText" Grid.Row="5" IsReadOnly="True" TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                  Padding="12" BorderBrush="#D6DEE8" Background="White"
-                 Text="Select the connected column, then choose where to save the ZIP report. No device is opened until you click Read and choose a destination." />
+                 Text="Select the spare column. Read saves a backup report; Upload uses the selected .signal file. No device opens until you start a read or confirm an upload." />
 
         <TextBlock x:Name="StatusText" Grid.Row="6" Margin="0,12,0,0" Foreground="#394C60"
                    TextWrapping="Wrap" Text="Ready. Device detection does not open USB." />

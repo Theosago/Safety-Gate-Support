@@ -5,7 +5,7 @@ internal static class Program
     private static int Main()
     {
         int passed = 0, failed = 0;
-        foreach (var (name, run) in WireChecks.Cases.Concat(SignalArchiveChecks.Cases).Concat(DeviceInfoChecks.Cases))
+        foreach (var (name, run) in WireChecks.Cases.Concat(SignalArchiveChecks.Cases).Concat(DeviceInfoChecks.Cases).Concat(UploadChecks.Cases))
         {
             try
             {

@@ -87,7 +87,7 @@ public static class UsbCheckSession
         progress("Saving the diagnostic report…");
         WriteReport(reportPath, new
         {
-            tool = "SiemensUsbCheck", version = "0.1.1",
+            tool = "SiemensUsbCheck", version = "0.2.0",
             startedUtc = started, finishedUtc = DateTimeOffset.UtcNow,
             success, summary, error = failure,
             devicePort = port, usbVendorId = "303A", usbProductId = "80F7",
