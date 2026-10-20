@@ -30,6 +30,8 @@ jobs:
           global-json-file: global.json
       - name: Build Windows desktop app
         run: dotnet build SafetyGateSupport/SafetyGateSupport.csproj -c Release
+      - name: Validate Siemens upload and recovery on Windows
+        run: dotnet run --project tests/SafetyGateSupport.SiemensValidation/SafetyGateSupport.SiemensValidation.csproj -c Release
       - name: Run Windows desktop regression checks
         shell: pwsh
         run: |

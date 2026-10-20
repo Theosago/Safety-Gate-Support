@@ -17,6 +17,11 @@ internal static class Program
             {
                 failed++;
                 Console.Error.WriteLine($"FAIL {name}: {exception.GetType().Name}: {exception.Message}");
+                if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
+                {
+                    var detail = $"{name}: {exception}".Replace("%", "%25").Replace("\r", "%0D").Replace("\n", "%0A");
+                    Console.WriteLine($"::error title=Siemens validation::{detail}");
+                }
             }
         }
         Console.WriteLine($"{passed} passed; {failed} failed.");
