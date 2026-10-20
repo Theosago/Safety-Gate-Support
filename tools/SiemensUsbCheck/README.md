@@ -1,28 +1,31 @@
-# Siemens USB Configuration — 0.2.0
+# Siemens USB Configuration — 0.2.1
 
 Upload a `.signal` file to a Siemens **8WD4613-5JH37** over USB without opening
 Siemens Configurator. The standalone `SiemensUsbCheck.exe` includes its .NET
 runtime. It also retains the Read device and save report action.
 
-USB identity and backup reads have been verified on real columns. This first
-upload version has software regression coverage but still needs physical upload
-validation. Use your spare column disconnected from operating equipment.
+USB identity and backup reads have succeeded on two columns. One column accepted
+an upload and returned it in a later independent readback. Version 0.2.1 fixes report-saving failures that
+could interrupt same-session reconnect verification; that recovery still needs
+hardware retesting. Use your spare column disconnected from operating equipment.
 Opening USB can restart the column; uploading replaces its settings and requests
 a normal application restart. No firmware update or bootloader commands exist.
 
 ## Upload a configuration
 
 1. Download `SiemensUsbCheck-Windows-x64` from the successful GitHub Actions run
-   for version 0.2.0. Extract the complete ZIP into a new folder.
+   for version 0.2.1. Extract the complete ZIP into a new folder.
 2. Close Siemens Configurator and other programs using the column. Connect the
    spare with a USB data cable, following the manufacturer's power instructions.
-3. Run `SiemensUsbCheck.exe` and confirm **v0.2.0** in its title. Select the column;
+3. Run `SiemensUsbCheck.exe` and confirm **v0.2.1** in its title. Select the column;
    use Refresh if needed.
 4. Click **Choose .signal file**, then select the actual configuration file.
    A report ZIP is not a configuration file. A backup named `column-backup.signal`
    extracted from an earlier report can also be selected to restore those settings.
 5. Click **Upload selected file**. Choose a new report ZIP filename in a writable
    folder, then confirm the displayed target and file.
+   Reports default to `%LOCALAPPDATA%\SiemensUsbCheck\Reports`. A local folder
+   avoids shared-drive locks; you can copy the completed files to a share afterward.
 6. Wait for verification. Keep the report and the separate `.before.signal` file
    beside it. Check the actual light and sound behavior on the spare.
 7. Send back the upload report ZIP, whether it succeeds or fails.
@@ -41,6 +44,13 @@ disk, and saves a report containing both the original and selected configuration
 Existing reports and backups are never overwritten. Failure to save either blocks
 upload. If the selected settings already match, it saves the backup and skips
 upload and restart.
+
+Report snapshots retry transient file-access failures up to four times. Required
+pre-write and pre-restart checkpoints still block device writes if they cannot
+be saved. Once the restart has been sent, report-saving errors do not prevent the
+remaining read-only verification. A permanently unwritable final report is shown
+separately from whether the stored settings were verified. Reports record the
+affected phase, operation and storage warnings.
 
 For a changed configuration it sends the original selected ZIP bytes, waits for
 a successful reply, then reads back all 65 JSON configuration files and compares

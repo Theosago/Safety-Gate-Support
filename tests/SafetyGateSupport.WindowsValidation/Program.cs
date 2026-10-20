@@ -233,7 +233,7 @@ internal static class Program
         Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "CancelButton").IsEnabled,
             "The tool must start idle, without opening a column.");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Upload must require a selected device and validated file.");
-        Require(window.Title.Contains("v0.2.0", StringComparison.Ordinal), "The upload tool version was not updated.");
+        Require(window.Title.Contains("v0.2.1", StringComparison.Ordinal), "The upload tool version was not updated.");
         Require(Control<TextBox>(window, "ResultText").IsReadOnly, "The report preview must not be an editable command field.");
         var rendered = false;
         window.ContentRendered += (_, _) => rendered = true;

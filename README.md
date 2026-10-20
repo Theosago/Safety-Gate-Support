@@ -36,8 +36,9 @@ integrations still need validation in the plant environment.
 For the separate Siemens 8WD4613-5JH37 USB investigation, download
 **SiemensUsbCheck-Windows-x64** from a successful workflow run. This diagnostic
 backs up a spare column and, from version 0.2.0, uploads compatible `.signal`
-files with a saved original and readback verification. Upload is still awaiting
-physical spare-column validation. Follow [its instructions](tools/SiemensUsbCheck/README.md) and see
+files with a saved original and readback verification. Hardware upload and a later
+readback have succeeded; version 0.2.1's reconnect recovery still needs retesting.
+Follow [its instructions](tools/SiemensUsbCheck/README.md) and see
 [protocol evidence and validation limits](docs/SIEMENS_USB.md).
 
 ## Develop and run on Windows

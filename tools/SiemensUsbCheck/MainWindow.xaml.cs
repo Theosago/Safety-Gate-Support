@@ -84,6 +84,7 @@ public partial class MainWindow : Window
         };
         try
         {
+            destination.InitialDirectory = LocalReportFolder();
             if (destination.ShowDialog(this) != true)
                 return;
         }
@@ -163,6 +164,7 @@ public partial class MainWindow : Window
                 Title = "Choose a new upload report and backup location",
                 Filter = "Upload report (*.zip)|*.zip", DefaultExt = ".zip", AddExtension = true,
                 CheckPathExists = true, OverwritePrompt = true,
+                InitialDirectory = LocalReportFolder(),
                 FileName = $"Siemens-8WD46-upload-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..4]}.zip"
             };
             if (destination.ShowDialog(this) != true) return;
@@ -186,7 +188,7 @@ public partial class MainWindow : Window
                 cancellation.Token, ((IProgress<string>)progress).Report));
             ResultText.Text = $"{result.Summary}\n\nOriginal backup:\n{(result.BackupPath.Length == 0 ? "Not created; no upload was sent." : result.BackupPath)}\n\nReport:\n{result.ReportPath}";
             StatusText.Text = result.Success ? "Settings verified. Keep the backup and check the spare column's behavior." :
-                result.ReadbackVerified ? "Settings matched, but the report could not be updated. Keep the original backup." :
+                result.ReadbackVerified ? "Stored settings matched, but the session did not finish cleanly. Keep the backup and report." :
                 "Upload not fully verified. Keep the backup and report; do not assume the old settings are still active.";
         }
         catch (Exception error)
@@ -202,6 +204,13 @@ public partial class MainWindow : Window
         _operationCancellation?.Cancel();
         CancelButton.IsEnabled = false;
         StatusText.Text = "Canceling… Waiting for the driver and report. Cancellation cannot undo settings already written.";
+    }
+
+    private static string LocalReportFolder()
+    {
+        string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SiemensUsbCheck", "Reports");
+        System.IO.Directory.CreateDirectory(folder);
+        return folder;
     }
 
     protected override void OnClosing(CancelEventArgs e)

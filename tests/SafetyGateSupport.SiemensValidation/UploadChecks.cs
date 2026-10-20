@@ -32,6 +32,9 @@ internal static class UploadChecks
         ("upload: backup disk failure prevents PUT", BackupFailure),
         ("upload: report checkpoint failure prevents PUT", CheckpointFailure),
         ("upload: report failure after PUT preserves the standalone backup", PostWriteReportFailure),
+        ("upload: reconnect report failure cannot stop read-only verification", ReconnectReportFailure),
+        ("upload: transient reconnect report failure recovers without another PUT", TransientReconnectReportFailure),
+        ("upload: verified settings with a close failure are not a clean success", CloseFailureAfterReadback),
         ("upload: partial driver write failure is never retried", PartialWriteFailure),
         ("upload: HTTP upload rejection is not retried or reset", UploadRejected),
         ("upload: lost acknowledgement is not retried or reset", LostAcknowledgement),
@@ -162,6 +165,7 @@ internal static class UploadChecks
             File.Delete(f.Report);Directory.CreateDirectory(f.Report);
         });
         Check(!result.Success && !result.UploadAttempted && s.Completed && File.ReadAllBytes(f.Backup).SequenceEqual(original), "Checkpoint failure allowed upload or destroyed backup.");
+        Check(result.Summary.Contains(f.Report, StringComparison.Ordinal), "Report failure did not identify the affected path.");
     }
     private static void UploadRejected()
     {
@@ -191,6 +195,50 @@ internal static class UploadChecks
         Check(!result.Success && result.UploadAttempted && !s.Completed && s.Disposed &&
             result.Summary.Contains("Synthetic partial driver write", StringComparison.Ordinal) && File.ReadAllBytes(f.Backup).SequenceEqual(before),
             "A partial write was retried, accepted, or lost its recovery data.");
+    }
+    private static void CloseFailureAfterReadback()
+    {
+        using var f = new Fixture();var before = Original();
+        var s = new ScriptStream(Reply(GetInfo, Info()), Reply(GetConfig, before)) { FailDispose = true };
+        var result = f.Run(before, [s]);
+        Check(!result.Success && result.ReadbackVerified && !result.UploadAttempted && s.Completed &&
+            result.Summary.Contains("Closing the original USB connection", StringComparison.Ordinal),
+            "A failed serial close was reported as a clean success or lost the verified-settings distinction.");
+    }
+    private static void ReconnectReportFailure()
+    {
+        using var f = new Fixture();var before = Original();var selected = Desired();
+        var first = new ScriptStream(BeforeReset(before, selected));
+        var second = new ScriptStream(Reply(GetInfo, Info()), Reply(GetConfig, selected));
+        var result = f.Run(selected, [first, second], progress: message =>
+        {
+            if (!message.StartsWith("Waiting for the column to reconnect", StringComparison.Ordinal)) return;
+            File.Delete(f.Report);Directory.CreateDirectory(f.Report);
+        });
+        Check(!result.Success && result.ReadbackVerified && first.Completed && second.Completed,
+            "A post-restart report failure stopped read-only verification or was hidden.");
+        Check(File.ReadAllBytes(f.Backup).SequenceEqual(before) && result.Summary.Contains(f.Report, StringComparison.Ordinal),
+            "Permanent report failure lost the recovery backup or affected-path context.");
+    }
+    private static void TransientReconnectReportFailure()
+    {
+        using var f = new Fixture();var before = Original();var selected = Desired();bool recovered = false;
+        var first = new ScriptStream(BeforeReset(before, selected));
+        var second = new ScriptStream(Reply(GetInfo, Info()), Reply(GetConfig, Repack(selected)));
+        var result = f.Run(selected, [first, second], progress: message =>
+        {
+            if (!message.StartsWith("Waiting for the column to reconnect", StringComparison.Ordinal)) return;
+            File.Delete(f.Report);Directory.CreateDirectory(f.Report);
+        }, delay: (_, cancellation) =>
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (Directory.Exists(f.Report)) { Directory.Delete(f.Report);recovered = true; }
+        });
+        Check(recovered && result.Success && result.ReadbackVerified && first.Completed && second.Completed,
+            "A transient report failure did not recover or triggered an extra upload.");
+        using var zip = ZipFile.OpenRead(f.Report);using var json = JsonDocument.Parse(Read(zip, "report.json"));
+        Check(json.RootElement.GetProperty("reportWarnings").GetArrayLength() > 0 &&
+            File.ReadAllBytes(f.Backup).SequenceEqual(before), "Recovered report failure was not recorded or lost its backup.");
     }
     private static void LostAcknowledgement()
     {
@@ -292,13 +340,14 @@ internal static class UploadChecks
         public string Report => Path.Combine(Root, "upload.zip");
         public string Backup => Path.Combine(Root, "upload.before.signal");
         public Fixture() => Directory.CreateDirectory(Root);
-        public SignalUploadResult Run(byte[] selected, ScriptStream[] streams, CancellationToken token = default, Action<string>? progress = null)
+        public SignalUploadResult Run(byte[] selected, ScriptStream[] streams, CancellationToken token = default,
+            Action<string>? progress = null, Action<TimeSpan, CancellationToken>? delay = null)
         {
             int next = 0;
             return SignalUploadSession.Run(PreparedSignalUpload.FromBytes(selected), Target, Report, _ =>
             {
                 Check(next < streams.Length, "Unexpected connection or reconnection.");return streams[next++];
-            }, token, progress, (_, cancellation) => cancellation.ThrowIfCancellationRequested());
+            }, token, progress, delay ?? ((_, cancellation) => cancellation.ThrowIfCancellationRequested()));
         }
         public void Dispose() => Directory.Delete(Root, recursive: true);
     }
@@ -310,6 +359,7 @@ internal static class UploadChecks
         public Action<byte[]>? BeforeRequest { get; init; }
         public Action<int>? AfterResponse { get; init; }
         public bool FailConfigWrite { get; init; }
+        public bool FailDispose { get; init; }
         public bool Completed => _index == script.Length;
         public bool Disposed { get; private set; }
         public override bool CanRead => !Disposed;
@@ -349,6 +399,10 @@ internal static class UploadChecks
         public override void Flush() { }
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
         public override void SetLength(long value) => throw new NotSupportedException();
-        protected override void Dispose(bool disposing) { Disposed = true;base.Dispose(disposing); }
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = true;base.Dispose(disposing);
+            if (disposing && FailDispose) throw new IOException("Synthetic serial close failed.");
+        }
     }
 }

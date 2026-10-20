@@ -1,9 +1,11 @@
 # Siemens 8WD46 USB investigation
 
 The standalone `tools/SiemensUsbCheck` diagnostic is the first hardware-validation
-step toward independent configuration transfer. Version 0.2.0 adds experimental
-upload with durable backup and verification. Physical upload validation is still
-pending. The main console's existing Siemens application launcher is unchanged.
+step toward independent configuration transfer. Version 0.2.0 added experimental
+upload with durable backup and verification. Hardware upload and a later
+independent readback have succeeded. Version 0.2.1's same-session reconnect recovery
+still needs hardware retesting. The main console's existing Siemens application
+launcher is unchanged.
 
 ## Evidence and limits
 
@@ -58,8 +60,20 @@ the column has been programmed. Subsequent user-run reads verified complete
 schema-5 backups from two different units. Their initial 65 JSON files were
 identical; only ZIP timestamps differed. A later known-programmed configuration
 on the second unit contained five active states and still reported `firstConfig:
-false`. It must not be used to identify a blank column. Physical upload remains
-unverified.
+false`. It must not be used to identify a blank column. A real configuration PUT
+succeeded and matched an exact pre-restart readback and a later independent
+readback. Version 0.2.0 stopped at its reconnect report checkpoint
+with an access-denied error before attempting to reopen the port. The checkpoint
+event-to-error interval was about one second, shorter than the two-second delay
+that precedes reconnect; the later report confirmed persistence. Two differently
+named selected files in those reports contained identical JSON entries.
+
+Version 0.2.1 retries report I/O failures, keeps required pre-write checkpoints,
+and allows read-only reconnect verification to continue when its report snapshot
+cannot be saved. It records phase/operation, exception codes and storage warnings,
+and reports final report failure separately from verified device settings. The
+default report folder is local AppData instead of the file dialog's previous
+shared-drive location. The changed recovery path still needs a real hardware test.
 
 ## Version 0.2.0 upload flow
 
