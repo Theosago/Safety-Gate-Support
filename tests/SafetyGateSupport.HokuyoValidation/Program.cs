@@ -15,7 +15,7 @@ var checks = new (string Name, Action Check)[]
     ("discovery excludes non-USB, invalid COM names and duplicate ports", DiscoveryFiltering),
     ("automatic selection prefers one recognized scanner and preserves the exact selection", AutomaticSelection),
     ("ambiguous connections are never auto-selected or probed", AmbiguousSelection),
-    ("identity request matches the independently checked native CRC vector", () => Require(Convert.ToHexString(UamWire.IdentityRequest()) == "0230303045565230303334393203", "VR00 wire vector changed.")),
+    ("identity request matches the independently checked native CRC vector", () => Require(Convert.ToHexString(UamWire.LegacyIdentityRequest()) == "0230303045565230303334393203", "VR00 wire vector changed.")),
     ("only fixed read requests are exposed", () => { Require(Encoding.ASCII.GetString(UamWire.StatusRequest()).Contains("AR00"), "Wrong status request."); Require(UamWire.StatusRequest().Length == 14, "Unexpected request payload."); }),
     ("framing rejects corrupt CRC, mismatched lengths and wrong commands", WireFailures),
     ("unknown and truncated status fields cannot become a healthy reading", UnknownStatus),
@@ -23,6 +23,11 @@ var checks = new (string Name, Action Check)[]
     ("fragmented replies complete with exactly two fixed read requests", SuccessfulSession),
     ("wrong model and ambiguous model strings prevent AR00", ModelMismatch),
     ("protocol rejection stops without retries", RejectedIdentity),
+    ("both real working and faulty reports are identical valid empty rejections", CapturedRejection),
+    ("VR42 supports the native normalized VR00 version reply", NormalizedVersionReply),
+    ("legacy identity is queried once only after empty status 90", LegacyFallback),
+    ("a double identity rejection never becomes a physical fault diagnosis", DoubleRejection),
+    ("status 90 carrying unexpected data cannot trigger a fallback", RejectionWithData),
     ("cancel before start never opens USB", CanceledSession),
     ("existing or unwritable report prevents opening USB", ReportFailure),
     ("partial replies are retained and never treated as successful", PartialReply),
@@ -93,17 +98,49 @@ static void UnknownStatus()
 }
 static void SuccessfulSession()
 {
-    WithFolder(folder=> { var fake=new FakeUsb(Reply("VR00","UAM-05LP-T301,1.0,TEST").Concat(Reply("AR00","0010740000000")).ToArray()); var path=Path.Combine(folder,"report.zip"); var result=Run(fake,path);Require(result.Success && fake.Closed,"Read incomplete or port not closed.");Require(fake.Sent.SequenceEqual(UamWire.IdentityRequest().Concat(UamWire.StatusRequest())),"Unexpected commands sent."); using var zip=ZipFile.OpenRead(path);Require(zip.GetEntry("result.json")!=null && zip.GetEntry("AR00-response.bin")!=null,"Evidence missing."); });
+    WithFolder(folder=> { var fake=new FakeUsb(Reply("VR42","UAM-05LP-T301,1.0,TEST").Concat(Reply("AR00","0010740000000")).ToArray()); var path=Path.Combine(folder,"report.zip"); var result=Run(fake,path);Require(result.Success && fake.Closed,"Read incomplete or port not closed.");Require(fake.Sent.SequenceEqual(UamWire.IdentityRequest().Concat(UamWire.StatusRequest())),"Unexpected commands sent."); using var zip=ZipFile.OpenRead(path);Require(zip.GetEntry("result.json")!=null && zip.GetEntry("AR00-response.bin")!=null,"Evidence missing."); });
 }
 static void ModelMismatch()
 {
-    foreach(string name in new[]{"URG-04LX","UAM-05LP-T301-OTHER","unknown UAM-05LP-T301","UAM-05LP"}) WithFolder(folder=> {var fake=new FakeUsb(Reply("VR00",name+",1.0,TEST")); Require(!Run(fake,Path.Combine(folder,"r.zip")).Success,"Wrong model accepted.");Require(fake.Sent.SequenceEqual(UamWire.IdentityRequest()),"AR00 sent to wrong model.");});
+    foreach(string name in new[]{"URG-04LX","UAM-05LP-T301-OTHER","unknown UAM-05LP-T301","UAM-05LP"}) WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42",name+",1.0,TEST")); Require(!Run(fake,Path.Combine(folder,"r.zip")).Success,"Wrong model accepted.");Require(fake.Sent.SequenceEqual(UamWire.IdentityRequest()),"AR00 sent to wrong model.");});
 }
-static void RejectedIdentity() {WithFolder(folder=> {var fake=new FakeUsb(Reply("VR00","","37"));Require(!Run(fake,Path.Combine(folder,"r.zip")).Success,"Rejection accepted.");Require(fake.Sent.Count==14,"Retried rejected query.");});}
+static void RejectedIdentity() {WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42","","37"));Require(!Run(fake,Path.Combine(folder,"r.zip")).Success,"Rejection accepted.");Require(fake.Sent.Count==14,"Retried rejected query.");});}
+static void CapturedRejection()
+{
+    // Both user captures, working and faulty, contain this exact 16-byte reply.
+    var raw=Convert.FromHexString("02303031305652303039303644323303");
+    var reply=UamWire.Decode(raw,"VR00");
+    Require(reply.Status=="90"&&reply.Data=="","Real rejection was misdecoded as data or a scanner condition.");
+    var startup=Encoding.ASCII.GetString(UamWire.IdentityRequest());
+    Require(startup.Substring(1,8)=="000EVR42","Vendor startup identity query missing.");
+}
+static void NormalizedVersionReply()
+{
+    var reply=UamWire.Decode(Reply("VR00","UAM-05LP-T301,1.0,TEST"),"VR42");
+    Require(reply.Command=="VR00"&&reply.Status=="00","Normalized VR version reply rejected.");
+    Throws<InvalidDataException>(()=>UamWire.Decode(Reply("AR00","0010000000000"),"VR42"));
+    Throws<InvalidDataException>(()=>UamWire.Decode(Reply("VR99",""),"VR42"));
+}
+static void LegacyFallback()
+{
+    WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42","","90").Concat(Reply("VR00","UAM-05LP-T301,1.0,TEST")).Concat(Reply("AR00","0010740000000")).ToArray());
+        var result=Run(fake,Path.Combine(folder,"r.zip"));Require(result.Success,"Explicit legacy fallback failed.");
+        Require(fake.Sent.SequenceEqual(UamWire.IdentityRequest().Concat(UamWire.LegacyIdentityRequest()).Concat(UamWire.StatusRequest())),"Fallback sent unexpected commands.");});
+}
+static void DoubleRejection()
+{
+    WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42","","90").Concat(Convert.FromHexString("02303031305652303039303644323303")).ToArray());
+        var result=Run(fake,Path.Combine(folder,"r.zip"));Require(!result.Success&&result.Summary.Contains("not a scanner display fault code"),"Rejection misclassified as fault diagnosis.");
+        Require(fake.Sent.SequenceEqual(UamWire.IdentityRequest().Concat(UamWire.LegacyIdentityRequest())),"AR00 or extra retries sent after double rejection.");});
+}
+static void RejectionWithData()
+{
+    WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42","unexpected","90"));Require(!Run(fake,Path.Combine(folder,"r.zip")).Success,"Rejection with data accepted.");Require(fake.Sent.SequenceEqual(UamWire.IdentityRequest()),"Unexpected fallback on malformed rejection.");});
+}
 static void CanceledSession() {WithFolder(folder=> {using var c=new CancellationTokenSource();c.Cancel();bool opened=false;var r=UamReadSession.Run(new("COM1","test","test"),Path.Combine(folder,"r.zip"),_=>{opened=true;return new MemoryStream();},c.Token,_=>{});Require(!opened&&!r.Success,"Canceled operation opened USB.");});}
 static void ReportFailure() {WithFolder(folder=> {string p=Path.Combine(folder,"r.zip");File.WriteAllText(p,"old");bool opened=false;Throws<IOException>(()=>UamReadSession.Run(new("COM1","test","test"),p,_=>{opened=true;return new MemoryStream();},default,_=>{}));Require(!opened&&File.ReadAllText(p)=="old","Existing report damaged or USB opened.");});}
-static void PartialReply() {WithFolder(folder=> {var fake=new FakeUsb(Reply("VR00","UAM-05LP-T301,1.0,TEST")[..10]);string p=Path.Combine(folder,"r.zip");Require(!Run(fake,p).Success,"Partial reply accepted.");using var z=ZipFile.OpenRead(p);Require(z.GetEntry("VR00-response.bin")?.Length==10,"Partial evidence lost.");});}
-static void CloseFailure() {WithFolder(folder=> {var fake=new FakeUsb(Reply("VR00","UAM-05LP-T301,1.0,TEST").Concat(Reply("AR00","0010000000000")).ToArray()){FailClose=true};var r=Run(fake,Path.Combine(folder,"r.zip"));Require(!r.Success&&r.Summary.Contains("close failed"),"Close failure hidden.");});}
+static void PartialReply() {WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42","UAM-05LP-T301,1.0,TEST")[..10]);string p=Path.Combine(folder,"r.zip");Require(!Run(fake,p).Success,"Partial reply accepted.");using var z=ZipFile.OpenRead(p);Require(z.GetEntry("VR42-response.bin")?.Length==10,"Partial evidence lost.");});}
+static void CloseFailure() {WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42","UAM-05LP-T301,1.0,TEST").Concat(Reply("AR00","0010000000000")).ToArray()){FailClose=true};var r=Run(fake,Path.Combine(folder,"r.zip"));Require(!r.Success&&r.Summary.Contains("close failed"),"Close failure hidden.");});}
 static UamReadResult Run(FakeUsb fake,string path)=>UamReadSession.Run(new("COM1","test","test"),path,_=>fake,default,_=>{});
 static void WithFolder(Action<string> action){string p=Path.Combine(Path.GetTempPath(),"uam-validation-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(p);try{action(p);}finally{Directory.Delete(p,true);}}
 static void Throws<T>(Action action) where T:Exception {try{action();}catch(T){return;}throw new Exception("Expected "+typeof(T).Name);}

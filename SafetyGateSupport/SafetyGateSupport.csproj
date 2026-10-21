@@ -9,9 +9,9 @@
     <RootNamespace>SafetyGateSupport</RootNamespace>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
-    <Version>6.6.1</Version>
-    <AssemblyVersion>6.6.1.0</AssemblyVersion>
-    <FileVersion>6.6.1.0</FileVersion>
+    <Version>6.6.2</Version>
+    <AssemblyVersion>6.6.2.0</AssemblyVersion>
+    <FileVersion>6.6.2.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="SeedData.zip" />

@@ -23,8 +23,18 @@ public static class UamReadSession
             ct.ThrowIfCancellationRequested();
             progress("Opening selected test scanner…");
             stream = connect(ct);
-            var identity = Exchange(stream, UamWire.IdentityRequest(), "VR00", report, ct);
-            if (identity.Status != "00") throw new InvalidDataException("Identity request rejected with protocol status " + identity.Status + ".");
+            progress("Reading scanner identity with the vendor startup query…");
+            var identity = Exchange(stream, UamWire.IdentityRequest(), "VR42", report, ct);
+            // Project Designer starts with VR42. Older devices can reject that version query.
+            // Only this explicit empty rejection permits the separate legacy read, once.
+            if (identity.Status == "90" && identity.Data.Length == 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                progress("Startup identity query rejected; reading legacy identity once…");
+                identity = Exchange(stream, UamWire.LegacyIdentityRequest(), "VR00", report, ct);
+            }
+            if (identity.Status != "00")
+                throw new InvalidDataException($"USB communication received a valid reply, but the identity read returned protocol status {identity.Status}. This is not a scanner display fault code; scanner health cannot be determined. No status request was sent.");
             // Only accept an exact model field, never a substring in an unrelated device's identity.
             string[] fields = identity.Data.Split(',').Select(s => s.Trim()).ToArray();
             if (!fields.Contains("UAM-05LP-T301", StringComparer.Ordinal))
@@ -40,15 +50,15 @@ public static class UamReadSession
         catch (Exception error) when (error is not OutOfMemoryException)
         {
             failure = error.GetType().Name + ": " + error.Message;
-            summary = "Scanner condition NOT VERIFIED. " + (error is OperationCanceledException ? "Read canceled or session deadline reached." : failure);
+            summary = "Scanner condition NOT VERIFIED. " + (error is OperationCanceledException ? "Read canceled or session deadline reached." : error.Message);
         }
         finally
         {
             try { stream?.Dispose(); }
             catch (Exception error) { success = false; failure = "USB close failed: " + error.Message; summary += "\n" + failure + "\nScanner condition not verified."; }
         }
-        Write(report, "result.json", JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 1, timestampUtc = DateTimeOffset.UtcNow, port, readCompleted = success, hardwareValidated = false, summary, failure, allowedRequests = new[] { "VR00", "AR00" } }, new JsonSerializerOptions { WriteIndented = true }));
-        Write(report, "README.txt", Encoding.UTF8.GetBytes("First hardware validation. Compare this snapshot with Project Designer and the scanner front display on the same test unit. Commands are identity VR00 and one-shot measurement/status AR00 only. No login, configuration, reset, streaming or mode-changing commands are sent. No automatic retry. A completed read is not a passed scanner functional test. Do not use this report as authorization to operate equipment.\n\n" + summary));
+        Write(report, "result.json", JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 2, timestampUtc = DateTimeOffset.UtcNow, port, readCompleted = success, hardwareValidated = false, summary, failure, allowedRequests = new[] { "VR42", "VR00", "AR00" } }, new JsonSerializerOptions { WriteIndented = true }));
+        Write(report, "README.txt", Encoding.UTF8.GetBytes("First hardware validation. Compare this snapshot with Project Designer and the scanner front display on the same test unit. Commands are startup identity VR42, legacy identity VR00 only after an empty status-90 rejection, and one-shot measurement/status AR00. No login, configuration, reset, streaming or mode-changing commands are sent. No repeated commands or automatic reset. A completed read is not a passed scanner functional test. Do not use this report as authorization to operate equipment.\n\n" + summary));
         progress("USB closed; finishing local report…");
         return new UamReadResult(success, summary, reportPath);
     }
