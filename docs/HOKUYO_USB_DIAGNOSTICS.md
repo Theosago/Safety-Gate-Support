@@ -1,11 +1,11 @@
 # UAM-05LP-T301 USB diagnostics — first hardware validation
 
-Safety Gate Support 6.6.0 adds **Check UAM scanner…** to a unit's UAM scanner resource and to its guided scanner troubleshooting. This is a read-only diagnostic prototype, awaiting comparison against an actual USB response. It does not program the scanner, change its operating mode, reset errors, clear history, or start continuous measurement.
+Safety Gate Support 6.6.1 adds **Check UAM scanner…** to a unit's UAM scanner resource and to its guided scanner troubleshooting. This is a read-only diagnostic prototype, awaiting comparison against an actual USB response. It does not program the scanner, change its operating mode, reset errors, clear history, or start continuous measurement.
 
 ## Try the first reading
 
 1. Use the spare UAM-05LP-T301, isolated from operating equipment. Supply its specified external power, connect its USB data cable, and close UAM Project Designer. Its USB driver must already be installed.
-2. Open the unit's **Scanner Configuration** resource → **Check UAM scanner…**. Refreshing lists present SLS USB serial devices without opening a port.
+2. Open the unit's **Scanner Configuration** resource → **Check UAM scanner…**. Present USB serial connections are discovered from the Windows PnP tree, including vendor driver child interfaces, without opening a port. Plug/unplug automatically refreshes the list. A sole USB connection or sole recognized Hokuyo candidate is selected automatically; multiple ambiguous devices require selection.
 3. Select the intended scanner, click **Read USB status and save report…**, and save the ZIP locally. The default is `%LOCALAPPDATA%\SafetyGateSupport\HokuyoReports`; Q: is not needed for reports. Confirm the first test reading. Serial open uses 115200, 8N1, DTR and RTS asserted, matching the supplied vendor software.
 4. Retain the preliminary result and front-display code. After the Support program releases USB, compare the same scanner's state in Project Designer. Send the generated report ZIP and the observed state for validation. There is no need to upload the full vendor installer again.
 
@@ -17,7 +17,7 @@ The separate **Look up a display code** tab works without USB. Its explanations 
 
 Static inspection of the supplied UAM Project Designer native executable identified its SLS serial interface (`VID_143F`, `PID_0021`), connection settings, fixed identity read `VR00` and one-shot measurement/status read `AR00`. Vendor code was neither executed nor incorporated into this repository. Vendor EXEs, DLLs, manuals and user diagnostic captures are not distributed with the app.
 
-Frames use STX/ETX, four uppercase hexadecimal total-length characters and CRC-16 with reflected polynomial 0x8408, zero initial value and no final XOR or byte swap. The native implementation independently yields `000EVR00` → `3492`. Replies require matching command, valid length, printable ASCII, CRC, and protocol result `00`. The model must be the exact `UAM-05LP-T301` comma-separated identity field before `AR00` is sent. A different identity format is retained for review, never accepted using a loose substring.
+Frames use STX/ETX, four uppercase hexadecimal total-length characters and CRC-16 with reflected polynomial 0x8408, zero initial value and no final XOR or byte swap. The native implementation independently yields `000EVR00` → `3492`. Replies require matching command, valid length, printable ASCII, CRC, and protocol result `00`. USB IDs and names rank candidate connections only; unidentified USB serial connections are kept visible to support alternate driver revisions. The legacy serial-port map and the Ports device class are not required. A listed USB connection is not proof that a scanner is attached. No ports are automatically opened or probed. The model must be the exact `UAM-05LP-T301` comma-separated identity field before `AR00` is sent. A different identity format is retained for review, never accepted using a loose substring.
 
 The common LP monitor prefix is mode(1), area(2 hex), active error(1), last error(2 hex), lockout(1). Native readers consume active error and last error separately. This initial decoder only presents that prefix provisionally; it does not infer output causes from unvalidated trailing fields. No real hardware capture has yet verified this implementation's framing or interpretation.
 

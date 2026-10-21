@@ -1,4 +1,4 @@
-# Safety Gate Support — Home Preview (6.6.0)
+# Safety Gate Support — Home Preview (6.6.1)
 
 1. Extract the entire ZIP into a folder on your Windows PC.
 2. Double-click **SafetyGateSupportPreview.exe**.

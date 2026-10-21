@@ -10,6 +10,11 @@ var checks = new (string Name, Action Check)[]
     ("range boundaries do not swallow other named errors", () => { Require(UamErrorCatalog.Lookup("80").Title == "Master-unit error", "Master error became generic."); Require(UamErrorCatalog.Lookup("C0").Title == "Optical-window contamination" && UamErrorCatalog.Lookup("C1").Title.StartsWith("Optical window removed"), "Window range boundary incorrect."); Require(UamErrorCatalog.Lookup("D3").Title == "Incomplete configuration" && UamErrorCatalog.Lookup("E6").Title == "Incomplete configuration" && !UamErrorCatalog.Lookup("E7").Title.StartsWith("Incomplete"), "Configuration range boundary incorrect."); }),
     ("invalid code strings are rejected without decimal guessing", () => { foreach (string value in new[]{"", "1", "123", "G1", "7 4", "0x123", "-1"}) { try { UamErrorCatalog.Lookup(value); throw new Exception("Accepted invalid code: " + value); } catch(FormatException) { } } }),
     ("all byte values have a source and a conservative interpretation", () => { for (int n=0;n<256;n++) { var info=UamErrorCatalog.Lookup(n.ToString("X2")); Require(info.Title.Length > 0 && info.Checks.Length > 0 && info.Source.Contains("C-61-00003-12"), "Missing lookup detail."); } }),
+    ("discovery accepts COM59 with both vendor USB IDs and driver child interfaces", KnownUsbCandidates),
+    ("discovery retains unidentified USB interfaces without claiming scanner identity", UnknownUsbCandidates),
+    ("discovery excludes non-USB, invalid COM names and duplicate ports", DiscoveryFiltering),
+    ("automatic selection prefers one recognized scanner and preserves the exact selection", AutomaticSelection),
+    ("ambiguous connections are never auto-selected or probed", AmbiguousSelection),
     ("identity request matches the independently checked native CRC vector", () => Require(Convert.ToHexString(UamWire.IdentityRequest()) == "0230303045565230303334393203", "VR00 wire vector changed.")),
     ("only fixed read requests are exposed", () => { Require(Encoding.ASCII.GetString(UamWire.StatusRequest()).Contains("AR00"), "Wrong status request."); Require(UamWire.StatusRequest().Length == 14, "Unexpected request payload."); }),
     ("framing rejects corrupt CRC, mismatched lengths and wrong commands", WireFailures),
@@ -27,6 +32,45 @@ int passed=0;
 foreach(var (name, check) in checks) { try {check();passed++;Console.WriteLine("PASS "+name);} catch(Exception error){Console.Error.WriteLine($"FAIL {name}: {error}");} }
 Console.WriteLine($"Hokuyo checks: {passed}/{checks.Length} passed.");return passed==checks.Length?0:1;
 static void Require(bool ok,string message){if(!ok)throw new InvalidOperationException(message);}
+
+static UamSerialDevice Device(string port, string usb, string label="USB serial device", string instance="") => new(port, instance.Length==0 ? usb : instance, usb, label, "");
+static void KnownUsbCandidates()
+{
+    var virtualDriver=UamDeviceDiscovery.FindCandidates([Device("COM59","","HOKUYO UAM-05LP USB Driver",@"ROOT\vendor-serial\test")]);
+    Require(virtualDriver.Count==1 && virtualDriver[0].IsRecognizedCandidate,"Named vendor virtual interface excluded without a USB parent.");
+    foreach(string id in new[]{@"USB\VID_143F&PID_0021\test",@"USB\VID_15D1&PID_0000&MI_00\test"})
+    {
+        var devices=UamDeviceDiscovery.FindCandidates([Device("COM59",id,instance:@"FTDIBUS\child")]);
+        Require(devices.Count==1&&devices[0].PortName=="COM59"&&devices[0].IsRecognizedCandidate,"Vendor driver or high COM number excluded.");
+    }
+}
+static void UnknownUsbCandidates()
+{
+    var devices=UamDeviceDiscovery.FindCandidates([Device("COM59",@"USB\VID_ABCD&PID_1234\test")]);
+    Require(devices.Count==1&&!devices[0].IsRecognizedCandidate&&devices[0].DisplayName.Contains("identity not checked"),"Unknown USB device hidden or called a scanner.");
+    Require(UamDeviceDiscovery.AutoSelect(devices,null)==devices[0],"Sole connected USB device not selected.");
+}
+static void DiscoveryFiltering()
+{
+    var devices=UamDeviceDiscovery.FindCandidates([Device("COM59",@"USB\VID_143F&PID_0021\test"),Device("com59",@"USB\VID_143F&PID_0021\duplicate"),Device("COM1",@"ACPI\PNP0501\test"),Device("COM0",@"USB\VID_ABCD&PID_1234\test"),Device("COM59evil",@"USB\VID_ABCD&PID_1234\test"),Device("LPT1",@"USB\VID_ABCD&PID_1234\test")]);
+    Require(devices.Count==1,"Non-USB, malformed or duplicate port accepted.");
+}
+static void AutomaticSelection()
+{
+    var devices=UamDeviceDiscovery.FindCandidates([Device("COM3",@"USB\VID_ABCD&PID_1234\test"),Device("COM59",@"USB\VID_143F&PID_0021\test")]);
+    Require(UamDeviceDiscovery.AutoSelect(devices,null)?.PortName=="COM59","Recognized scanner was not preferred.");
+    Require(UamDeviceDiscovery.AutoSelect(devices,devices.Single(d=>d.PortName=="COM3"))?.PortName=="COM3","Explicit selection lost during refresh.");
+    var renamed=devices.Select(d=>d with{PortName="COM99"}).ToArray();
+    Require(UamDeviceDiscovery.AutoSelect(renamed,devices[0])?.PortName=="COM99","Stale port selected after reconnection.");
+}
+static void AmbiguousSelection()
+{
+    var unknown=UamDeviceDiscovery.FindCandidates([Device("COM3",@"USB\VID_ABCD&PID_1234\a"),Device("COM59",@"USB\VID_ABCD&PID_1234\b")]);
+    Require(UamDeviceDiscovery.AutoSelect(unknown,null)==null,"Ambiguous USB device selected.");
+    var known=UamDeviceDiscovery.FindCandidates([Device("COM3",@"USB\VID_143F&PID_0021\a"),Device("COM59",@"USB\VID_143F&PID_0021\b")]);
+    Require(UamDeviceDiscovery.AutoSelect(known,null)==null,"One of two scanners selected arbitrarily.");
+    Require(UamDeviceDiscovery.AutoSelect([],known[0])==null,"Disconnected scanner retained.");
+}
 
 static byte[] Reply(string command, string data, string status="00")
 {

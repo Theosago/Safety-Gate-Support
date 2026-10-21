@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -94,6 +96,7 @@ internal static class Program
             ("Unit light resource exposes the built-in USB action", IntegratedLightResource),
             ("UAM diagnostics opens idle and manual lookup never changes USB status", UamDiagnosticsStartup),
             ("Home preview UAM diagnostics keeps USB disabled after device selection", UamPreview),
+            ("UAM device-change notification refreshes stale USB selection without opening ports", UamHotPlugRefresh),
             ("UAM resource exposes diagnostics without adding it to a light resource", UamResource),
             ("Support library loads imported documentation on demand and filters filenames", SupportLibraryWindowStartup),
             ("Siemens USB check window renders with read-only controls and idle connection", SiemensWindowStartup),
@@ -311,6 +314,25 @@ internal static class Program
         Require(Control<TextBlock>(window, "LookupTitleText").Text.Contains("not covered"), "Unknown code was accepted as normal.");
         Equal(original, Control<TextBox>(window, "ResultText").Text, "Manual lookup changed USB status");
     }
+
+    private static async Task UamHotPlugRefresh()
+    {
+        var fixture = NewFixture();
+        var window = Track(new UamDiagnosticsWindow(fixture.Data, fixture.Gate, fixture.BlueUnit));
+        ShowOffscreen(window);
+        await WaitUntil(() => Control<Button>(window, "RefreshButton").IsEnabled, "Initial USB discovery did not settle.");
+        var combo = Control<ComboBox>(window, "DeviceCombo");
+        combo.ItemsSource = new[] { new SafetyGateSupport.Hokuyo.UamUsbPort("COM59", "validation-disconnected-device", "validation disconnected scanner") };
+        combo.SelectedIndex = 0;
+        Require(Control<Button>(window, "ReadButton").IsEnabled, "Fixture selection was not active.");
+        _ = SendMessageW(new WindowInteropHelper(window).Handle, 0x0219, new IntPtr(7), IntPtr.Zero);
+        await WaitUntil(() => combo.SelectedItem is not SafetyGateSupport.Hokuyo.UamUsbPort p || p.DeviceInstanceId != "validation-disconnected-device", "Plug/unplug notification did not clear stale selection.");
+        Require(!Control<Button>(window, "CancelButton").IsEnabled, "Device discovery started a USB read.");
+    }
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    private static extern IntPtr SendMessageW(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
     private static async Task UamPreview()
     {

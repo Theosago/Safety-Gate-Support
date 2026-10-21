@@ -2,6 +2,8 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using SafetyGateSupport.Hokuyo;
 using SafetyGateSupport.Models;
@@ -12,6 +14,8 @@ namespace SafetyGateSupport;
 public partial class UamDiagnosticsWindow : Window
 {
     private readonly bool _preview;
+    private HwndSource? _deviceNotifications;
+    private readonly DispatcherTimer _deviceRefresh = new() { Interval = TimeSpan.FromMilliseconds(600) };
     private bool _detecting;
     private bool _closeAfter;
     private CancellationTokenSource? _operation;
@@ -24,7 +28,29 @@ public partial class UamDiagnosticsWindow : Window
     {
         MaxHeight = SystemParameters.WorkArea.Height;
         if (_preview) { DetectionText.Text = "Home preview: USB operations are disabled. Explore Look up a display code without hardware."; UpdateControls(); return; }
+        _deviceNotifications = HwndSource.FromVisual(this) as HwndSource;
+        _deviceNotifications?.AddHook(DeviceMessage);
+        _deviceRefresh.Tick += async (_, _) =>
+        {
+            _deviceRefresh.Stop();
+            if (_detecting || _operation is not null) { _deviceRefresh.Start(); return; }
+            await DetectAsync();
+        };
         await DetectAsync();
+    }
+    private IntPtr DeviceMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message == 0x0219 && !_preview) // WM_DEVICECHANGE: debounce driver/interface arrival and removal.
+        {
+            _deviceRefresh.Stop(); _deviceRefresh.Start();
+        }
+        return IntPtr.Zero;
+    }
+    protected override void OnClosed(EventArgs e)
+    {
+        _deviceRefresh.Stop();
+        _deviceNotifications?.RemoveHook(DeviceMessage);
+        base.OnClosed(e);
     }
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await DetectAsync();
     private async Task DetectAsync()
@@ -36,16 +62,22 @@ public partial class UamDiagnosticsWindow : Window
         {
             var devices = await Task.Run(WindowsUamConnection.DetectPorts);
             DeviceCombo.ItemsSource = devices;
-            DeviceCombo.SelectedItem = devices.FirstOrDefault(p => p.DeviceInstanceId == previous?.DeviceInstanceId);
-            if (devices.Count == 1) DeviceCombo.SelectedIndex = 0;
-            DetectionText.Text = devices.Count == 0 ? "No supported SLS USB serial device is present. Check external power, the data cable, and the driver supplied with Project Designer. Detection does not open a port." : $"{devices.Count} supported USB serial device(s) detected. Select the intended test scanner. No USB connection has been opened.";
+            var selected = UamDeviceDiscovery.AutoSelect(devices, previous);
+            DeviceCombo.SelectedItem = selected;
+            if (previous?.DeviceInstanceId != selected?.DeviceInstanceId || previous?.PortName != selected?.PortName)
+                ResultText.Text = "Not checked for this USB connection. Read identity and status to confirm the scanner model.";
+            DetectionText.Text = devices.Count == 0
+                ? "No USB serial connection found. Check scanner power, the USB data cable and the Project Designer driver. Plugging in a device refreshes this list automatically."
+                : selected is not null
+                    ? $"USB connection detected: {selected.PortName}. The scanner model is confirmed only when you run the read check. No port has been opened."
+                    : "Multiple USB serial connections found. Select the scanner connection shown in Project Designer. No ports have been opened or probed.";
         }
         catch (Exception error) { DetectionText.Text = "Device detection failed: " + error.Message; }
         finally { _detecting = false; UpdateControls(); }
     }
     private void Device_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (ReadButton is null) return;
+        if (ReadButton is null || _detecting) return;
         ResultText.Text = "Not checked for this USB selection. Detection does not establish scanner health.";
         UpdateControls();
     }
