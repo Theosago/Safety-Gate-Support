@@ -1,0 +1,75 @@
+name: Build UAM software analysis collector
+
+on:
+  push:
+    paths:
+      - 'tools/UamSoftwarePack/**'
+      - 'tests/UamSoftwarePack.Validation/**'
+      - '.github/workflows/uam-analysis.yml'
+      - 'global.json'
+  pull_request:
+    paths:
+      - 'tools/UamSoftwarePack/**'
+      - 'tests/UamSoftwarePack.Validation/**'
+      - '.github/workflows/uam-analysis.yml'
+      - 'global.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Validate bounded software collection
+        run: dotnet run --project tests/UamSoftwarePack.Validation/UamSoftwarePack.Validation.csproj -c Release
+
+  windows-build:
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Validate software collection on Windows
+        run: dotnet run --project tests/UamSoftwarePack.Validation/UamSoftwarePack.Validation.csproj -c Release
+      - name: Publish self-contained collector
+        run: dotnet publish tools/UamSoftwarePack/UamSoftwarePack.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/uam-software-pack
+      - name: Smoke-test the published Windows application
+        shell: pwsh
+        run: |
+          $collector = Start-Process -FilePath (Resolve-Path artifacts/uam-software-pack/UamSoftwarePack.exe) -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(30)
+            do {
+              Start-Sleep -Milliseconds 250
+              $collector.Refresh()
+              if ($collector.HasExited) { throw 'Collector exited before its window opened.' }
+            } until (($collector.MainWindowHandle -ne 0 -and $collector.MainWindowTitle -like '*UAM software analysis pack*') -or (Get-Date) -gt $deadline)
+            if ($collector.MainWindowHandle -eq 0 -or $collector.MainWindowTitle -notlike '*UAM software analysis pack*') { throw 'Published collector did not open its window.' }
+            Write-Host 'Published UAM collector window opened successfully.'
+          } finally {
+            if (!$collector.HasExited) {
+              $null = $collector.CloseMainWindow()
+              if (!$collector.WaitForExit(10000)) { $collector.Kill(); $collector.WaitForExit() }
+            }
+          }
+      - name: Add instructions and checksum
+        shell: pwsh
+        run: |
+          Copy-Item tools/UamSoftwarePack/README.md artifacts/uam-software-pack/README.md
+          $collectorHash = (Get-FileHash artifacts/uam-software-pack/UamSoftwarePack.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$collectorHash  UamSoftwarePack.exe" | Set-Content artifacts/uam-software-pack/UamSoftwarePack.exe.sha256 -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UAM-Software-Analysis-Pack-Windows-x64
+          path: artifacts/uam-software-pack/
+          if-no-files-found: error
+          retention-days: 30
