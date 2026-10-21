@@ -92,6 +92,9 @@ internal static class Program
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
             ("Integrated column tool requires explicit assigned file selection and keeps observation state accurate", IntegratedColumnWindow),
             ("Unit light resource exposes the built-in USB action", IntegratedLightResource),
+            ("UAM diagnostics opens idle and manual lookup never changes USB status", UamDiagnosticsStartup),
+            ("Home preview UAM diagnostics keeps USB disabled after device selection", UamPreview),
+            ("UAM resource exposes diagnostics without adding it to a light resource", UamResource),
             ("Support library loads imported documentation on demand and filters filenames", SupportLibraryWindowStartup),
             ("Siemens USB check window renders with read-only controls and idle connection", SiemensWindowStartup),
             ("Siemens USB check saves an exact backup using only the two permitted GETs", SiemensBackupSession),
@@ -288,6 +291,49 @@ internal static class Program
         var resource = fixture.Data.ResourcesFor(fixture.Gate, fixture.BlueUnit).First(SignalColumnService.IsLightResource);
         var window = Track(new ResourceWindow(fixture.Data, fixture.Gate, fixture.BlueUnit, resource));
         Require(Control<Button>(window, "SignalColumnButton").Visibility == Visibility.Visible, "Unit light resource has no integrated USB action.");
+        return Task.CompletedTask;
+    }
+
+    private static async Task UamDiagnosticsStartup()
+    {
+        var fixture = NewFixture();
+        var window = Track(new UamDiagnosticsWindow(fixture.Data, fixture.Gate, fixture.BlueUnit));
+        ShowOffscreen(window);
+        await WaitUntil(() => Control<Button>(window, "RefreshButton").IsEnabled, "UAM passive detection did not settle.");
+        Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "CancelButton").IsEnabled, "Idle UAM window enabled a read without a device.");
+        string original = Control<TextBox>(window, "ResultText").Text;
+        Control<TextBox>(window, "CodeBox").Text = "74";
+        Click(Control<Button>(window, "LookupButton"));
+        Require(Control<TextBlock>(window, "LookupTitleText").Text.Contains("Power-supply"), "Manual supply code was not rendered.");
+        Require(Control<TextBlock>(window, "LookupSourceText").Text.Contains("138–141"), "Manual source missing.");
+        Control<TextBox>(window, "CodeBox").Text = "00";
+        Click(Control<Button>(window, "LookupButton"));
+        Require(Control<TextBlock>(window, "LookupTitleText").Text.Contains("Unlisted"), "Unknown code was accepted as normal.");
+        Equal(original, Control<TextBox>(window, "ResultText").Text, "Manual lookup changed USB status");
+    }
+
+    private static async Task UamPreview()
+    {
+        var profile = HomePreviewService.Create(Path.Combine(NewDirectory(), "preview"));
+        // Preview profile creates only local starter data, never the normal Q: profile.
+        profile.InitializeSharedData();
+        var unit = profile.LoadSystems().First(); var gate = profile.LoadGates().Single(g => g.Id == unit.GateId);
+        var window = Track(new UamDiagnosticsWindow(profile, gate, unit));
+        ShowOffscreen(window); await DispatcherSettled();
+        Control<ComboBox>(window, "DeviceCombo").ItemsSource = new[] { new SafetyGateSupport.Hokuyo.UamUsbPort("COM1", "test", "test") };
+        Control<ComboBox>(window, "DeviceCombo").SelectedIndex = 0;
+        Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "RefreshButton").IsEnabled && !Control<ComboBox>(window, "DeviceCombo").IsEnabled, "Home preview enabled USB operations.");
+    }
+
+    private static Task UamResource()
+    {
+        var fixture = NewFixture();
+        var resource = new ResourceDefinition { Id = "test-uam", Label = "UAM scanner", Kind = "ManagedFiles", LaunchAction = "UAM", AppliesToUnitIds = [fixture.BlueUnit.Id], RelativeFolder = "Validation/UAM" };
+        var window = Track(new ResourceWindow(fixture.Data, fixture.Gate, fixture.BlueUnit, resource));
+        Require(Control<Button>(window, "UamDiagnosticsButton").Visibility == Visibility.Visible, "UAM diagnostics action missing.");
+        var light = fixture.Data.ResourcesFor(fixture.Gate, fixture.BlueUnit).First(SignalColumnService.IsLightResource);
+        var lightWindow = Track(new ResourceWindow(fixture.Data, fixture.Gate, fixture.BlueUnit, light));
+        Require(Control<Button>(lightWindow, "UamDiagnosticsButton").Visibility == Visibility.Collapsed, "UAM action shown for a light resource.");
         return Task.CompletedTask;
     }
 

@@ -32,6 +32,8 @@ jobs:
         run: dotnet build SafetyGateSupport/SafetyGateSupport.csproj -c Release
       - name: Validate Siemens upload and recovery on Windows
         run: dotnet run --project tests/SafetyGateSupport.SiemensValidation/SafetyGateSupport.SiemensValidation.csproj -c Release
+      - name: Validate read-only Hokuyo framing and failure handling
+        run: dotnet run --project tests/SafetyGateSupport.HokuyoValidation/SafetyGateSupport.HokuyoValidation.csproj -c Release
       - name: Run Windows desktop regression checks
         shell: pwsh
         run: |
@@ -55,6 +57,7 @@ jobs:
           "$usbCheckHash  SiemensUsbCheck.exe" | Set-Content artifacts/siemens-usb-check/SiemensUsbCheck.exe.sha256 -Encoding ascii
           Copy-Item tools/SiemensUsbCheck/README.md artifacts/siemens-usb-check/README.md
           Copy-Item docs/WINDOWS_QUICK_START.md artifacts/win-x64/README.md
+          Copy-Item docs/HOKUYO_USB_DIAGNOSTICS.md artifacts/win-x64/HOKUYO_USB_DIAGNOSTICS.md
       - name: Package and smoke-test home preview
         shell: pwsh
         run: |

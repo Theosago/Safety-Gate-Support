@@ -112,7 +112,7 @@ internal static class SupportLibraryChecks
         {
             Require(flow.Nodes.Any(n => n.Id == flow.StartNodeId), "Missing flow start.");
             Require(flow.Nodes.SelectMany(n => n.Choices).All(c => flow.Nodes.Any(n => n.Id == c.NextNodeId)), "Unresolved troubleshooting branch.");
-            Require(flow.Nodes.All(n => n.Action is "" or "Library" or "SignalColumn"), "Unknown tool action.");
+            Require(flow.Nodes.All(n => n.Action is "" or "Library" or "SignalColumn" or "UamDiagnostics"), "Unknown tool action.");
         }
         var edited = new TroubleshootingFlow { Id = defaults[0].Id, Title = "Site edited flow", Nodes = [new() { Prompt = "Keep this edit" }] };
         var merged = GuidedTroubleshooting.Merge([edited]);

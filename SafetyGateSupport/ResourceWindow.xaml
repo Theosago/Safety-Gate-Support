@@ -41,6 +41,7 @@
      <Button Content="Open Current Folder" Click="OpenCurrentFolder_Click"/>
      <Button x:Name="UpdateButton" Content="Upload / Update Drawing" Click="Update_Click" Visibility="Collapsed"/>
      <Button Content="View Archive" Click="OpenArchive_Click"/>
+     <Button x:Name="UamDiagnosticsButton" Content="Check UAM scanner…" Click="UamDiagnostics_Click" Visibility="Collapsed"/>
      <Button x:Name="SignalColumnButton" Content="Check / configure column…" Click="SignalColumn_Click" Visibility="Collapsed"/>
      <Button x:Name="LaunchButton" Click="Launch_Click" Visibility="Collapsed"/>
     </WrapPanel>

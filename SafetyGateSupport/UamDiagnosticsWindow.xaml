@@ -1,0 +1,48 @@
+<Window x:Class="SafetyGateSupport.UamDiagnosticsWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Hokuyo UAM-05LP-T301 — Diagnostics" Width="920" Height="780" MinWidth="760" MinHeight="620"
+ WindowStartupLocation="CenterOwner" Loaded="Window_Loaded">
+ <Grid Margin="20">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel>
+   <TextBlock Text="Hokuyo UAM-05LP-T301 diagnostics" FontSize="25" FontWeight="SemiBold"/>
+   <TextBlock x:Name="ContextText" Margin="0,5,0,14" TextWrapping="Wrap"/>
+  </StackPanel>
+  <TabControl Grid.Row="1">
+   <TabItem Header="USB status">
+    <Grid Margin="14">
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <TextBlock Text="First hardware validation: use a test scanner isolated from operating equipment. Close Project Designer. The scanner needs its specified external power and a USB data cable. Opening the serial port asserts DTR/RTS; connection behavior must be checked on the test unit. This tool does not reset faults or write configurations." TextWrapping="Wrap" Margin="0,0,0,12"/>
+     <DockPanel Grid.Row="1">
+      <Button x:Name="RefreshButton" DockPanel.Dock="Right" Content="Refresh devices" Click="Refresh_Click"/>
+      <ComboBox x:Name="DeviceCombo" IsEditable="False" MinHeight="34" VerticalAlignment="Center" SelectionChanged="Device_Changed"/>
+     </DockPanel>
+     <TextBlock x:Name="DetectionText" Grid.Row="2" Text="Device detection does not open USB." TextWrapping="Wrap" Margin="0,8,0,12"/>
+     <WrapPanel Grid.Row="3" Margin="0,0,0,12">
+      <Button x:Name="ReadButton" Content="Read USB status and save report…" Click="Read_Click" IsEnabled="False"/>
+      <Button x:Name="CancelButton" Content="Cancel" Click="Cancel_Click" IsEnabled="False"/>
+     </WrapPanel>
+     <TextBox x:Name="ResultText" Grid.Row="4" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="10" Text="Not checked. A detected USB port does not establish scanner health. Active fault status, past error codes, protective outputs and physical function are different observations."/>
+    </Grid>
+   </TabItem>
+   <TabItem Header="Look up a display code">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="14">
+     <TextBlock Text="Enter the two hexadecimal characters shown on the scanner's front display (for example 57, 70 or b1). This is a manual lookup, separate from a live USB reading." TextWrapping="Wrap"/>
+     <DockPanel Margin="0,12,0,12">
+      <Button x:Name="LookupButton" DockPanel.Dock="Right" Content="Look up code" Click="Lookup_Click"/>
+      <TextBox x:Name="CodeBox" MaxLength="8" MinHeight="34" VerticalContentAlignment="Center"/>
+     </DockPanel>
+     <TextBlock x:Name="LookupTitleText" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap"/>
+     <TextBlock x:Name="LookupBodyText" Margin="0,12,0,0" TextWrapping="Wrap" FontSize="14" LineHeight="22"/>
+     <TextBlock x:Name="LookupSourceText" Margin="0,16,0,0" Foreground="#666" TextWrapping="Wrap"/>
+     <TextBlock Text="Follow the approved service and functional-test procedures. A code lookup does not clear an error or establish that the safety installation is working correctly." Margin="0,18,0,0" TextWrapping="Wrap"/>
+    </StackPanel></ScrollViewer>
+   </TabItem>
+  </TabControl>
+  <DockPanel Grid.Row="2" Margin="0,12,0,0">
+   <Button DockPanel.Dock="Right" Content="Close" Click="Close_Click"/>
+   <TextBlock x:Name="StatusText" Text="Not checked." TextWrapping="Wrap" VerticalAlignment="Center"/>
+  </DockPanel>
+ </Grid>
+</Window>

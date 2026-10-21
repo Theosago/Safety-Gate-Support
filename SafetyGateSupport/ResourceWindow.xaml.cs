@@ -27,6 +27,7 @@ public partial class ResourceWindow : Window
         else if (resource.LaunchAction.Equals("UAM", StringComparison.OrdinalIgnoreCase)) { LaunchButton.Content = "Launch UAM Project Designer"; LaunchButton.Visibility = Visibility.Visible; }
         else LaunchButton.Visibility = Visibility.Collapsed;
         SignalColumnButton.Visibility = SignalColumnService.IsLightResource(resource) ? Visibility.Visible : Visibility.Collapsed;
+        UamDiagnosticsButton.Visibility = resource.LaunchAction.Equals("UAM", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         RefreshFiles();
     }
 
@@ -90,6 +91,7 @@ public partial class ResourceWindow : Window
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) { MessageBox.Show($"{name} has not been configured on this computer.\n\nUse hidden setup mode to configure the executable path.", "Software path not configured", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         FileLauncherService.Open(path);
     }
+    private void UamDiagnostics_Click(object sender, RoutedEventArgs e) => new UamDiagnosticsWindow(_data, _gate, _unit) { Owner = this }.ShowDialog();
     private async void SignalColumn_Click(object sender, RoutedEventArgs e) => await SignalColumnService.OpenAsync(this, _data, _gate, _unit, new[] { _resource });
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
     private sealed class ResourceFileItem { public string Name { get; set; } = ""; public string Path { get; set; } = ""; public string Modified { get; set; } = ""; public string Size { get; set; } = ""; }

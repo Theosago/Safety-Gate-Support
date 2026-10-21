@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console, version **6.5.1**, based on the supplied
+Windows WPF support console, version **6.6.0**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,
@@ -114,3 +114,5 @@ dotnet publish .\SafetyGateSupport\SafetyGateSupport.csproj -c Release -r win-x6
 Output: `artifacts/win-x64/SafetyGateSupport.exe`. Initial data contains 60 units
 in 28 gates across three areas, with identification photos. No data format change
 or reinitialization is required to upgrade from version 6.4.1.
+
+Hokuyo UAM-05LP-T301 read-only USB diagnostics are available as a first-hardware-validation prototype; see [USB diagnostics and current limits](docs/HOKUYO_USB_DIAGNOSTICS.md). No scanner programming controls are provided.

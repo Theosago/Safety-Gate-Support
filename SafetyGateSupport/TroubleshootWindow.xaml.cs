@@ -68,6 +68,12 @@ public partial class TroubleshootWindow : Window
             tool.Click += async (_, _) => await SignalColumnService.OpenAsync(this, _data, _gate, _unit, _resources);
             ChoicePanel.Children.Add(tool);
         }
+        if (node.Action == "UamDiagnostics")
+        {
+            var tool = new Button { Content = "Check UAM scanner…", MinHeight = 42 };
+            tool.Click += (_, _) => new UamDiagnosticsWindow(_data, _gate, _unit) { Owner = this }.ShowDialog();
+            ChoicePanel.Children.Add(tool);
+        }
         if (node.Action == "Library")
         {
             var library = new Button { Content = "Open support library…", MinHeight = 42 };

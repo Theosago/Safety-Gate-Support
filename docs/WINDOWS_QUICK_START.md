@@ -1,10 +1,10 @@
-# Safety Gate Support 6.5.1 — Windows quick start
+# Safety Gate Support 6.6.0 — Windows quick start
 
 ## Upgrade
 
-1. Download **SafetyGateSupport-Windows-x64** from the successful GitHub Actions run for version 6.5.1. Extract the **whole ZIP** to a new folder on the PC.
+1. Download **SafetyGateSupport-Windows-x64** from the successful GitHub Actions run for version 6.6.0. Extract the **whole ZIP** to a new folder on the PC.
 2. Close the older app and run **SafetyGateSupport.exe**. No SDK, installer, or Siemens Configurator is required for the built-in light tool.
-3. Confirm **v6.5.1** in the sidebar. Existing local settings, shared data, photos, and site troubleshooting edits remain in use. Keep the old executable folder until the new version has been checked at the site.
+3. Confirm **v6.6.0** in the sidebar. Existing local settings, shared data, photos, and site troubleshooting edits remain in use. Keep the old executable folder until the new version has been checked at the site.
 
 On a new PC, use **Set Up Shared Data** or **Ctrl+Shift+Alt+A → Shared Data / Software** to select the existing shared folder. Initialize starter data only when starting with an empty folder. The default shared folder is `Q:\SafetyGateSupport`; local settings live under `%LOCALAPPDATA%\SafetyGateSupport`.
 
@@ -41,3 +41,7 @@ Guided troubleshooting includes separate **BEA LZR-S600**, **UAM scanner**, and 
 - **Parts:** imported parts lists are available as manuals. Existing Parts records remain intact. The documents contain differing actuator stroke/part descriptions; confirm the fitted component and current stockroom record before ordering.
 
 The original manuals, plant configurations, and vendor binaries are imported from your PC; they are not bundled into the public source or Windows artifact. Programs requiring a Windows driver or installer still need that vendor setup on each PC.
+
+## Hokuyo scanner diagnostics
+
+Open a unit's UAM scanner resource and choose **Check UAM scanner…**. Version 6.6.0 includes a read-only USB diagnostic prototype and offline front-display error-code lookup. The first USB report must be compared on the spare scanner before the live interpretation can be considered validated. See [Hokuyo USB diagnostics](HOKUYO_USB_DIAGNOSTICS.md). No scanner programming controls are included.

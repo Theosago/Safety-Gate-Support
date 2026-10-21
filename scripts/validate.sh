@@ -10,3 +10,5 @@ dotnet run --project tests/SafetyGateSupport.SiemensValidation/SafetyGateSupport
     --configuration Release
 dotnet run --project tests/SafetyGateSupport.Validation/SafetyGateSupport.Validation.csproj \
     --configuration Release -- "$@"
+
+dotnet run --project tests/SafetyGateSupport.HokuyoValidation/SafetyGateSupport.HokuyoValidation.csproj --configuration Release
