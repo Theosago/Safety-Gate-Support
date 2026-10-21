@@ -308,7 +308,7 @@ internal static class Program
         Require(Control<TextBlock>(window, "LookupSourceText").Text.Contains("138–141"), "Manual source missing.");
         Control<TextBox>(window, "CodeBox").Text = "00";
         Click(Control<Button>(window, "LookupButton"));
-        Require(Control<TextBlock>(window, "LookupTitleText").Text.Contains("Unlisted"), "Unknown code was accepted as normal.");
+        Require(Control<TextBlock>(window, "LookupTitleText").Text.Contains("not covered"), "Unknown code was accepted as normal.");
         Equal(original, Control<TextBox>(window, "ResultText").Text, "Manual lookup changed USB status");
     }
 
