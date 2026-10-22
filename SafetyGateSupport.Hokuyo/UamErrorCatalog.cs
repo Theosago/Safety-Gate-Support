@@ -15,6 +15,8 @@ public static class UamErrorCatalog
         if (text.Length != 2 || !byte.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out byte number))
             throw new FormatException("Enter the two hexadecimal characters shown on the scanner, for example 57, 70, or b1. Codes are not decimal numbers.");
         string normalized = number.ToString("X2", CultureInfo.InvariantCulture);
+        if (number == 0x75)
+            return new(normalized, "Internal system error", "UAM Project Designer calls for manufacturer intervention. Preserve the error details and contact Hokuyo or the authorized distributor. A later clear reading under different conditions does not establish that an intermittent fault is resolved.", Source + "; error 75 wording confirmed by UAM Project Designer 1.1.17 Monitor details", true);
         var item = number switch
         {
             0x45 => ("Setting error / incomplete setting", "Have qualified personnel review the approved configuration and its completeness."),

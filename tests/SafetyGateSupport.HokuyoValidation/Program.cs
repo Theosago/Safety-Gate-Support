@@ -19,7 +19,7 @@ var checks = new (string Name, Action Check)[]
     ("only fixed read requests are exposed", () => { Require(Encoding.ASCII.GetString(UamWire.StatusRequest()).Contains("AR00"), "Wrong status request."); Require(UamWire.StatusRequest().Length == 14, "Unexpected request payload."); }),
     ("framing rejects corrupt CRC, mismatched lengths and wrong commands", WireFailures),
     ("unknown and truncated status fields cannot become a healthy reading", UnknownStatus),
-    ("active fault and past code stay separate", () => { var past = UamStatus.Parse("0010740000000"); Require(!past.ErrorActive && past.LastErrorCode == "74" && past.Describe().Contains("not being classified as a current fault"), "Stored fault mislabeled active."); var active=UamStatus.Parse("0011741000000"); Require(active.ErrorActive && active.Lockout, "Active fault lost."); }),
+    ("active fault and past code stay separate", () => { var past = UamStatus.Parse("0010340000000"); Require(!past.ErrorActive && past.LastErrorCode == "74" && past.Describe().Contains("not being classified as a current fault"), "Stored fault mislabeled active."); var active=UamStatus.Parse("0011341000000"); Require(active.ErrorActive && active.Lockout, "Active fault lost."); }),
     ("fragmented replies use the complete VR42 identity before status", SuccessfulSession),
     ("wrong model and ambiguous model strings prevent AR00", ModelMismatch),
     ("protocol rejection stops without retries", RejectedIdentity),
@@ -34,7 +34,12 @@ var checks = new (string Name, Action Check)[]
     ("cancel before start never opens USB", CanceledSession),
     ("existing or unwritable report prevents opening USB", ReportFailure),
     ("partial replies are retained and never treated as successful", PartialReply),
-    ("failed USB close invalidates an otherwise completed read", CloseFailure)
+    ("failed USB close invalidates an otherwise completed read", CloseFailure),
+    ("captured obstruction status converts wire 45 to display 85", CapturedObstruction),
+    ("real power-only frames remain clear without inventing a display fault", CapturedClearSnapshots),
+    ("error conversion follows the native offset and byte bounds", DisplayCodeConversion),
+    ("error 75 retains the vendor manufacturer-intervention explanation", InternalError75),
+    ("busy serial port explains how to release access without claiming a read", BusyPort)
 };
 int passed=0;
 foreach(var (name, check) in checks) { try {check();passed++;Console.WriteLine("PASS "+name);} catch(Exception error){Console.Error.WriteLine($"FAIL {name}: {error}");} }
@@ -160,6 +165,46 @@ static void IdentityFieldValidation()
     foreach(string data in new[]{"UAM-05LP-OTHER,02.04.02r","OTHER,02.04.02r,UAM-05LP-T301","unknown UAM-05LP,02.04.02r","UAM-05LP,","UAM-05LP","UAM-05LP,firmware with spaces"})
         Throws<InvalidDataException>(()=>UamIdentity.Parse(data));
     Require(UamIdentity.Parse("UAM-05LP-T301,02.04.02r").Family=="UAM-05LP-T301","Explicit full model no longer supported.");
+}
+static void CapturedObstruction()
+{
+    var frame=Convert.FromBase64String(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"Fixtures","obstruction-ar00.base64")).Trim());
+    var reply=UamWire.Decode(frame,"AR00");
+    var status=UamStatus.Parse(reply.Data);
+    Require(status.ErrorActive&&!status.Lockout&&status.RawLastErrorCode=="45"&&status.LastErrorCode=="85","Captured obstruction status misdecoded.");
+    string message=status.Describe();
+    Require(message.Contains("85 — Object in limited-detection zone / optical-window contamination")&&!message.Contains("Setting error"),"Obstruction produced the old wrong configuration explanation.");
+    var identity=Reply("VR42","UAM-05LP,02.04.03r,TEST,00,0000,validation-unit,");
+    WithFolder(folder=> {string path=Path.Combine(folder,"r.zip");var result=Run(new FakeUsb(identity.Concat(frame).ToArray()),path);
+        Require(result.Success&&result.Summary.Contains("Reported display error: 85"),"Captured fault status was not exposed by the real read session.");
+        using var zip=ZipFile.OpenRead(path);using var json=new StreamReader(zip.GetEntry("status.json")!.Open());
+        string saved=json.ReadToEnd();Require(saved.Contains("\"RawLastErrorCode\":\"45\"")&&saved.Contains("\"LastErrorCode\":\"85\""),"Raw and display error values were not preserved independently.");});
+}
+static void CapturedClearSnapshots()
+{
+    foreach(string name in new[]{"working-ar00.base64","bench-clear-ar00.base64"})
+    {
+        var frame=Convert.FromBase64String(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"Fixtures",name)).Trim());
+        var status=UamStatus.Parse(UamWire.Decode(frame,"AR00").Data);
+        Require(!status.ErrorActive&&!status.Lockout&&status.RawLastErrorCode=="00"&&status.LastErrorCode is null,"Clear captured frame became an active error.");
+        Require(status.Describe().Contains("No active fault reported")&&!status.Describe().Contains("error: 40")&&!status.Describe().Contains("Scanner working correctly"),"Clear snapshot became a fault or health certification.");
+    }
+}
+static void DisplayCodeConversion()
+{
+    foreach(var (raw,display) in new[]{("05","45"),("35","75"),("44","84"),("45","85"),("81","C1"),("B5","F5")})
+        Require(UamStatus.Parse("0011"+raw+"0000000").LastErrorCode==display,"Error offset incorrect for "+raw);
+    foreach(string raw in new[]{"C0","FF"})Throws<InvalidDataException>(()=>UamStatus.Parse("0011"+raw+"0000000"));
+    var past=UamStatus.Parse("0010350000000");Require(!past.ErrorActive&&past.LastErrorCode=="75"&&past.Describe().Contains("not being classified as a current fault"),"Past 75 became a current fault.");
+}
+static void InternalError75()
+{
+    var info=UamErrorCatalog.Lookup("75");Require(info.Title=="Internal system error"&&info.Checks.Contains("manufacturer intervention")&&info.Source.Contains("Project Designer"),"Known vendor error 75 lost its explanation or source.");
+}
+static void BusyPort()
+{
+    WithFolder(folder=> {var result=UamReadSession.Run(new("COM59","test","test"),Path.Combine(folder,"r.zip"),_=>throw new UnauthorizedAccessException("Access denied"),default,_=>{});
+        Require(!result.Success&&result.Summary.Contains("COM59 is busy or access was denied")&&result.Summary.Contains("Close UAM Project Designer"),"Busy-port result did not explain the next step.");});
 }
 static void CanceledSession() {WithFolder(folder=> {using var c=new CancellationTokenSource();c.Cancel();bool opened=false;var r=UamReadSession.Run(new("COM1","test","test"),Path.Combine(folder,"r.zip"),_=>{opened=true;return new MemoryStream();},c.Token,_=>{});Require(!opened&&!r.Success,"Canceled operation opened USB.");});}
 static void ReportFailure() {WithFolder(folder=> {string p=Path.Combine(folder,"r.zip");File.WriteAllText(p,"old");bool opened=false;Throws<IOException>(()=>UamReadSession.Run(new("COM1","test","test"),p,_=>{opened=true;return new MemoryStream();},default,_=>{}));Require(!opened&&File.ReadAllText(p)=="old","Existing report damaged or USB opened.");});}

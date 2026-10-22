@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console, version **6.6.3**, based on the supplied
+Windows WPF support console, version **6.6.4**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,

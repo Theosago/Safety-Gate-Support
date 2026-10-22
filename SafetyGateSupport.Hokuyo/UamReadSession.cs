@@ -40,21 +40,26 @@ public static class UamReadSession
             progress("Reading one status snapshot…");
             var status = Exchange(stream, UamWire.StatusRequest(), "AR00", report, ct);
             if (status.Status != "00") throw new InvalidDataException("Status request rejected with protocol status " + status.Status + ".");
-            summary = deviceIdentity.Describe() + UamStatus.Parse(status.Data).Describe();
+            var scannerStatus = UamStatus.Parse(status.Data);
+            Write(report, "status.json", JsonSerializer.SerializeToUtf8Bytes(scannerStatus));
+            summary = deviceIdentity.Describe() + scannerStatus.Describe();
             ct.ThrowIfCancellationRequested();
             success = true;
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
             failure = error.GetType().Name + ": " + error.Message;
-            summary = "Scanner condition NOT VERIFIED. " + (error is OperationCanceledException ? "Read canceled or session deadline reached." : error.Message);
+            summary = "Scanner condition NOT VERIFIED. " + (error is OperationCanceledException ? "Read canceled or session deadline reached."
+                : error is UnauthorizedAccessException && stream is null
+                    ? $"{port.PortName} is busy or access was denied. Close UAM Project Designer and any other app using the scanner, then try again. Scanner status was not read."
+                    : error.Message);
         }
         finally
         {
             try { stream?.Dispose(); }
             catch (Exception error) { success = false; failure = "USB close failed: " + error.Message; summary += "\n" + failure + "\nScanner condition not verified."; }
         }
-        Write(report, "result.json", JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 2, timestampUtc = DateTimeOffset.UtcNow, port, readCompleted = success, hardwareValidated = false, summary, failure, allowedRequests = new[] { "VR42", "VR00", "AR00" } }, new JsonSerializerOptions { WriteIndented = true }));
+        Write(report, "result.json", JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 3, timestampUtc = DateTimeOffset.UtcNow, port, readCompleted = success, hardwareValidated = false, summary, failure, allowedRequests = new[] { "VR42", "VR00", "AR00" } }, new JsonSerializerOptions { WriteIndented = true }));
         Write(report, "README.txt", Encoding.UTF8.GetBytes("First hardware validation. Compare this snapshot with Project Designer and the scanner front display on the same test unit. Commands are startup identity VR42, legacy VR00 only after an empty status-90 startup rejection, and one-shot measurement/status AR00. No login, configuration, reset, streaming or mode-changing commands are sent. No repeated commands or automatic reset. A completed read is not a passed scanner functional test. Do not use this report as authorization to operate equipment.\n\n" + summary));
         progress("USB closed; finishing local report…");
         return new UamReadResult(success, summary, reportPath);
