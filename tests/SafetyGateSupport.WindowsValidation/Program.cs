@@ -272,7 +272,9 @@ internal static class Program
         var column = Track(new global::SiemensUsbCheck.MainWindow("Asset DEMO / Unit 1", [file], previewOnly: true));
         ShowOffscreen(column); Control<ComboBox>(column, "AssignedFilesCombo").SelectedIndex = 0;
         await WaitUntil(() => Control<Panel>(column, "SegmentPreviewPanel").Children.Count == 9, "Screenshot light preview did not load.");
-        SetPreviewInputs(column, 2); await DispatcherSettled(); Capture(column, "02-light-preview.png"); column.Close();
+        SetPreviewInputs(column, 2); await DispatcherSettled();
+        Descendants<ScrollViewer>(column).First().ScrollToBottom(); await DispatcherSettled();
+        Capture(column, "02-light-preview.png"); column.Close();
         var guide = Track(new TroubleshootWindow(data, gate, unit, data.LoadResources(), data.LoadTroubleshootingFlows(), "builtin-triage-v7", "gate-open"));
         ShowOffscreen(guide); await DispatcherSettled(); Capture(guide, "03-guided-check.png");
 
@@ -281,7 +283,14 @@ internal static class Program
             window.UpdateLayout();
             var content = (FrameworkElement)window.Content;
             var bitmap = new RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth), (int)Math.Ceiling(content.ActualHeight), 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(content);
+            var drawing = new DrawingVisual();
+            using (var context = drawing.RenderOpen())
+            {
+                var bounds = new Rect(0, 0, content.ActualWidth, content.ActualHeight);
+                context.DrawRectangle(window.Background ?? Brushes.White, null, bounds);
+                context.DrawRectangle(new VisualBrush(content), null, bounds);
+            }
+            bitmap.Render(drawing);
             var png = new PngBitmapEncoder(); png.Frames.Add(BitmapFrame.Create(bitmap));
             using var output = File.Create(Path.Combine(folder, filename)); png.Save(output);
             Require(output.Length > 5000, "WPF screenshot unexpectedly empty.");
