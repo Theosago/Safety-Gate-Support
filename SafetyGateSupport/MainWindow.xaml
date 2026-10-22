@@ -9,7 +9,7 @@
    <Grid>
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel Margin="14,18,14,10">
-     <TextBlock Text="Safety Gate" FontWeight="Bold" FontSize="19"/><TextBlock Text="Support" FontSize="16" Foreground="#AEC4D3"/>
+     <TextBlock Text="Safety Gate" Foreground="#F2F7FB" FontWeight="Bold" FontSize="19"/><TextBlock Text="Support" FontSize="16" Foreground="#AEC4D3"/>
     </StackPanel>
     <StackPanel Grid.Row="1" Margin="0,12,0,0">
      <Button x:Name="HomeNav" Style="{StaticResource NavButton}" Content="⌂   Home" Click="HomeNav_Click"/>
@@ -78,15 +78,15 @@
     </Grid>
     <Grid Grid.Row="2">
      <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <GroupBox Header="Safety Gates" Margin="0,0,10,0"><ListBox x:Name="AssetList" Margin="5" DisplayMemberPath="Display" SelectionChanged="AssetList_SelectionChanged"/></GroupBox>
-     <GroupBox Header="Units" Grid.Column="1" Margin="0,0,10,0"><ListBox x:Name="UnitList" Margin="5" DisplayMemberPath="UnitDisplay" SelectionChanged="UnitList_SelectionChanged"/></GroupBox>
+     <GroupBox Header="Safety Gates" Margin="0,0,10,0"><ListBox x:Name="AssetList" Margin="5" SelectionChanged="AssetList_SelectionChanged"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox></GroupBox>
+     <GroupBox Header="Units" Grid.Column="1" Margin="0,0,10,0"><ListBox x:Name="UnitList" Margin="5" SelectionChanged="UnitList_SelectionChanged"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding UnitDisplay}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox></GroupBox>
      <ScrollViewer Grid.Column="2"><StackPanel Margin="8,0,0,0">
       <StackPanel x:Name="NoUnitPanel" VerticalAlignment="Center" Margin="20,80,20,0">
-       <TextBlock Text="Select a safety gate, then choose a unit." FontSize="21" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-       <TextBlock Text="Your unit’s current files and tools appear here." Foreground="#666" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+       <TextBlock Text="Select a safety gate, then choose a unit." FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+       <TextBlock Text="Your unit’s current files and tools appear here." TextWrapping="Wrap" Foreground="#666" HorizontalAlignment="Center" Margin="0,8,0,0"/>
       </StackPanel>
       <StackPanel x:Name="UnitDetailPanel" Visibility="Collapsed">
-       <TextBlock x:Name="UnitTitleText" FontSize="24" FontWeight="Bold"/>
+       <TextBlock x:Name="UnitTitleText" TextWrapping="Wrap" FontSize="24" FontWeight="Bold"/>
        <TextBlock x:Name="UnitAreaText" Foreground="#555" Margin="0,2,0,10"/><WrapPanel><Button Content="Find this unit’s files" Style="{StaticResource PrimaryButton}" Click="UnitFiles_Click"/><Button Content="Troubleshoot" Click="TroubleshootSystem_Click"/></WrapPanel>
        <StackPanel>
         <Border BorderBrush="#AAA" BorderThickness="1" Padding="4" Height="220"><Image x:Name="GateImage" Stretch="Uniform"/></Border>

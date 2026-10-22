@@ -35,6 +35,8 @@ jobs:
       - name: Validate read-only Hokuyo framing and failure handling
         run: dotnet run --project tests/SafetyGateSupport.HokuyoValidation/SafetyGateSupport.HokuyoValidation.csproj -c Release
       - name: Run Windows desktop regression checks
+        env:
+          SAFETYGATE_UI_SNAPSHOTS: ${{ github.workspace }}/artifacts/ui-preview
         shell: pwsh
         run: |
           dotnet run --project tests/SafetyGateSupport.WindowsValidation/SafetyGateSupport.WindowsValidation.csproj -c Release 2>&1 | Tee-Object -FilePath windows-validation.log
@@ -108,5 +110,12 @@ jobs:
         with:
           name: SafetyGateSupport-Home-Preview-Windows-x64
           path: artifacts/home-preview/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload rendered v7 screens
+        uses: actions/upload-artifact@v4
+        with:
+          name: SafetyGateSupport-V7-Screenshots
+          path: artifacts/ui-preview/
           if-no-files-found: error
           retention-days: 30

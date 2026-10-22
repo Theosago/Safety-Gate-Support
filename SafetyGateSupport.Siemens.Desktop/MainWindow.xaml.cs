@@ -342,6 +342,7 @@ public partial class MainWindow : Window
         DeviceCombo.IsEnabled = !_previewOnly && !running && !_isRefreshing;
         if (AssignedFilesCombo is not null) AssignedFilesCombo.IsEnabled = !running && !_isRefreshing;
         foreach (var input in InputSwitches) input.IsEnabled = !running && !_isRefreshing;
+        ClearInputsButton.IsEnabled = !running && !_isRefreshing;
         if (ObservationCombo is not null) ObservationCombo.IsEnabled = !running && !_isRefreshing && _selectedUpload is not null;
         RefreshButton.IsEnabled = !_previewOnly && !running && !_isRefreshing;
         ReadButton.IsEnabled = !_previewOnly && !running && !_isRefreshing && DeviceCombo.SelectedItem is UsbColumnPort;

@@ -76,13 +76,15 @@ public partial class TroubleshootWindow : Window
         {
             var tool = new Button { Content = "Check / configure signal column…", MinHeight = 42 };
             tool.Click += async (_, _) => await SignalColumnService.OpenAsync(this, _data, _gate, _unit, _resources);
-            ChoicePanel.Children.Add(tool);
+            tool.Style = (Style)FindResource("PrimaryButton");
+            ChoicePanel.Children.Insert(0, tool);
         }
         if (node.Action == "UamDiagnostics")
         {
             var tool = new Button { Content = "Check UAM scanner…", MinHeight = 42 };
             tool.Click += (_, _) => new UamDiagnosticsWindow(_data, _gate, _unit) { Owner = this }.ShowDialog();
-            ChoicePanel.Children.Add(tool);
+            tool.Style = (Style)FindResource("PrimaryButton");
+            ChoicePanel.Children.Insert(0, tool);
         }
         if (node.Action == "Library")
         {
@@ -101,7 +103,8 @@ public partial class TroubleshootWindow : Window
             var next = _flows.FirstOrDefault(f => f.Id == node.Action[6..]);
             var tool = new Button { Content = new TextBlock { Text = next is null ? "Guide unavailable — open unit files" : "Continue to " + next.Title, TextWrapping = TextWrapping.Wrap }, MinHeight = 42, HorizontalContentAlignment = HorizontalAlignment.Left };
             tool.Click += (_, _) => { if (next is not null) FlowList.SelectedItem = next; else OpenUnitFiles(); };
-            ChoicePanel.Children.Add(tool);
+            tool.Style = (Style)FindResource("PrimaryButton");
+            ChoicePanel.Children.Insert(0, tool);
         }
         foreach (var id in node.ResourceIds.Distinct())
         {

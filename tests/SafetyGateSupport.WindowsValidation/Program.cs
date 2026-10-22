@@ -110,7 +110,8 @@ internal static class Program
             ("Siemens USB check reads the backup after numeric/chunked identity with firstConfig false", SiemensFirstConfigFalse),
             ("Siemens USB check refuses a different model before requesting configuration", SiemensModelMismatch),
             ("Siemens USB check preserves an HTTP error without retries or reset requests", SiemensHttpFailure),
-            ("A canceled Siemens USB check saves its report without sending requests", SiemensCancellation)
+            ("A canceled Siemens USB check saves its report without sending requests", SiemensCancellation),
+            ("V7 real WPF screens render to preview images", V7Screenshots)
         ];
 
         var passed = 0;
@@ -255,8 +256,41 @@ internal static class Program
         Require(data.LoadSystems().Any(u => u.Id == "home-preview-unit"), "Demo unit missing after actual window startup.");
     }
 
+    private static async Task V7Screenshots()
+    {
+        string? folder = Environment.GetEnvironmentVariable("SAFETYGATE_UI_SNAPSHOTS");
+        if (string.IsNullOrWhiteSpace(folder)) folder = Path.Combine(NewDirectory(), "screenshots");
+        Directory.CreateDirectory(folder);
+        var data = HomePreviewService.Create(NewDirectory()); HomePreviewService.Initialize(data);
+        var main = Track(new MainWindow(data)); ShowOffscreen(main);
+        await WaitUntil(() => main.IsEnabled, "Screenshot preview did not initialize.");
+        await DispatcherSettled(); Capture(main, "01-home.png"); main.Close();
+        var gate = data.LoadGates().Single(g => g.Id == "home-preview-gate");
+        var unit = data.LoadSystems().Single(u => u.Id == "home-preview-unit");
+        var resource = data.LoadResources().Single(r => r.Id == "home-preview-light");
+        string file = Directory.GetFiles(data.ResourceCurrentFolder(resource, gate), "*.signal").Single();
+        var column = Track(new global::SiemensUsbCheck.MainWindow("Asset DEMO / Unit 1", [file], previewOnly: true));
+        ShowOffscreen(column); Control<ComboBox>(column, "AssignedFilesCombo").SelectedIndex = 0;
+        await WaitUntil(() => Control<Panel>(column, "SegmentPreviewPanel").Children.Count == 9, "Screenshot light preview did not load.");
+        SetPreviewInputs(column, 2); await DispatcherSettled(); Capture(column, "02-light-preview.png"); column.Close();
+        var guide = Track(new TroubleshootWindow(data, gate, unit, data.LoadResources(), data.LoadTroubleshootingFlows(), "builtin-triage-v7", "gate-open"));
+        ShowOffscreen(guide); await DispatcherSettled(); Capture(guide, "03-guided-check.png");
+
+        void Capture(Window window, string filename)
+        {
+            window.UpdateLayout();
+            var content = (FrameworkElement)window.Content;
+            var bitmap = new RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth), (int)Math.Ceiling(content.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(content);
+            var png = new PngBitmapEncoder(); png.Frames.Add(BitmapFrame.Create(bitmap));
+            using var output = File.Create(Path.Combine(folder, filename)); png.Save(output);
+            Require(output.Length > 5000, "WPF screenshot unexpectedly empty.");
+        }
+    }
+
     private static void SetPreviewInputs(Window window, int state)
     {
+        Control<TabControl>(window, "WorkflowTabs").SelectedIndex = 1;
         for (int bit = 0; bit < 6; bit++) Control<ToggleButton>(window, $"Input{bit + 1}Toggle").IsChecked = (state & (1 << bit)) != 0;
     }
 
@@ -538,7 +572,7 @@ internal static class Program
         Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "CancelButton").IsEnabled,
             "The tool must start idle, without opening a column.");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Upload must require a selected device and validated file.");
-        Require(window.Title.Contains("v0.3.0", StringComparison.Ordinal), "The upload tool version was not updated.");
+        Require(window.Title.Contains("v0.4.0", StringComparison.Ordinal), "The upload tool version was not updated.");
         Require(Control<TextBox>(window, "ResultText").IsReadOnly, "The report preview must not be an editable command field.");
         var rendered = false;
         window.ContentRendered += (_, _) => rendered = true;

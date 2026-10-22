@@ -71,8 +71,13 @@ public partial class UnitFilesWindow : Window
         string query = FileSearchBox.Text.Trim();
         var matches = _files.Where(f => (_filter == "all" || f.Kind == _filter) && (query.Length == 0 || $"{f.Name} {f.Category}".Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
         FileList.ItemsSource = matches;
-        foreach (var button in FilterPanel.Children.OfType<Button>()) button.FontWeight = Equals(button.Tag, _filter) ? FontWeights.Bold : FontWeights.Normal;
-        StatusText.Text = matches.Count == 0 ? "No matching current files assigned. Try All files, or use More resources to review this unit’s assignments." : $"{matches.Count} current file(s) • {_filter}";
+        foreach (var button in FilterPanel.Children.OfType<Button>())
+        {
+            bool selected = Equals(button.Tag, _filter);
+            button.FontWeight = selected ? FontWeights.Bold : FontWeights.Normal;
+            button.Background = selected ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(226, 242, 247)) : System.Windows.Media.Brushes.White;
+        }
+        StatusText.Text = matches.Count == 0 ? "No matching current files assigned. Try All files, or use Import / assign files to review this unit’s assignments." : $"{matches.Count} current file(s) • {_filter}";
         StatusText.Text += _unavailable;
     }
     private void Filter_Click(object sender, RoutedEventArgs e) { _filter = (string)((Button)sender).Tag; RefreshFiles(); }

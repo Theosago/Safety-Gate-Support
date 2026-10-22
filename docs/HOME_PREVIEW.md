@@ -4,7 +4,7 @@
 2. Double-click **SafetyGateSupportPreview.exe**.
 3. Under **Just need a file?**, click **Light configurations**, search **DEMO**, select **Unit 1**, and click **Continue**. Click **Check / configure light**.
 
-Choose **DEMO ONLY - not for equipment.signal** in the assigned-files list. Use **Expected lights and sound — preview only**. Turn on only **Input 1** (red), **Input 2** (amber), **Input 3** (green), or **Input 4** (sound); turn the others off The preview displays stored values; it does not animate or play physical outputs. Device discovery, USB reads and uploads are disabled in the home preview. The sample configuration is also blocked from upload by the shared upload engine.
+Choose **DEMO ONLY - not for equipment.signal** in the assigned-files list. Use the **Expected lights & sound** tab. Turn on only **Input 1** (red), **Input 2** (amber), **Input 3** (green), or **Input 4** (sound); turn the others off. The preview displays stored values; it does not animate or play physical outputs. Device discovery, USB reads and uploads are disabled in the home preview. The sample configuration is also blocked from upload by the shared upload engine.
 
 Use the six symptom cards on Home or **Troubleshoot** on a selected unit to explore the new signal-column, BEA LZR-S600, UAM scanner and actuator guides. Browse the starter inventory/photos, search, try notes, and open **Support library** to explore importing local documents or ZIPs.
 
