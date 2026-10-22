@@ -25,20 +25,22 @@ public static class UamReadSession
             stream = connect(ct);
             progress("Reading scanner identity with the vendor startup query…");
             var identity = Exchange(stream, UamWire.IdentityRequest(), "VR42", report, ct);
-            // Match the native connection sequence: VR42 startup identity, then VR00 version.
-            // An empty status-90 startup rejection is the sole supported older-device fallback.
-            if (identity.Status == "00") VerifyModel(identity);
-            else if (identity.Status != "90" || identity.Data.Length != 0) RejectIdentity(identity);
-            ct.ThrowIfCancellationRequested();
-            progress("Reading version data with the vendor follow-up query…");
-            identity = Exchange(stream, UamWire.LegacyIdentityRequest(), "VR00", report, ct);
+            // The real VR42 reply already contains product, firmware and unit ID.
+            // Do not issue a redundant older query after a complete primary identity.
+            if (identity.Status == "90" && identity.Data.Length == 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                progress("Startup identity query rejected; reading legacy identity once…");
+                identity = Exchange(stream, UamWire.LegacyIdentityRequest(), "VR00", report, ct);
+            }
             if (identity.Status != "00") RejectIdentity(identity);
-            VerifyModel(identity);
+            var deviceIdentity = UamIdentity.Parse(identity.Data);
+            Write(report, "identity.json", JsonSerializer.SerializeToUtf8Bytes(deviceIdentity));
             ct.ThrowIfCancellationRequested();
             progress("Reading one status snapshot…");
             var status = Exchange(stream, UamWire.StatusRequest(), "AR00", report, ct);
             if (status.Status != "00") throw new InvalidDataException("Status request rejected with protocol status " + status.Status + ".");
-            summary = UamStatus.Parse(status.Data).Describe();
+            summary = deviceIdentity.Describe() + UamStatus.Parse(status.Data).Describe();
             ct.ThrowIfCancellationRequested();
             success = true;
         }
@@ -53,15 +55,9 @@ public static class UamReadSession
             catch (Exception error) { success = false; failure = "USB close failed: " + error.Message; summary += "\n" + failure + "\nScanner condition not verified."; }
         }
         Write(report, "result.json", JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 2, timestampUtc = DateTimeOffset.UtcNow, port, readCompleted = success, hardwareValidated = false, summary, failure, allowedRequests = new[] { "VR42", "VR00", "AR00" } }, new JsonSerializerOptions { WriteIndented = true }));
-        Write(report, "README.txt", Encoding.UTF8.GetBytes("First hardware validation. Compare this snapshot with Project Designer and the scanner front display on the same test unit. Commands are startup identity VR42, follow-up identity/version VR00, and one-shot measurement/status AR00. No login, configuration, reset, streaming or mode-changing commands are sent. No repeated commands or automatic reset. A completed read is not a passed scanner functional test. Do not use this report as authorization to operate equipment.\n\n" + summary));
+        Write(report, "README.txt", Encoding.UTF8.GetBytes("First hardware validation. Compare this snapshot with Project Designer and the scanner front display on the same test unit. Commands are startup identity VR42, legacy VR00 only after an empty status-90 startup rejection, and one-shot measurement/status AR00. No login, configuration, reset, streaming or mode-changing commands are sent. No repeated commands or automatic reset. A completed read is not a passed scanner functional test. Do not use this report as authorization to operate equipment.\n\n" + summary));
         progress("USB closed; finishing local report…");
         return new UamReadResult(success, summary, reportPath);
-    }
-    private static void VerifyModel(UamReply identity)
-    {
-        // No loose substring match, and no status read on an unconfirmed model.
-        if (!identity.Data.Split(',').Select(s => s.Trim()).Contains("UAM-05LP-T301", StringComparer.Ordinal))
-            throw new InvalidDataException("Identity does not contain the exact UAM-05LP-T301 model field. Status read withheld; keep the report.");
     }
     private static void RejectIdentity(UamReply identity) =>
         throw new InvalidDataException($"USB communication received a valid reply, but the identity read returned protocol status {identity.Status}. This is not a scanner display fault code; scanner health cannot be determined. No status request was sent.");
