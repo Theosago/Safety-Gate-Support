@@ -126,7 +126,7 @@ static void NormalizedVersionReply()
 }
 static void LegacyFallback()
 {
-    WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42","","90").Concat(Reply("AR00","0010740000000")).ToArray());
+    WithFolder(folder=> {var fake=new FakeUsb(Reply("VR42","","90").Concat(Reply("VR00","UAM-05LP-T301,1.0,TEST")).Concat(Reply("AR00","0010740000000")).ToArray());
         var result=Run(fake,Path.Combine(folder,"r.zip"));Require(result.Success,"Explicit legacy fallback failed.");
         Require(fake.Sent.SequenceEqual(UamWire.IdentityRequest().Concat(UamWire.LegacyIdentityRequest()).Concat(UamWire.StatusRequest())),"Fallback sent unexpected commands.");});
 }
