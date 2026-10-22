@@ -6,8 +6,8 @@
  <Grid Margin="20">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <StackPanel>
-   <TextBlock Text="Troubleshoot a System" FontSize="26" FontWeight="Bold"/>
-   <TextBlock Text="Choose the gate and unit you are working on. Confirm the unit preview, then start troubleshooting." Foreground="#555" Margin="0,4,0,14" TextWrapping="Wrap"/>
+   <TextBlock x:Name="TaskTitleText" Text="Which unit are you working on?" FontSize="26" FontWeight="Bold"/>
+   <TextBlock x:Name="TaskDescriptionText" Text="Search across all areas by asset number. Choose the unit and confirm its photo before continuing." Foreground="#555" Margin="0,4,0,14" TextWrapping="Wrap"/>
   </StackPanel>
 
   <Grid Grid.Row="1" Margin="0,0,0,12">
@@ -55,7 +55,7 @@
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <TextBlock x:Name="SelectedText" Text="Select a safety gate and unit." Foreground="#555" FontSize="14" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0"/>
    <Button Grid.Column="1" Content="Cancel" Click="Cancel_Click" Padding="22,8" Margin="0,0,8,0"/>
-   <Button x:Name="StartButton" Grid.Column="2" Content="Start Troubleshooting" Click="Start_Click" Padding="22,8" IsEnabled="False" Background="#EAF2FB" BorderBrush="#1769AA" BorderThickness="1"/>
+   <Button x:Name="StartButton" Grid.Column="2" Content="Continue" Click="Start_Click" Padding="22,8" IsEnabled="False" Style="{StaticResource PrimaryButton}"/>
   </Grid>
  </Grid>
 </Window>

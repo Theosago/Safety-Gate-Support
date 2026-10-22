@@ -167,7 +167,7 @@ internal static class Program
         Equal(3, data.LoadCategories().Count, "Seeded area count");
         Equal(360, data.LoadResources().Count, "Migrated resource count");
         Equal(3, data.LoadTroubleshootingFlows().Count(f => !f.Id.StartsWith("builtin-")), "Migrated troubleshooting flow count");
-        Equal(4, data.LoadTroubleshootingFlows().Count(f => f.Id.StartsWith("builtin-")), "Curated troubleshooting flow count");
+        Equal(5, data.LoadTroubleshootingFlows().Count(f => f.Id.StartsWith("builtin-")), "Curated troubleshooting flow count");
         Require(data.LoadSystems().All(unit => File.Exists(data.Resolve(unit.PrimaryPhoto))), "Every seeded identification photo should be present.");
     }
 

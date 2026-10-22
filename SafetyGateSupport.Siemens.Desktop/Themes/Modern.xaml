@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <SolidColorBrush x:Key="Accent" Color="#176B87"/>
+ <SolidColorBrush x:Key="Sidebar" Color="#122638"/>
+ <Style TargetType="Window"><Setter Property="Background" Value="#F3F6FA"/><Setter Property="Foreground" Value="#172D40"/><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="14"/></Style>
+ <Style TargetType="Button">
+  <Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#18384D"/><Setter Property="BorderBrush" Value="#CDD9E3"/><Setter Property="BorderThickness" Value="1"/>
+  <Setter Property="Padding" Value="16,11"/><Setter Property="Margin" Value="4"/><Setter Property="FontSize" Value="14"/><Setter Property="Cursor" Value="Hand"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+   <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+   </Border>
+   <ControlTemplate.Triggers>
+    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#17859C"/><Setter TargetName="Surface" Property="Opacity" Value="0.85"/></Trigger>
+    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.65"/></Trigger>
+    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#17859C"/><Setter TargetName="Surface" Property="BorderThickness" Value="2"/></Trigger>
+    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.42"/></Trigger>
+   </ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Background" Value="#176B87"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderBrush" Value="#176B87"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+ <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#E1EDF4"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Margin" Value="10,4"/><Setter Property="Padding" Value="14,13"/></Style>
+ <Style x:Key="TaskCard" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="18"/><Setter Property="MinHeight" Value="112"/><Setter Property="Margin" Value="0,0,12,12"/></Style>
+ <Style TargetType="TextBox"><Setter Property="Padding" Value="9,7"/><Setter Property="BorderBrush" Value="#CDD9E3"/><Setter Property="Background" Value="White"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+ <Style TargetType="ComboBox"><Setter Property="Padding" Value="9,7"/><Setter Property="MinHeight" Value="36"/><Setter Property="BorderBrush" Value="#CDD9E3"/><Setter Property="Background" Value="White"/></Style>
+ <Style TargetType="ListBox"><Setter Property="BorderBrush" Value="#DFE6ED"/><Setter Property="Background" Value="White"/><Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/></Style>
+ <Style TargetType="ListBoxItem"><Setter Property="Padding" Value="8,10"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+ <Style TargetType="GroupBox"><Setter Property="Margin" Value="0,6"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupBox"><Border Background="White" BorderBrush="#DFE6ED" BorderThickness="1" CornerRadius="10" Padding="12"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><ContentPresenter ContentSource="Header" Margin="2,0,0,10" TextElement.FontWeight="SemiBold" TextElement.Foreground="#405D70"/><ContentPresenter Grid.Row="1"/></Grid></Border></ControlTemplate></Setter.Value></Setter></Style>
+ <Style TargetType="ToggleButton"><Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#405D70"/><Setter Property="BorderBrush" Value="#CDD9E3"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton"><Border x:Name="Switch" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"><StackPanel><ContentPresenter HorizontalAlignment="Center"/><TextBlock x:Name="Value" Text="OFF" HorizontalAlignment="Center" FontSize="11" Margin="0,3,0,0"/></StackPanel></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Switch" Property="Background" Value="#176B87"/><Setter Property="Foreground" Value="White"/><Setter TargetName="Value" Property="Text" Value="ON"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Switch" Property="BorderBrush" Value="#179CB5"/><Setter TargetName="Switch" Property="BorderThickness" Value="2"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Switch" Property="Opacity" Value="0.42"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+</ResourceDictionary>

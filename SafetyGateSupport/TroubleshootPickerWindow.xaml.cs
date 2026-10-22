@@ -21,14 +21,11 @@ public partial class TroubleshootPickerWindow : Window
         _data = data;
         _gates = gates.ToList();
         _units = units.ToList();
-        var areas = categories.ToList();
+        var areas = new[] { "All areas" }.Concat(categories).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         AreaBox.ItemsSource = areas;
         ClearPreview();
-        if (areas.Count > 0)
-            AreaBox.SelectedItem = areas.FirstOrDefault(a => a.Equals("East Side", StringComparison.OrdinalIgnoreCase))
-                ?? areas.FirstOrDefault(a => a.Equals("West Side", StringComparison.OrdinalIgnoreCase))
-                ?? areas.FirstOrDefault(a => a.Equals("906 / Outside", StringComparison.OrdinalIgnoreCase))
-                ?? areas[0];
+        AreaBox.SelectedIndex = 0;
+        Loaded += (_, _) => AssetSearchBox.Focus();
     }
 
     private SafetyGate? SelectedGate => AssetList.SelectedItem as SafetyGate;
@@ -47,7 +44,7 @@ public partial class TroubleshootPickerWindow : Window
     {
         if (AssetList is null || AssetSearchBox is null || string.IsNullOrWhiteSpace(_currentArea)) return;
         var q = AssetSearchBox.Text.Trim();
-        AssetList.ItemsSource = _gates.Where(g => g.Category.Equals(_currentArea, StringComparison.OrdinalIgnoreCase))
+        AssetList.ItemsSource = _gates.Where(g => _currentArea == "All areas" || g.Category.Equals(_currentArea, StringComparison.OrdinalIgnoreCase))
             .Where(g => string.IsNullOrWhiteSpace(q) || $"{g.AssetNumber} {g.Display} {g.Manufacturer} {g.Model} {g.Location}".Contains(q, StringComparison.OrdinalIgnoreCase))
             .OrderBy(g => int.TryParse(g.AssetNumber, out var n) ? n : int.MaxValue)
             .ThenBy(g => g.Manufacturer)

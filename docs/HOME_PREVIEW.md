@@ -1,12 +1,12 @@
-# Safety Gate Support — Home Preview (6.6.4)
+# Safety Gate Support — Home Preview (7.0.0)
 
 1. Extract the entire ZIP into a folder on your Windows PC.
 2. Double-click **SafetyGateSupportPreview.exe**.
-3. Click **Home Preview**, select **Asset DEMO / Unit 1**, and open **Light Configuration — SAMPLE** → **Check / configure column**.
+3. Under **Just need a file?**, click **Light configurations**, search **DEMO**, select **Unit 1**, and click **Continue**. Click **Check / configure light**.
 
-Choose **DEMO ONLY - not for equipment.signal** in the assigned-files list. Expand **Expected output and physical observation** and choose state **1** (red), **2** (amber), **4** (green), or **8** (sound). The preview displays stored values; it does not animate or play physical outputs. Device discovery, USB reads and uploads are disabled in the home preview. The sample configuration is also blocked from upload by the shared upload engine.
+Choose **DEMO ONLY - not for equipment.signal** in the assigned-files list. Use **Expected lights and sound — preview only**. Turn on only **Input 1** (red), **Input 2** (amber), **Input 3** (green), or **Input 4** (sound); turn the others off The preview displays stored values; it does not animate or play physical outputs. Device discovery, USB reads and uploads are disabled in the home preview. The sample configuration is also blocked from upload by the shared upload engine.
 
-Use **Troubleshoot This System** to explore the new signal-column, BEA LZR-S600, UAM scanner and actuator guides. Browse the starter inventory/photos, search, try notes, and open **Support library** to explore importing local documents or ZIPs.
+Use the six symptom cards on Home or **Troubleshoot** on a selected unit to explore the new signal-column, BEA LZR-S600, UAM scanner and actuator guides. Browse the starter inventory/photos, search, try notes, and open **Support library** to explore importing local documents or ZIPs.
 
 No Q drive, VPN, Siemens software, SDK, or installer is required. This is a self-contained local preview. It uses its own settings and data under:
 

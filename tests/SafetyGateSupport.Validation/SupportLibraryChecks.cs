@@ -107,16 +107,16 @@ internal static class SupportLibraryChecks
     private static void CuratedFlows()
     {
         var defaults = GuidedTroubleshooting.Defaults().ToList();
-        Require(defaults.Count == 4 && defaults.Select(f => f.Id).Distinct().Count() == 4, "Missing or duplicated model-specific flows.");
+        Require(defaults.Count == 5 && defaults.Select(f => f.Id).Distinct().Count() == 5, "Missing or duplicated model-specific flows.");
         foreach (var flow in defaults)
         {
             Require(flow.Nodes.Any(n => n.Id == flow.StartNodeId), "Missing flow start.");
             Require(flow.Nodes.SelectMany(n => n.Choices).All(c => flow.Nodes.Any(n => n.Id == c.NextNodeId)), "Unresolved troubleshooting branch.");
-            Require(flow.Nodes.All(n => n.Action is "" or "Library" or "SignalColumn" or "UamDiagnostics"), "Unknown tool action.");
+            Require(flow.Nodes.All(n => n.Action is "" or "Library" or "SignalColumn" or "UamDiagnostics" or "Files" || n.Action.StartsWith("Guide:") && defaults.Any(f => f.Id == n.Action[6..])), "Unknown tool action.");
         }
         var edited = new TroubleshootingFlow { Id = defaults[0].Id, Title = "Site edited flow", Nodes = [new() { Prompt = "Keep this edit" }] };
         var merged = GuidedTroubleshooting.Merge([edited]);
-        Require(merged.Count == 4 && ReferenceEquals(merged.Single(f => f.Id == edited.Id), edited), "A site edit was overwritten by a built-in flow.");
-        Require(GuidedTroubleshooting.Merge(merged).Count == 4, "Repeated merging duplicates flows.");
+        Require(merged.Count == 5 && ReferenceEquals(merged.Single(f => f.Id == edited.Id), edited), "A site edit was overwritten by a built-in flow.");
+        Require(GuidedTroubleshooting.Merge(merged).Count == 5, "Repeated merging duplicates flows.");
     }
 }

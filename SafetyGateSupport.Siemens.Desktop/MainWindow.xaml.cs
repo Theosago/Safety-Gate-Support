@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using Microsoft.Win32;
 using SiemensUsbCheck.Services;
 using SafetyGateSupport.Siemens;
@@ -35,8 +37,7 @@ public partial class MainWindow : Window
             AssignedFilesCombo.Text = "Select this unit's approved configuration";
             SelectedSignalText.Text = "Select an assigned file above, or browse for an approved .signal file. No file is selected automatically.";
         }
-        StateCombo.ItemsSource = Enumerable.Range(0, 64).Select(n => $"State {n} — inputs: {string.Join(", ", Enumerable.Range(1, 6).Where(i => (n & (1 << (i - 1))) != 0))}");
-        StateCombo.SelectedIndex = 0;
+        UpdatePreview();
     }
 
     private async void AssignedFiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -66,10 +67,29 @@ public partial class MainWindow : Window
         finally { _isRefreshing = false; UpdateControls(); UpdatePreview(); }
     }
 
-    private void StateCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) { UpdatePreview(); ResetObservation(); }
+    private ToggleButton[] InputSwitches => [Input1Toggle, Input2Toggle, Input3Toggle, Input4Toggle, Input5Toggle, Input6Toggle];
+    private int PreviewState => InputSwitches.Select((input, bit) => input.IsChecked == true ? 1 << bit : 0).Sum();
+    private void Input_Changed(object sender, RoutedEventArgs e) { if (InputStateText is null) return; UpdatePreview(); ResetObservation(); }
+    private void ClearInputs_Click(object sender, RoutedEventArgs e) { foreach (var input in InputSwitches) input.IsChecked = false; }
     private void UpdatePreview()
     {
-        if (PreviewText is not null) PreviewText.Text = _selectedUpload is null ? "Choose a configuration to view expected outputs." : SignalStatePreview.Describe(_selectedUpload, Math.Max(0, StateCombo.SelectedIndex));
+        int state = PreviewState;
+        string on = string.Join(", ", Enumerable.Range(1, 6).Where(i => (state & (1 << (i - 1))) != 0));
+        InputStateText.Text = $"Inputs ON: {(on.Length == 0 ? "none" : on)}  •  stored combination {state}";
+        SegmentPreviewPanel.Children.Clear();
+        PreviewText.Text = _selectedUpload is null ? "Choose a configuration to view expected outputs." : SignalStatePreview.Describe(_selectedUpload, state);
+        if (_selectedUpload is null) { SoundPreviewText.Text = "Choose an assigned configuration to see its lights and sound."; return; }
+        var appearance = SignalStatePreview.ReadAppearance(_selectedUpload, state);
+        foreach (var segment in appearance.Segments)
+        {
+            var color = segment.IsOff ? Color.FromRgb(228, 234, 239) : Color.FromRgb((byte)segment.Red, (byte)segment.Green, (byte)segment.Blue);
+            var panel = new StackPanel { Width = 86, Margin = new Thickness(0, 0, 10, 8) };
+            panel.Children.Add(new TextBlock { Text = $"Segment {segment.Number}", FontSize = 12, Margin = new Thickness(0, 0, 0, 5) });
+            panel.Children.Add(new Border { Height = 46, CornerRadius = new CornerRadius(7), Background = new SolidColorBrush(color), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(1), ToolTip = $"RGB {segment.Red}, {segment.Green}, {segment.Blue}; brightness {segment.Brightness}" });
+            panel.Children.Add(new TextBlock { Text = segment.IsOff ? "Off" : segment.EffectName, FontSize = 12, Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
+            SegmentPreviewPanel.Children.Add(panel);
+        }
+        SoundPreviewText.Text = appearance.SoundMode == 0 || appearance.SoundVolume == 0 ? "Sound: off" : $"Sound: configured • mode {appearance.SoundMode}, volume {appearance.SoundVolume}. Compare actual sound; this preview does not play it.";
     }
     private void ResetObservation() { if (ObservationCombo is not null) ObservationCombo.SelectedIndex = 0; if (ObservationText is not null) ObservationText.Text = "Physical function is unverified. Check all applicable states using the approved site test procedure."; }
     private void Observation_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -90,7 +110,7 @@ public partial class MainWindow : Window
         {
             Title = "Safety Gate Support — Home Preview • Signal column";
             DetectionText.Text = "Home preview: device discovery, USB reads, and uploads are disabled. Explore a selected file and expected output below.";
-            ResultText.Text = "Preview only. Choose the assigned DEMO ONLY file, then expand Expected output and select state 1 (red), 2 (amber), 4 (green), or 8 (sound). No hardware is required.";
+            ResultText.Text = "Preview only. Choose the assigned DEMO ONLY file, then turn on just input 1 (red), 2 (amber), 3 (green), or 4 (sound). No hardware is required.";
             StatusText.Text = "Local preview • no USB access • illustrative configuration only";
             UpdateControls();
             return;
@@ -321,6 +341,7 @@ public partial class MainWindow : Window
         bool running = _operationCancellation is not null;
         DeviceCombo.IsEnabled = !_previewOnly && !running && !_isRefreshing;
         if (AssignedFilesCombo is not null) AssignedFilesCombo.IsEnabled = !running && !_isRefreshing;
+        foreach (var input in InputSwitches) input.IsEnabled = !running && !_isRefreshing;
         if (ObservationCombo is not null) ObservationCombo.IsEnabled = !running && !_isRefreshing && _selectedUpload is not null;
         RefreshButton.IsEnabled = !_previewOnly && !running && !_isRefreshing;
         ReadButton.IsEnabled = !_previewOnly && !running && !_isRefreshing && DeviceCombo.SelectedItem is UsbColumnPort;

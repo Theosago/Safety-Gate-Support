@@ -11,7 +11,7 @@ hardware retesting. Use your spare column disconnected from operating equipment.
 Opening USB can restart the column; uploading replaces its settings and requests
 a normal application restart. No firmware update or bootloader commands exist.
 
-Version 0.3.0 shares its desktop component with Safety Gate Support 6.5.0. Choose a file, read the column to compare settings, and expand Expected output to inspect any of the 64 input states. Previewing states does not change inputs or outputs. Recorded physical observations apply only to the selected state and are cleared when the state, file, or USB target changes.
+Version 0.4.0 shares its redesigned desktop component with Safety Gate Support 7. Choose a file, read the column to compare settings, and use the six ON/OFF input switches to preview the expected light segments and sound. All 64 combinations remain available without a dropdown. Previewing states does not change inputs or outputs. Recorded physical observations apply only to the selected state and are cleared when the state, file, or USB target changes.
 
 ## Upload a configuration
 

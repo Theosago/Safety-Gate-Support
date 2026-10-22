@@ -151,13 +151,13 @@ public partial class MainWindow : Window
         if (_sharedDataReady)
         {
             ConnectionText.Text = (_data.IsHomePreview ? "● HOME PREVIEW • local data\n" : "● Connected\n") + _data.SharedRoot;
-            ConnectionText.Foreground = System.Windows.Media.Brushes.ForestGreen;
+            ConnectionText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(132, 218, 193));
             SetupButton.Visibility = Visibility.Collapsed;
         }
         else
         {
             ConnectionText.Text = "● Shared data unavailable\n" + _data.SharedRoot;
-            ConnectionText.Foreground = System.Windows.Media.Brushes.Firebrick;
+            ConnectionText.Foreground = System.Windows.Media.Brushes.LightSalmon;
             SetupButton.Visibility = Visibility.Visible;
         }
     }
@@ -194,10 +194,20 @@ public partial class MainWindow : Window
     private void PartsNav_Click(object sender, RoutedEventArgs e) { _partFilterGateId = _partFilterUnitId = ""; ShowParts(); RefreshParts(); }
 
     private void HideAllViews() { HomeView.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
-    private void ShowHome() { HideAllViews(); HomeView.Visibility = Visibility.Visible; }
-    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; EnsureSystemAreaSelected(); }
-    private void ShowManuals() { HideAllViews(); ManualsView.Visibility = Visibility.Visible; }
-    private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; }
+    private void ShowHome() { HideAllViews(); HomeView.Visibility = Visibility.Visible; SetActiveNavigation(HomeNav); }
+    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); EnsureSystemAreaSelected(); }
+    private void ShowManuals() { HideAllViews(); ManualsView.Visibility = Visibility.Visible; SetActiveNavigation(ManualsNav); }
+    private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; SetActiveNavigation(PartsNav); }
+
+    private void SetActiveNavigation(Button active)
+    {
+        foreach (var button in new[] { HomeNav, SystemsNav, ManualsNav, PartsNav })
+            button.Background = ReferenceEquals(button, active) ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 69, 88)) : System.Windows.Media.Brushes.Transparent;
+    }
+    private void UnitFiles_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is { } gate && SelectedUnit is { } unit) new UnitFilesWindow(_data, gate, unit, _resources) { Owner = this }.ShowDialog();
+    }
 
     private void EnsureSystemAreaSelected()
     {
@@ -557,14 +567,27 @@ public partial class MainWindow : Window
         catch { /* A missing or invalid preview must not interrupt gate navigation. */ }
     }
 
-    private void HomeTroubleshoot_Click(object sender, RoutedEventArgs e)
+    private void HomeTroubleshoot_Click(object sender, RoutedEventArgs e) => BeginTask("unknown");
+    private void Symptom_Click(object sender, RoutedEventArgs e) => BeginTask((string)((Button)sender).Tag);
+    private void FindFiles_Click(object sender, RoutedEventArgs e) => BeginTask((string)((Button)sender).Tag, files: true);
+
+    private void BeginTask(string task, bool files = false)
     {
         if (!_sharedDataReady) { MessageBox.Show("Set up or reconnect the shared data first.", "Shared data unavailable", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         var picker = new TroubleshootPickerWindow(_data, _gates, _systems, _categories) { Owner = this };
+        picker.TaskTitleText.Text = files ? "Find files for your unit" : "Which unit needs help?";
+        picker.TaskDescriptionText.Text = files ? "Search by asset number, choose a unit, and confirm its identification photo." : "Your symptom is saved. Choose the unit to start the next check.";
         if (picker.ShowDialog() == true && picker.ChosenSystem is { } unit)
         {
             NavigateToSystem(unit);
-            if (GateFor(unit) is { } gate) new TroubleshootWindow(_data, gate, unit, _resources, _flows) { Owner = this }.ShowDialog();
+            if (GateFor(unit) is not { } gate) return;
+            if (files) new UnitFilesWindow(_data, gate, unit, _resources, task) { Owner = this }.ShowDialog();
+            else
+            {
+                string flow = task switch { "light" => "builtin-light-v1", "actuator" => "builtin-actuator-v1", _ => "builtin-triage-v7" };
+                string? node = task is "gate-open" or "gate-close" or "scanner" ? task : null;
+                new TroubleshootWindow(_data, gate, unit, _resources, _flows, flow, node) { Owner = this }.ShowDialog();
+            }
         }
     }
     private void TroubleshootSystem_Click(object sender, RoutedEventArgs e)

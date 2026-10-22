@@ -14,6 +14,7 @@ internal static class SignalArchiveChecks
         ("signal: schema-5 summary and active states", ValidSummary),
         ("signal: preserves caller's archive bytes", PreservesBytes),
         ("signal: preview maps the six input bits without altering configuration", StatePreview),
+        ("signal: visual appearance uses stored colors, effects and sound without edits", VisualAppearance),
         ("signal: all four known hardware variants", KnownHardware),
         ("signal: deflated ZIP is supported", DeflatedArchive),
         ("signal: unknown editor metadata is ignored", UnknownEditorMetadata),
@@ -72,6 +73,19 @@ internal static class SignalArchiveChecks
         Check(SignalStatePreview.Describe(prepared, 11).Contains("mode 1, volume 5"), "Expected sound missing.");
         Check(prepared.GetBytes().SequenceEqual(bytes), "Preview modified the prepared configuration.");
         Throws<ArgumentOutOfRangeException>(() => SignalStatePreview.Describe(prepared, 64));
+    }
+
+    private static void VisualAppearance()
+    {
+        byte[] bytes = Archive(); var selected = PreparedSignalUpload.FromBytes(bytes, "visual.signal");
+        var red = SignalStatePreview.ReadAppearance(selected, 7);
+        Check(red.Segments.Count == 9 && red.Segments[0].Number == 1 && red.Segments[0].Red == 255 && !red.Segments[0].IsOff, "Stored red appearance was lost.");
+        Check(SignalStatePreview.ReadAppearance(selected, 0).Segments.All(s => s.IsOff), "Inactive segments appeared lit.");
+        var sound = SignalStatePreview.ReadAppearance(selected, 11);
+        Check(sound.SoundMode == 1 && sound.SoundVolume == 5, "Sound-only appearance was lost.");
+        Check(selected.GetBytes().SequenceEqual(bytes), "Visual preview changed the upload bytes.");
+        Throws<ArgumentOutOfRangeException>(() => SignalStatePreview.ReadAppearance(selected, -1));
+        Throws<ArgumentOutOfRangeException>(() => SignalStatePreview.ReadAppearance(selected, 64));
     }
 
     private static void PreservesBytes()

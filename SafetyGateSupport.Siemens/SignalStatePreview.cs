@@ -7,6 +7,27 @@ namespace SafetyGateSupport.Siemens;
 /// <summary>Displays stored expanded values; never sends commands or changes an archive.</summary>
 public static class SignalStatePreview
 {
+    public sealed record Segment(int Number, int Red, int Green, int Blue, int Brightness, int Effect)
+    {
+        public bool IsOff => Brightness == 0 || Effect == 0 || (Red == 0 && Green == 0 && Blue == 0);
+        public string EffectName => Effect switch { 0 => "Off", 10 => "Steady", 50 => "Blink · 1 Hz", 51 => "Blink · 2 Hz", 52 => "Blink · 3 Hz", 90 => "Flash once", 91 => "Flash twice", 92 => "Flash three times", 130 => "Rotate", _ => $"Effect {Effect}" };
+    }
+    public sealed record Appearance(IReadOnlyList<Segment> Segments, int SoundMode, int SoundVolume);
+
+    public static Appearance ReadAppearance(PreparedSignalUpload selected, int state)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        if (state is < 0 or > 63) throw new ArgumentOutOfRangeException(nameof(state));
+        using var stream = new MemoryStream(selected.GetBytes(), false);
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+        using var entry = zip.GetEntry($"state_config_{state}.json")!.Open();
+        using var document = JsonDocument.Parse(entry);
+        var segments = document.RootElement.GetProperty("Segments").EnumerateArray().Select((s, i) => new Segment(i + 1,
+            s.GetProperty("r").GetInt32(), s.GetProperty("g").GetInt32(), s.GetProperty("b").GetInt32(), s.GetProperty("brightness").GetInt32(), s.GetProperty("lightEffect").GetInt32())).ToArray();
+        var sound = document.RootElement.GetProperty("Sound");
+        return new(segments, sound.GetProperty("mode").GetInt32(), sound.GetProperty("volume").GetInt32());
+    }
+
     public static string Describe(PreparedSignalUpload selected, int state)
     {
         ArgumentNullException.ThrowIfNull(selected);

@@ -6,21 +6,25 @@
  <Grid Margin="20">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <StackPanel>
-   <TextBlock Text="Hokuyo UAM-05LP-T301 diagnostics" FontSize="25" FontWeight="SemiBold"/>
+   <TextBlock Text="Check the scanner’s current USB status" FontSize="25" FontWeight="SemiBold"/>
    <TextBlock x:Name="ContextText" Margin="0,5,0,14" TextWrapping="Wrap"/>
   </StackPanel>
   <TabControl Grid.Row="1">
-   <TabItem Header="USB status">
+   <TabItem Header="Read current status">
     <Grid Margin="14">
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-     <TextBlock Text="First hardware validation: use a test scanner isolated from operating equipment. Close Project Designer. The scanner needs its specified external power and a USB data cable. Opening the serial port asserts DTR/RTS; connection behavior must be checked on the test unit. This tool does not reset faults or write configurations." TextWrapping="Wrap" Margin="0,0,0,12"/>
+     <Border Background="#EAF3F7" CornerRadius="8" Padding="14" Margin="0,0,0,12"><StackPanel>
+      <TextBlock Text="Is there an active scanner error right now?" FontWeight="SemiBold" FontSize="17" TextWrapping="Wrap"/>
+      <TextBlock Text="Close Project Designer. Connect USB and the specified external power on an isolated test scanner. Read once, then use the troubleshooting guide for the next check." TextWrapping="Wrap" Margin="0,6,0,0"/>
+      <Expander Header="What this check can tell you" Margin="0,8,0,0"><TextBlock Text="Reads identity and a status snapshot; it does not reset faults or program the scanner. Opening serial asserts DTR/RTS. A clear snapshot does not prove the gate’s wiring, interlocks or protective function. Stored codes are distinct from active errors. Compare new conditions with Project Designer on the same isolated scanner." TextWrapping="Wrap" Margin="0,8,0,0"/></Expander>
+     </StackPanel></Border>
      <DockPanel Grid.Row="1">
       <Button x:Name="RefreshButton" DockPanel.Dock="Right" Content="Refresh devices" Click="Refresh_Click"/>
       <ComboBox x:Name="DeviceCombo" IsEditable="False" MinHeight="34" VerticalAlignment="Center" SelectionChanged="Device_Changed"/>
      </DockPanel>
      <TextBlock x:Name="DetectionText" Grid.Row="2" Text="Device detection does not open USB." TextWrapping="Wrap" Margin="0,8,0,12"/>
      <WrapPanel Grid.Row="3" Margin="0,0,0,12">
-      <Button x:Name="ReadButton" Content="Read USB status and save report…" Click="Read_Click" IsEnabled="False"/>
+      <Button x:Name="ReadButton" Content="Read scanner status…" Style="{StaticResource PrimaryButton}" Click="Read_Click" IsEnabled="False"/>
       <Button x:Name="CancelButton" Content="Cancel" Click="Cancel_Click" IsEnabled="False"/>
      </WrapPanel>
      <TextBox x:Name="ResultText" Grid.Row="4" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="10" Text="Not checked. A detected USB port does not establish scanner health. Active fault status, past error codes, protective outputs and physical function are different observations."/>

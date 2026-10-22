@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -92,6 +93,11 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview rapid selection and deselection stay correct", AdminPhotoSelection),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
+            ("V7 home tasks carry the chosen symptom and file filter through unit confirmation", V7HomeTasks),
+            ("V7 symptom routes start the selected guide and retain site edits", V7TroubleshootingRoutes),
+            ("V7 unit picker searches across areas by default", V7PickerSearch),
+            ("V7 unit files exclude other-unit and archived configurations", V7AssignedFiles),
+            ("V7 six input switches preview all combinations without enabling USB", V7InputSwitches),
             ("Integrated column tool requires explicit assigned file selection and keeps observation state accurate", IntegratedColumnWindow),
             ("Unit light resource exposes the built-in USB action", IntegratedLightResource),
             ("UAM diagnostics opens idle and manual lookup never changes USB status", UamDiagnosticsStartup),
@@ -249,6 +255,11 @@ internal static class Program
         Require(data.LoadSystems().Any(u => u.Id == "home-preview-unit"), "Demo unit missing after actual window startup.");
     }
 
+    private static void SetPreviewInputs(Window window, int state)
+    {
+        for (int bit = 0; bit < 6; bit++) Control<ToggleButton>(window, $"Input{bit + 1}Toggle").IsChecked = (state & (1 << bit)) != 0;
+    }
+
     private static async Task HomePreviewColumnWindow()
     {
         string path = Path.Combine(NewDirectory(), "DEMO ONLY.signal"); File.WriteAllBytes(path, HomePreviewService.SampleConfiguration());
@@ -257,11 +268,157 @@ internal static class Program
         Require(!Control<Button>(window, "RefreshButton").IsEnabled, "Preview attempted device discovery.");
         Control<ComboBox>(window, "AssignedFilesCombo").SelectedIndex = 0;
         await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(path), "Preview sample did not load.");
-        Control<ComboBox>(window, "StateCombo").SelectedIndex = 2;
+        SetPreviewInputs(window, 2);
         Require(Control<TextBox>(window, "PreviewText").Text.Contains("RGB 255, 180, 0"), "Preview sample's amber state did not render.");
         Control<ComboBox>(window, "DeviceCombo").ItemsSource = new[] { TestColumnPort() };
         Control<ComboBox>(window, "DeviceCombo").SelectedIndex = 0;
         Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "UploadButton").IsEnabled && !Control<ComboBox>(window, "DeviceCombo").IsEnabled, "Home preview enabled USB operations after file/port selection.");
+    }
+
+    private static async Task V7HomeTasks()
+    {
+        var fixture = NewFixture();
+        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main);
+        await WaitUntil(() => main.IsEnabled, "V7 home did not finish loading.");
+        main.Width = 1000; main.Height = 680; main.UpdateLayout();
+        var symptoms = Control<Panel>(main, "SymptomPanel");
+        foreach (var card in symptoms.Children.OfType<Button>())
+        {
+            var position = card.TranslatePoint(new Point(0, 0), Control<ScrollViewer>(main, "HomeView"));
+            Require(card.ActualWidth > 180 && position.X >= 0 && position.X + card.ActualWidth <= Control<ScrollViewer>(main, "HomeView").ActualWidth + 1,
+                "A home symptom card exceeds the minimum window width.");
+        }
+        foreach (string task in new[] { "GateOpenTask", "LightFilesTask" })
+        {
+            Exception? failure = null;
+            bool picked = false, completed = false;
+            var deadline = Stopwatch.StartNew();
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+            timer.Tick += (_, _) =>
+            {
+                try
+                {
+                    if (deadline.Elapsed > TimeSpan.FromSeconds(12)) throw new InvalidOperationException("Home task did not open its destination.");
+                    var picker = Application.Current.Windows.OfType<TroubleshootPickerWindow>().SingleOrDefault();
+                    if (picker is not null)
+                    {
+                        if (!picked)
+                        {
+                            Track(picker);
+                            var gates = Control<ListBox>(picker, "AssetList");
+                            gates.SelectedItem = gates.Items.Cast<SafetyGate>().Single(g => g.Id == fixture.Gate.Id);
+                            var units = Control<ListBox>(picker, "UnitList");
+                            units.SelectedItem = units.Items.Cast<SafetySystem>().Single(u => u.Id == fixture.BlueUnit.Id);
+                            picked = true;
+                        }
+                        if (Control<Button>(picker, "StartButton").IsEnabled) Click(Control<Button>(picker, "StartButton"));
+                        return;
+                    }
+                    if (task == "GateOpenTask" && Application.Current.Windows.OfType<TroubleshootWindow>().SingleOrDefault() is { } guide)
+                    {
+                        Track(guide);
+                        Equal("What happens when opening is requested?", Control<TextBlock>(guide, "StepPromptText").Text, "Home symptom did not reach its guide");
+                        completed = true; timer.Stop(); guide.Close();
+                    }
+                    else if (task == "LightFilesTask" && Application.Current.Windows.OfType<UnitFilesWindow>().SingleOrDefault() is { } files)
+                    {
+                        Track(files);
+                        Require(Control<TextBlock>(files, "UnitText").Text.Contains(fixture.BlueUnit.UnitDisplay), "File shortcut lost the selected unit.");
+                        completed = true; timer.Stop(); files.Close();
+                    }
+                }
+                catch (Exception error)
+                {
+                    failure = error; timer.Stop();
+                    foreach (var window in Application.Current.Windows.Cast<Window>().Where(w => !ReferenceEquals(w, main)).ToArray()) window.Close();
+                }
+            };
+            timer.Start();
+            try { Click(Control<Button>(main, task)); }
+            finally { timer.Stop(); }
+            if (failure is not null) throw failure;
+            Require(completed, "Home task ended without opening a guide or file browser.");
+            // A completed task leaves the confirmed unit selected; return to Home for the next task.
+            Click(Control<Button>(main, "HomeNav"));
+        }
+    }
+
+    private static async Task V7InputSwitches()
+    {
+        string path = Path.Combine(NewDirectory(), "DEMO ONLY.signal"); File.WriteAllBytes(path, HomePreviewService.SampleConfiguration());
+        var window = Track(new global::SiemensUsbCheck.MainWindow("DEMO / Unit 1", new[] { path }, previewOnly: true));
+        ShowOffscreen(window); Control<ComboBox>(window, "AssignedFilesCombo").SelectedIndex = 0;
+        await WaitUntil(() => Control<Panel>(window, "SegmentPreviewPanel").Children.Count == 9, "Visual light preview did not load.");
+        for (int state = 0; state < 64; state++)
+        {
+            SetPreviewInputs(window, state);
+            Require(Control<TextBlock>(window, "InputStateText").Text.EndsWith($"combination {state}"), "Six switches selected the wrong stored combination.");
+            Require(Control<TextBox>(window, "PreviewText").Text.StartsWith($"State {state}:"), "Visible lights and stored details are out of sync.");
+        }
+        SetPreviewInputs(window, 4);
+        var segment = (StackPanel)Control<Panel>(window, "SegmentPreviewPanel").Children[0];
+        var swatch = segment.Children.OfType<Border>().Single();
+        Equal(Colors.Lime, ((SolidColorBrush)swatch.Background).Color, "Green example swatch");
+        SetPreviewInputs(window, 8);
+        Require(Control<TextBlock>(window, "SoundPreviewText").Text.Contains("configured"), "Sound-only combination was shown as silent.");
+        Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "UploadButton").IsEnabled, "Preview switches enabled USB.");
+    }
+
+    private static async Task V7TroubleshootingRoutes()
+    {
+        var fixture = NewFixture();
+        var flows = GuidedTroubleshooting.Defaults().ToList();
+        var triage = flows.Single(f => f.Id == "builtin-triage-v7");
+        var saved = new TroubleshootingFlow { Id = "builtin-light-v1", Title = "Site-edited guide", StartNodeId = "site", Nodes = [new() { Id = "site", Prompt = "Site-specific first check" }] };
+        var merged = GuidedTroubleshooting.Merge([saved]);
+        Require(ReferenceEquals(saved, merged.Single(f => f.Id == saved.Id)), "V7 replaced a saved site guide.");
+        foreach (string node in new[] { "gate-open", "gate-close", "scanner" })
+        {
+            var window = Track(new TroubleshootWindow(fixture.Data, fixture.Gate, fixture.BlueUnit, [], flows, triage.Id, node));
+            ShowOffscreen(window);
+            Equal(triage.Nodes.Single(n => n.Id == node).Prompt, Control<TextBlock>(window, "StepPromptText").Text, "Selected home symptom was lost");
+            window.Close();
+        }
+        var edited = Track(new TroubleshootWindow(fixture.Data, fixture.Gate, fixture.BlueUnit, [], merged, saved.Id));
+        ShowOffscreen(edited);
+        Equal("Site-specific first check", Control<TextBlock>(edited, "StepPromptText").Text, "Home route ignored the site-edited guide");
+        await DispatcherSettled();
+    }
+
+    private static async Task V7PickerSearch()
+    {
+        var fixture = NewFixture();
+        var gates = fixture.Data.LoadGates();
+        var window = Track(new TroubleshootPickerWindow(fixture.Data, gates, fixture.Data.LoadSystems(), fixture.Data.LoadCategories()));
+        ShowOffscreen(window);
+        Equal("All areas", Control<ComboBox>(window, "AreaBox").SelectedItem as string, "Picker default must not hide other areas");
+        Control<TextBox>(window, "AssetSearchBox").Text = fixture.Gate.AssetNumber;
+        Require(Control<ListBox>(window, "AssetList").Items.Cast<SafetyGate>().Any(g => g.Id == fixture.Gate.Id), "Cross-area asset search missed the unit.");
+        Require(!Control<Button>(window, "StartButton").IsEnabled, "Asset search bypassed explicit unit confirmation.");
+        await DispatcherSettled();
+    }
+
+    private static async Task V7AssignedFiles()
+    {
+        var fixture = NewFixture();
+        var own = new ResourceDefinition { Id = "v7-own", GateId = fixture.Gate.Id, Label = "Light Configuration", LaunchAction = "Siemens", RelativeFolder = "v7/own", AppliesToUnitIds = [fixture.BlueUnit.Id] };
+        var other = new ResourceDefinition { Id = "v7-other", GateId = fixture.Gate.Id, Label = "Other unit light", LaunchAction = "Siemens", RelativeFolder = "v7/other", AppliesToUnitIds = [fixture.RedUnit.Id] };
+        foreach (var resource in new[] { own, other })
+        {
+            string folder = fixture.Data.ResourceCurrentFolder(resource, fixture.Gate); Directory.CreateDirectory(folder);
+            File.WriteAllText(Path.Combine(folder, resource.Id + ".signal"), "fixture only");
+        }
+        string archive = fixture.Data.ResourceArchiveFolder(own, fixture.Gate); Directory.CreateDirectory(archive); File.WriteAllText(Path.Combine(archive, "old.signal"), "old fixture");
+        var window = Track(new UnitFilesWindow(fixture.Data, fixture.Gate, fixture.BlueUnit, [own, other], "light"));
+        ShowOffscreen(window);
+        var list = Control<ListBox>(window, "FileList");
+        await WaitUntil(() => list.Items.Count == 1, "Assigned current light file did not load.");
+        string name = (string)list.Items[0].GetType().GetProperty("Name")!.GetValue(list.Items[0])!;
+        Equal("v7-own.signal", name, "File finder included another unit or archived revision");
+        Control<TextBox>(window, "FileSearchBox").Text = "not present";
+        Equal(0, list.Items.Count, "File search filter");
+        Require(!Control<Button>(window, "OpenButton").IsEnabled, "Empty file selection left Open enabled.");
+        Require(Control<TextBlock>(window, "StatusText").Text.Contains("No matching"), "Missing file did not show a useful next step.");
     }
 
     private static async Task IntegratedColumnWindow()
@@ -279,11 +436,11 @@ internal static class Program
         assigned.SelectedIndex = 1;
         await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(second), "Explicit unit configuration did not load.");
         Require(Control<TextBox>(window, "ResultText").Text.Contains("not been checked"), "File choice incorrectly reported a device configuration match.");
-        Control<ComboBox>(window, "StateCombo").SelectedIndex = 7;
+        SetPreviewInputs(window, 7);
         Require(Control<TextBox>(window, "PreviewText").Text.Contains("RGB 255, 0, 0"), "Expected output did not use the selected state's stored values.");
         Control<ComboBox>(window, "ObservationCombo").SelectedIndex = 1;
         Require(Control<TextBlock>(window, "ObservationText").Text.Contains("this input state only"), "Observation implied complete functional validation.");
-        Control<ComboBox>(window, "StateCombo").SelectedIndex = 0;
+        SetPreviewInputs(window, 0);
         Equal(0, Control<ComboBox>(window, "ObservationCombo").SelectedIndex, "Changing the state must clear an obsolete observation");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "A valid file alone enabled upload without a port.");
     }
