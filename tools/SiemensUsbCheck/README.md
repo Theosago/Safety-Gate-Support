@@ -19,7 +19,7 @@ Version 0.4.0 shares its redesigned desktop component with Safety Gate Support 7
    for version 0.3.0. Extract the complete ZIP into a new folder.
 2. Close Siemens Configurator and other programs using the column. Connect the
    spare with a USB data cable, following the manufacturer's power instructions.
-3. Run `SiemensUsbCheck.exe` and confirm **v0.3.0** in its title. Select the column;
+3. Run `SiemensUsbCheck.exe` and confirm **v0.4.0** in its title. Select the column;
    use Refresh if needed.
 4. Click **Choose .signal file**, then select the actual configuration file.
    A report ZIP is not a configuration file. A backup named `column-backup.signal`
