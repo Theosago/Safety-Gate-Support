@@ -937,6 +937,9 @@ internal static class Program
 
     private static void ShowOffscreen(Window window)
     {
+        // WPF forbids a maximized window with suppressed activation; use a normal
+        // offscreen test surface while production viewers still open maximized.
+        window.WindowState = WindowState.Normal;
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.Left = -32000;
         window.Top = -32000;

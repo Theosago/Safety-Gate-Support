@@ -14,6 +14,7 @@ public partial class MainWindow
     private string _galleryArea = "";
     private int _galleryPage;
     private CancellationTokenSource? _galleryCancellation;
+    private readonly SemaphoreSlim _galleryPhotoLimit = new(4);
     private readonly System.Windows.Threading.DispatcherTimer _unitSearchTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
 
     public sealed class UnitCard : INotifyPropertyChanged
@@ -68,6 +69,7 @@ public partial class MainWindow
         var page = cards.Skip(_galleryPage * UnitsPerPage).Take(UnitsPerPage).ToList();
         UnitGallery.ItemsSource = page;
         GalleryEmptyText.Visibility = cards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        GalleryEmptyText.Text = _sharedDataReady ? "No matching units. Try another asset number or select All areas." : "Reconnect the shared folder to browse units. Your existing assignments have not been changed.";
         GalleryStatusText.Text = !_sharedDataReady ? "Shared data is unavailable. Reconnect the shared folder to see your units." : $"{cards.Count} unit(s) • {(_galleryArea.Length == 0 ? "All areas" : _galleryArea)} • Select the matching photo and unit number.";
         GalleryPageText.Text = $"Page {_galleryPage + 1} of {pages}";
         PreviousUnitsButton.IsEnabled = _galleryPage > 0; NextUnitsButton.IsEnabled = _galleryPage + 1 < pages;
@@ -80,12 +82,11 @@ public partial class MainWindow
     private async Task LoadGalleryPhotosAsync(List<UnitCard> cards, CancellationTokenSource cancellation)
     {
         var token = cancellation.Token;
-        using var limit = new SemaphoreSlim(4);
         try
         {
             await Task.WhenAll(cards.Select(async card =>
             {
-                await limit.WaitAsync(token);
+                await _galleryPhotoLimit.WaitAsync(token);
                 try
                 {
                     if (string.IsNullOrWhiteSpace(card.Unit.PrimaryPhoto)) { card.PhotoMessage = "No identification photo saved. Confirm the asset and unit number."; return; }
@@ -94,7 +95,12 @@ public partial class MainWindow
                     card.Photo = result.Source;
                     card.PhotoMessage = result.Status == IdentificationPhotoStatus.Missing ? "Saved photo unavailable. Check the shared drive or photo assignment." : "Photo could not be previewed. Confirm the asset and unit number.";
                 }
-                finally { limit.Release(); }
+                catch (OperationCanceledException) { throw; }
+                catch
+                {
+                    if (!_isClosed && !token.IsCancellationRequested) card.PhotoMessage = "This photo could not be previewed. Check its assignment; confirm the asset and unit number.";
+                }
+                finally { _galleryPhotoLimit.Release(); }
             }));
         }
         catch (OperationCanceledException) { }

@@ -59,6 +59,7 @@ public partial class UnitPhotoWindow : Window
         PreviousButton.IsEnabled = _index > 0; NextButton.IsEnabled = _index + 1 < _photos.Count;
         PhotoCountText.Text = $"Photo {_index + 1} of {_photos.Count} · whole image";
         string path = _photos[_index];
+        PhotoCaption.Text = Path.GetFileName(path) + " • " + _folderWarning;
         try
         {
             var photo = await IdentificationPhotoLoader.LoadAsync(path, 4096, token);

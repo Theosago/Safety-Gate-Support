@@ -75,7 +75,7 @@ public partial class MainWindow : Window
             _searchIndexRefreshTimer.Stop();
         };
         ShowHome();
-        HomeSubtitleText.Text = _content.HomeSubtitle;
+        HomeSubtitleText.Text = _data.IsHomePreview ? "HOME PREVIEW • Local starter photos and units. Select a photo card, or search Asset DEMO to explore the sample light configuration. USB is disabled." : _content.HomeSubtitle;
         ConnectionText.Text = "Connecting to shared data…";
         SearchHintText.Text = "Loading shared data…";
         IsEnabled = false;
@@ -126,7 +126,7 @@ public partial class MainWindow : Window
             _sharedDataReady = true;
             UpdateConnectionStatus();
             AreaBox.ItemsSource = _categories;
-            HomeSubtitleText.Text = _content.HomeSubtitle;
+            HomeSubtitleText.Text = _data.IsHomePreview ? "HOME PREVIEW • Local starter photos and units. Select a photo card, or search Asset DEMO to explore the sample light configuration. USB is disabled." : _content.HomeSubtitle;
             ManualsIntroText.Text = _content.ManualsIntro;
             PartsIntroText.Text = _content.PartsIntro;
             BuildHomeCategories();
@@ -574,7 +574,14 @@ public partial class MainWindow : Window
             }
         }
         catch (OperationCanceledException) { }
-        catch { /* A missing or invalid preview must not interrupt gate navigation. */ }
+        catch
+        {
+            if (!_isClosed && !token.IsCancellationRequested)
+            {
+                UnitPhotoMessage.Visibility = Visibility.Visible;
+                UnitPhotoMessage.Text = "This photo could not be previewed. Check its assignment.";
+            }
+        }
     }
 
     private void HomeTroubleshoot_Click(object sender, RoutedEventArgs e) => BeginTask("unknown");
