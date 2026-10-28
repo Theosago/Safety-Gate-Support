@@ -1,11 +1,11 @@
 # Safety Gate Support
 
-Windows WPF support console, version **7.0.0**, based on the supplied
+Windows WPF support console, version **7.1.0**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,
 drawings/configuration resources, manuals, parts, global search, and guided
-troubleshooting. **Version 7 starts with the symptom**, carries it through asset/unit confirmation into the guide, and offers direct access to current assigned files. The redesigned Siemens tool uses six input switches and visual segment previews in place of the 64-state dropdown. See [what changed in v7](docs/V7.md). Version 6.5.0 integrates Siemens USB backup, configuration comparison and upload, adds expected-output previews and documented troubleshooting, and imports local support libraries. Startup, photo loading and search retain the earlier performance improvements.
+troubleshooting. **Version 7.1 opens directly to a searchable photo gallery of units.** Select the unit to see a large, uncropped identification photo beside its troubleshooting and current-file actions. Gränges branding and a maximized photo viewer are included. The redesigned Siemens tool uses six input switches and visual segment previews in place of the 64-state dropdown. See [what changed in v7.1](docs/V7_1.md). Version 6.5.0 integrates Siemens USB backup, configuration comparison and upload, adds expected-output previews and documented troubleshooting, and imports local support libraries. Startup, photo loading and search retain the earlier performance improvements.
 
 See the [Windows quick start](docs/WINDOWS_QUICK_START.md) for upgrading, importing the supplied files, and checking a signal column.
 

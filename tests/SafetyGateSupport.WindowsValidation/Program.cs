@@ -93,7 +93,9 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview rapid selection and deselection stay correct", AdminPhotoSelection),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
-            ("V7 home tasks carry the chosen symptom and file filter through unit confirmation", V7HomeTasks),
+            ("Unit-first home opens the selected unit’s tools without a second picker", V7HomeTasks),
+            ("Unit photo gallery filters, bounds decodes and rejects stale completions", GalleryFilteringAndPhotos),
+            ("Large photo viewer preserves landscape and portrait images and original files", WholePhotoViewer),
             ("V7 symptom routes start the selected guide and retain site edits", V7TroubleshootingRoutes),
             ("V7 unit picker searches across areas by default", V7PickerSearch),
             ("V7 unit files exclude other-unit and archived configurations", V7AssignedFiles),
@@ -264,7 +266,12 @@ internal static class Program
         var data = HomePreviewService.Create(NewDirectory()); HomePreviewService.Initialize(data);
         var main = Track(new MainWindow(data)); ShowOffscreen(main);
         await WaitUntil(() => main.IsEnabled, "Screenshot preview did not initialize.");
-        await DispatcherSettled(); Capture(main, "01-home.png"); main.Close();
+        await WaitUntil(() => Control<ItemsControl>(main, "UnitGallery").Items.Cast<MainWindow.UnitCard>().Any(c => c.Photo is not null), "Gallery screenshot has no photos.");
+        await DispatcherSettled(); Capture(main, "01-home.png");
+        var photoCard = Control<ItemsControl>(main, "UnitGallery").Items.Cast<MainWindow.UnitCard>().First(c => c.Photo is not null);
+        await SelectGalleryUnit(main, photoCard.Unit);
+        await WaitUntil(() => Control<Image>(main, "GateImage").Source is not null, "Workspace screenshot has no photo.");
+        await DispatcherSettled(); Capture(main, "04-unit-workspace.png"); main.Close();
         var gate = data.LoadGates().Single(g => g.Id == "home-preview-gate");
         var unit = data.LoadSystems().Single(u => u.Id == "home-preview-unit");
         var resource = data.LoadResources().Single(r => r.Id == "home-preview-light");
@@ -322,45 +329,31 @@ internal static class Program
     {
         var fixture = NewFixture();
         var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main);
-        await WaitUntil(() => main.IsEnabled, "V7 home did not finish loading.");
+        await WaitUntil(() => main.IsEnabled, "Unit-first home did not finish loading.");
+        Equal(Visibility.Visible, Control<ScrollViewer>(main, "HomeView").Visibility, "Home must open directly to unit selection");
+        Require(Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "The opening screen has no units.");
+        Require(!Control<Button>(main, "GateOpenTask").IsVisible, "Troubleshooting must follow unit selection.");
+        await SelectGalleryUnit(main, fixture.BlueUnit);
+        await WaitUntil(() => HasColor(Control<Image>(main, "GateImage").Source, Colors.Blue), "Selected unit photo failed to load.");
         main.Width = 1000; main.Height = 680; main.UpdateLayout();
-        var symptoms = Control<Panel>(main, "SymptomPanel");
-        foreach (var card in symptoms.Children.OfType<Button>())
-        {
-            var position = card.TranslatePoint(new Point(0, 0), Control<ScrollViewer>(main, "HomeView"));
-            Require(card.ActualWidth > 180 && position.X >= 0 && position.X + card.ActualWidth <= Control<ScrollViewer>(main, "HomeView").ActualWidth + 1,
-                "A home symptom card exceeds the minimum window width.");
-        }
+        var hero = Control<Image>(main, "GateImage");
+        Require(Control<Button>(main, "EnlargePhotoButton").ActualWidth > 400 && Math.Max(hero.ActualWidth, hero.ActualHeight) >= 400 && hero.Stretch == Stretch.Uniform, "Workspace photo is too small or cropped.");
         foreach (string task in new[] { "GateOpenTask", "LightFilesTask" })
         {
             Exception? failure = null;
-            bool picked = false, completed = false;
+            bool completed = false;
             var deadline = Stopwatch.StartNew();
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
             timer.Tick += (_, _) =>
             {
                 try
                 {
-                    if (deadline.Elapsed > TimeSpan.FromSeconds(12)) throw new InvalidOperationException("Home task did not open its destination.");
-                    var picker = Application.Current.Windows.OfType<TroubleshootPickerWindow>().SingleOrDefault();
-                    if (picker is not null)
-                    {
-                        if (!picked)
-                        {
-                            Track(picker);
-                            var gates = Control<ListBox>(picker, "AssetList");
-                            gates.SelectedItem = gates.Items.Cast<SafetyGate>().Single(g => g.Id == fixture.Gate.Id);
-                            var units = Control<ListBox>(picker, "UnitList");
-                            units.SelectedItem = units.Items.Cast<SafetySystem>().Single(u => u.Id == fixture.BlueUnit.Id);
-                            picked = true;
-                        }
-                        if (Control<Button>(picker, "StartButton").IsEnabled) Click(Control<Button>(picker, "StartButton"));
-                        return;
-                    }
+                    if (deadline.Elapsed > TimeSpan.FromSeconds(12)) throw new InvalidOperationException("Unit task did not open its destination.");
+                    Require(!Application.Current.Windows.OfType<TroubleshootPickerWindow>().Any(), "The selected unit was requested again.");
                     if (task == "GateOpenTask" && Application.Current.Windows.OfType<TroubleshootWindow>().SingleOrDefault() is { } guide)
                     {
                         Track(guide);
-                        Equal("What happens when opening is requested?", Control<TextBlock>(guide, "StepPromptText").Text, "Home symptom did not reach its guide");
+                        Equal("What happens when opening is requested?", Control<TextBlock>(guide, "StepPromptText").Text, "Symptom did not reach its guide");
                         completed = true; timer.Stop(); guide.Close();
                     }
                     else if (task == "LightFilesTask" && Application.Current.Windows.OfType<UnitFilesWindow>().SingleOrDefault() is { } files)
@@ -376,14 +369,71 @@ internal static class Program
                     foreach (var window in Application.Current.Windows.Cast<Window>().Where(w => !ReferenceEquals(w, main)).ToArray()) window.Close();
                 }
             };
-            timer.Start();
-            try { Click(Control<Button>(main, task)); }
-            finally { timer.Stop(); }
+            timer.Start(); try { Click(Control<Button>(main, task)); } finally { timer.Stop(); }
             if (failure is not null) throw failure;
-            Require(completed, "Home task ended without opening a guide or file browser.");
-            // A completed task leaves the confirmed unit selected; return to Home for the next task.
-            Click(Control<Button>(main, "HomeNav"));
+            Require(completed, "Unit task ended without opening its destination.");
         }
+        Click(Control<Button>(main, "HomeNav"));
+        Click(Control<Button>(main, "SystemsNav"));
+        Require(Control<TextBlock>(main, "UnitTitleText").Text.Contains(fixture.BlueUnit.UnitDisplay) && Control<Panel>(main, "UnitDetailPanel").IsVisible,
+            "Returning to Selected unit discarded its context.");
+    }
+
+    private static async Task SelectGalleryUnit(MainWindow window, SafetySystem unit)
+    {
+        Control<TextBox>(window, "UnitSearchBox").Text = unit.AssetNumber ?? "";
+        await WaitUntil(() => Control<ItemsControl>(window, "UnitGallery").Items.Cast<MainWindow.UnitCard>().Any(c => c.Unit.Id == unit.Id), "Unit search did not find the intended unit.");
+        await DispatcherSettled();
+        var gallery = Control<ItemsControl>(window, "UnitGallery");
+        var card = Descendants<Button>(gallery).Single(b => b.Tag is SafetySystem u && u.Id == unit.Id);
+        Click(card);
+    }
+
+    private static async Task GalleryFilteringAndPhotos()
+    {
+        var fixture = NewFixture();
+        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main);
+        await WaitUntil(() => main.IsEnabled && Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "Gallery did not populate.");
+        var gallery = Control<ItemsControl>(main, "UnitGallery");
+        Require(gallery.Items.Count <= 12, "Gallery decoded unbounded inventory at once.");
+        Control<TextBox>(main, "UnitSearchBox").Text = fixture.Gate.AssetNumber;
+        await WaitUntil(() => gallery.Items.Cast<MainWindow.UnitCard>().Any(c => c.Unit.Id == fixture.RedUnit.Id), "Asset search missed the red test unit.");
+        await WaitUntil(() => gallery.Items.Cast<MainWindow.UnitCard>().Where(c => c.Unit.Id == fixture.RedUnit.Id).All(c => c.Photo is not null), "Gallery did not decode unit photos.");
+        var red = gallery.Items.Cast<MainWindow.UnitCard>().Single(c => c.Unit.Id == fixture.RedUnit.Id);
+        Require(HasColor(red.Photo, Colors.Red), "Gallery displayed another unit’s photo.");
+        Equal(640, Math.Max(red.Photo!.PixelWidth, red.Photo.PixelHeight), "Gallery decode bound");
+        Require(Math.Abs((double)red.Photo.PixelWidth / red.Photo.PixelHeight - 2) < 0.01, "Landscape photo was cropped.");
+        Control<TextBox>(main, "UnitSearchBox").Text = "no-unit-matches-this-query";
+        await WaitUntil(() => gallery.Items.Count == 0 && Control<TextBlock>(main, "GalleryEmptyText").IsVisible, "Empty search lacks guidance.");
+        Control<TextBox>(main, "UnitSearchBox").Text = "";
+        await WaitUntil(() => gallery.Items.Count > 0, "Clearing search did not restore units.");
+        Click(Control<Button>(main, "NextUnitsButton"));
+        Require(gallery.Items.Count <= 12, "Pagination exceeded the photo bound.");
+        Control<TextBox>(main, "UnitSearchBox").Text = fixture.Gate.AssetNumber;
+        await WaitUntil(() => gallery.Items.Cast<MainWindow.UnitCard>().Any(c => c.Unit.Id == fixture.BlueUnit.Id), "Rapid filtering retained a stale page.");
+        await DispatcherSettled();
+        Require(gallery.Items.Cast<MainWindow.UnitCard>().All(c => c.Gate.AssetNumber.Contains(fixture.Gate.AssetNumber)), "Obsolete photo completion restored stale search results.");
+    }
+
+    private static async Task WholePhotoViewer()
+    {
+        var fixture = NewFixture();
+        string path = fixture.Data.Resolve(fixture.RedUnit.PrimaryPhoto);
+        byte[] before = File.ReadAllBytes(path);
+        fixture.RedUnit.PhotosFolder = "viewer-extra";
+        Directory.CreateDirectory(fixture.Data.Resolve(fixture.RedUnit.PhotosFolder));
+        WriteImage(Path.Combine(fixture.Data.Resolve(fixture.RedUnit.PhotosFolder), "portrait.png"), 1500, 3000, Colors.Blue);
+        var viewer = Track(new UnitPhotoWindow(fixture.Data, fixture.Gate, fixture.RedUnit)); ShowOffscreen(viewer);
+        await WaitUntil(() => HasColor(Control<Image>(viewer, "FullPhoto").Source, Colors.Red), "Large photo did not load.");
+        Equal(Stretch.Uniform, Control<Image>(viewer, "FullPhoto").Stretch, "Large viewer must preserve the whole photo");
+        Equal(3000, ((BitmapSource)Control<Image>(viewer, "FullPhoto").Source).PixelWidth, "Large viewer detail");
+        Click(Control<Button>(viewer, "NextButton"));
+        await WaitUntil(() => HasColor(Control<Image>(viewer, "FullPhoto").Source, Colors.Blue), "Additional unit photo did not load.");
+        var portrait = (BitmapSource)Control<Image>(viewer, "FullPhoto").Source;
+        Require(Math.Abs((double)portrait.PixelWidth / portrait.PixelHeight - 0.5) < 0.01, "Portrait photo was cropped.");
+        Require(File.ReadAllBytes(path).SequenceEqual(before), "Viewing altered the original photo.");
+        viewer.Close();
+        File.Delete(path);
     }
 
     private static async Task V7InputSwitches()
@@ -731,7 +781,7 @@ internal static class Program
         var window = Track(new MainWindow(fixture.Data));
         ShowOffscreen(window);
         await WaitUntil(() => Control<Panel>(window, "HomeCategoryPanel").Children.Count > 0 && window.IsEnabled, "Main window inventory did not load.");
-        Click(Control<Panel>(window, "HomeCategoryPanel").Children.OfType<Button>().Single(button => Equals(button.Tag, fixture.Gate.Category)));
+        await SelectGalleryUnit(window, fixture.BlueUnit);
         var assets = Control<ListBox>(window, "AssetList");
         assets.SelectedItem = assets.Items.Cast<SafetyGate>().Single(gate => gate.Id == fixture.Gate.Id);
         var units = Control<ListBox>(window, "UnitList");

@@ -53,6 +53,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _data = data;
+        InitializeUnitGallery();
         if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
         _notesRefreshTimer.Tick += NotesRefreshTimer_Tick;
@@ -67,6 +68,7 @@ public partial class MainWindow : Window
             _dataGeneration++;
             CancelSearchIndexRefresh();
             CancelPhotoLoad();
+            _galleryCancellation?.Cancel(); _unitSearchTimer.Stop();
             _notesSaveTimer.Stop();
             _notesRefreshTimer.Stop();
             _searchDebounceTimer.Stop();
@@ -115,6 +117,7 @@ public partial class MainWindow : Window
                 GlobalSearchResults.ItemsSource = null; GlobalSearchResults.Visibility = Visibility.Collapsed;
                 SearchHintText.Text = "Shared data is unavailable.";
                 UpdateConnectionStatus();
+                RefreshUnitGallery();
                 return;
             }
             _gates = snapshot.Gates; _systems = snapshot.Systems; _resources = snapshot.Resources;
@@ -127,6 +130,7 @@ public partial class MainWindow : Window
             ManualsIntroText.Text = _content.ManualsIntro;
             PartsIntroText.Text = _content.PartsIntro;
             BuildHomeCategories();
+            RefreshUnitGallery();
             BuildHelpPanels();
             RefreshManuals();
             RefreshParts();
@@ -143,7 +147,7 @@ public partial class MainWindow : Window
                 MessageBox.Show(ex.Message, "Unable to load shared data", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
-        finally { _loadingData = false; if (!_isClosed) IsEnabled = true; }
+        finally { _loadingData = false; if (!_isClosed) { IsEnabled = true; if (HomeView.IsVisible) UnitSearchBox.Focus(); } }
     }
 
     private void UpdateConnectionStatus()
@@ -167,9 +171,8 @@ public partial class MainWindow : Window
         HomeCategoryPanel.Children.Clear();
         foreach (var category in _categories)
         {
-            var count = _gates.Count(g => g.Category.Equals(category, StringComparison.OrdinalIgnoreCase));
-            var button = new Button { Tag = category, MinWidth = 190, MinHeight = 72, Content = $"{category}\n{count} safety gates", Margin = new Thickness(4), HorizontalContentAlignment = HorizontalAlignment.Left };
-            button.Click += (_, _) => { ShowSystems(); AreaBox.SelectedItem = category; };
+            var button = new Button { Tag = category, MinWidth = 90, MinHeight = 36, Content = category, Margin = new Thickness(4), HorizontalContentAlignment = HorizontalAlignment.Left };
+            button.Click += (_, _) => SelectGalleryArea(category);
             HomeCategoryPanel.Children.Add(button);
         }
     }
@@ -189,13 +192,13 @@ public partial class MainWindow : Window
     }
 
     private void HomeNav_Click(object sender, RoutedEventArgs e) => ShowHome();
-    private void SystemsNav_Click(object sender, RoutedEventArgs e) => ShowSystems();
+    private void SystemsNav_Click(object sender, RoutedEventArgs e) { if (SelectedUnit is null) ShowHome(); else ShowSystems(); }
     private void ManualsNav_Click(object sender, RoutedEventArgs e) { _manualFilterGateId = _manualFilterUnitId = ""; ShowManuals(); RefreshManuals(); }
     private void PartsNav_Click(object sender, RoutedEventArgs e) { _partFilterGateId = _partFilterUnitId = ""; ShowParts(); RefreshParts(); }
 
     private void HideAllViews() { HomeView.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
     private void ShowHome() { HideAllViews(); HomeView.Visibility = Visibility.Visible; SetActiveNavigation(HomeNav); }
-    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); EnsureSystemAreaSelected(); }
+    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
     private void ShowManuals() { HideAllViews(); ManualsView.Visibility = Visibility.Visible; SetActiveNavigation(ManualsNav); }
     private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; SetActiveNavigation(PartsNav); }
 
@@ -554,14 +557,21 @@ public partial class MainWindow : Window
     {
         CancelPhotoLoad();
         GateImage.Source = null;
-        if (string.IsNullOrWhiteSpace(system.PrimaryPhoto) || _isClosed) return;
+        UnitPhotoMessage.Visibility = Visibility.Visible;
+        UnitPhotoMessage.Text = "Loading identification photo…";
+        if (string.IsNullOrWhiteSpace(system.PrimaryPhoto) || _isClosed) { UnitPhotoMessage.Text = "No identification photo saved for this unit."; return; }
         var cancellation = new CancellationTokenSource();
         _photoLoadCancellation = cancellation;
         var token = cancellation.Token;
         try
         {
             var result = await IdentificationPhotoLoader.LoadAsync(_data.Resolve(system.PrimaryPhoto), token);
-            if (!_isClosed && !token.IsCancellationRequested) GateImage.Source = result.Source;
+            if (!_isClosed && !token.IsCancellationRequested)
+            {
+                GateImage.Source = result.Source;
+                UnitPhotoMessage.Visibility = result.Source is null ? Visibility.Visible : Visibility.Collapsed;
+                UnitPhotoMessage.Text = result.Status == IdentificationPhotoStatus.Missing ? "Saved photo unavailable. Check the shared drive or photo assignment." : "This photo could not be previewed.";
+            }
         }
         catch (OperationCanceledException) { }
         catch { /* A missing or invalid preview must not interrupt gate navigation. */ }
@@ -574,20 +584,13 @@ public partial class MainWindow : Window
     private void BeginTask(string task, bool files = false)
     {
         if (!_sharedDataReady) { MessageBox.Show("Set up or reconnect the shared data first.", "Shared data unavailable", MessageBoxButton.OK, MessageBoxImage.Information); return; }
-        var picker = new TroubleshootPickerWindow(_data, _gates, _systems, _categories) { Owner = this };
-        picker.TaskTitleText.Text = files ? "Find files for your unit" : "Which unit needs help?";
-        picker.TaskDescriptionText.Text = files ? "Search by asset number, choose a unit, and confirm its identification photo." : "Your symptom is saved. Choose the unit to start the next check.";
-        if (picker.ShowDialog() == true && picker.ChosenSystem is { } unit)
+        if (SelectedUnit is not { } unit || SelectedGate is not { } gate) { ShowHome(); UnitSearchBox.Focus(); return; }
+        if (files) new UnitFilesWindow(_data, gate, unit, _resources, task) { Owner = this }.ShowDialog();
+        else
         {
-            NavigateToSystem(unit);
-            if (GateFor(unit) is not { } gate) return;
-            if (files) new UnitFilesWindow(_data, gate, unit, _resources, task) { Owner = this }.ShowDialog();
-            else
-            {
-                string flow = task switch { "light" => "builtin-light-v1", "actuator" => "builtin-actuator-v1", _ => "builtin-triage-v7" };
-                string? node = task is "gate-open" or "gate-close" or "scanner" ? task : null;
-                new TroubleshootWindow(_data, gate, unit, _resources, _flows, flow, node) { Owner = this }.ShowDialog();
-            }
+            string flow = task switch { "light" => "builtin-light-v1", "actuator" => "builtin-actuator-v1", _ => "builtin-triage-v7" };
+            string? node = task is "gate-open" or "gate-close" or "scanner" ? task : null;
+            new TroubleshootWindow(_data, gate, unit, _resources, _flows, flow, node) { Owner = this }.ShowDialog();
         }
     }
     private void TroubleshootSystem_Click(object sender, RoutedEventArgs e)

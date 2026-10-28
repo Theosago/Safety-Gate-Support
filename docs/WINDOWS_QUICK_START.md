@@ -1,10 +1,10 @@
-# Safety Gate Support 7.0.0 — Windows quick start
+# Safety Gate Support 7.1.0 — Windows quick start
 
 ## Upgrade
 
-1. Download **SafetyGateSupport-Windows-x64** from the successful GitHub Actions run for version 7.0.0. Extract the **whole ZIP** to a new folder on the PC.
+1. Download **SafetyGateSupport-Windows-x64** from the successful GitHub Actions run for version 7.1.0. Extract the **whole ZIP** to a new folder on the PC.
 2. Close the older app and run **SafetyGateSupport.exe**. No SDK, installer, or Siemens Configurator is required for the built-in light tool.
-3. Confirm **v7.0.0** in the sidebar. Existing local settings, shared data, photos, and site troubleshooting edits remain in use. Keep the old executable folder until the new version has been checked at the site.
+3. Confirm **v7.1.0** in the sidebar. Existing local settings, shared data, photos, and site troubleshooting edits remain in use. Keep the old executable folder until the new version has been checked at the site.
 
 On a new PC, use **Set Up Shared Data** or **Ctrl+Shift+Alt+A → Shared Data / Software** to select the existing shared folder. Initialize starter data only when starting with an empty folder. The default shared folder is `Q:\SafetyGateSupport`; local settings live under `%LOCALAPPDATA%\SafetyGateSupport`.
 
@@ -21,7 +21,7 @@ Standalone PDF/DOCX imports become searchable manuals. ZIP documents are availab
 
 ## Check or configure a signal column
 
-1. From Home choose **Light is dark or wrong**, search the asset, confirm the unit, then choose **Check stored settings / upload an approved file**. For a file without troubleshooting, choose **Light configurations** on Home; select the unit and use **Check / configure light**.
+1. On the opening photo gallery, search the asset or location and select the correct unit’s card. Confirm its large photo and identity. Choose **Light is dark or wrong**, then **Check stored settings / upload an approved file**. For a file directly, use **Light configurations** beside the photo, then **Check / configure light**.
 2. Confirm the displayed asset/unit and isolate equipment for servicing before USB connection. Close Siemens Configurator. Connect the Siemens **8WD4613-5JH37** using a USB data cable, then select its detected port. Opening USB can restart it. Detection alone does not open it.
 3. Explicitly select the unit's approved `.signal` file, or browse for an approved file. Multiple assigned files are not resolved automatically.
 4. Click **Read & compare**. The report contains `column-backup.signal`. A **MATCH** means the stored settings match the selected file; **DIFFERENT** means review the file assignment before deciding to change settings. Neither result measures physical function.
@@ -44,4 +44,4 @@ The original manuals, plant configurations, and vendor binaries are imported fro
 
 ## Hokuyo scanner diagnostics
 
-Open a unit's UAM scanner resource and choose **Check UAM scanner…**. Version 7.0.0 includes a read-only USB diagnostic prototype and offline front-display error-code lookup. The first USB report must be compared on the spare scanner before the live interpretation can be considered validated. See [Hokuyo USB diagnostics](HOKUYO_USB_DIAGNOSTICS.md). No scanner programming controls are included.
+Open a unit's UAM scanner resource and choose **Check UAM scanner…**. Version 7.1.0 includes a read-only USB diagnostic prototype and offline front-display error-code lookup. The first USB report must be compared on the spare scanner before the live interpretation can be considered validated. See [Hokuyo USB diagnostics](HOKUYO_USB_DIAGNOSTICS.md). No scanner programming controls are included.

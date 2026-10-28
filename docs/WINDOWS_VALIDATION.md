@@ -10,12 +10,13 @@ data folder for a first-time test.
    **Ctrl+Shift+Alt+A**, then select **Shared Data / Software**, choose an empty local folder,
    and click **Initialize Starter Data**. Confirm the connection status updates
    and the three seeded areas can be browsed.
-2. Select an area, gate, and unit in Systems. Confirm its identification photo
+2. Use the opening photo gallery to select a unit. Confirm its identification photo
    and unit details appear. Search for a known asset from Home and open a result.
-3. Open **Troubleshoot a System** from Home. Confirm Start Troubleshooting is
-   disabled until a unit is selected. Check its preview photo/details. Change
-   area or gate and confirm the previous unit/photo clears. Double-clicking a
-   unit should not launch troubleshooting; the Start button should.
+3. Filter the opening gallery by asset, location and area. Confirm that photos
+   show the complete image. Select a unit and check that file/troubleshooting
+   actions use it without another picker. Use **Change unit** to return to the
+   gallery. Enlarge a landscape and portrait photo, browse additional unit
+   photos, and check that the original files remain unchanged.
 4. In Setup Mode, add a temporary unit without a photo and confirm the picker
    shows the missing-photo message. Assign a photo, replace it, and confirm the
    picker displays the replacement. Test clipboard paste and image drag/drop,

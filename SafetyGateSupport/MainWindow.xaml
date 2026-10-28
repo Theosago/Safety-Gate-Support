@@ -9,11 +9,12 @@
    <Grid>
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel Margin="14,18,14,10">
+     <Image Source="{StaticResource GrangesStacked}" Stretch="Uniform" Height="90" Margin="8,0,8,18" AutomationProperties.Name="Gränges"/>
      <TextBlock Text="Safety Gate" Foreground="#F2F7FB" FontWeight="Bold" FontSize="19"/><TextBlock Text="Support" FontSize="16" Foreground="#AEC4D3"/>
     </StackPanel>
     <StackPanel Grid.Row="1" Margin="0,12,0,0">
-     <Button x:Name="HomeNav" Style="{StaticResource NavButton}" Content="⌂   Home" Click="HomeNav_Click"/>
-     <Button x:Name="SystemsNav" Style="{StaticResource NavButton}" Content="☷   Units &amp; files" Click="SystemsNav_Click"/>
+     <Button x:Name="HomeNav" Style="{StaticResource NavButton}" Content="⌂   Find a unit" Click="HomeNav_Click"/>
+     <Button x:Name="SystemsNav" Style="{StaticResource NavButton}" Content="☷   Selected unit" Click="SystemsNav_Click"/>
      <Button x:Name="ManualsNav" Style="{StaticResource NavButton}" Content="▤   Manuals" Click="ManualsNav_Click"/>
      <Button x:Name="PartsNav" Style="{StaticResource NavButton}" Content="⚙   Parts" Click="PartsNav_Click"/>
      <Button Style="{StaticResource NavButton}" Content="Support library" Click="SupportLibrary_Click"/>
@@ -21,7 +22,7 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18">
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v7.0.0" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v7.1.0" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -30,11 +31,31 @@
    <!-- HOME -->
    <ScrollViewer x:Name="HomeView" VerticalScrollBarVisibility="Auto">
     <StackPanel MaxWidth="930" HorizontalAlignment="Stretch">
-     <TextBlock Text="What’s wrong?" FontSize="34" FontWeight="SemiBold"/>
-     <TextBlock Text="Start with the symptom. We’ll find the right unit and walk through the next check." FontSize="15" Foreground="#536E81" TextWrapping="Wrap" Margin="0,6,0,20"/>
-     <UniformGrid Columns="3" x:Name="SymptomPanel"><Button x:Name="GateOpenTask" Style="{StaticResource TaskCard}" Tag="gate-open" Click="Symptom_Click"><StackPanel><TextBlock Text="Gate won’t open" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Start with indicators and the blocked condition." Foreground="#61788A" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel></Button><Button x:Name="GateCloseTask" Style="{StaticResource TaskCard}" Tag="gate-close" Click="Symptom_Click"><StackPanel><TextBlock Text="Gate won’t close" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Check the field, interlocks and visible symptoms." Foreground="#61788A" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel></Button><Button x:Name="ActuatorTask" Style="{StaticResource TaskCard}" Tag="actuator" Click="Symptom_Click"><StackPanel><TextBlock Text="Arm or actuator issue" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Motion, replacement and approved programs." Foreground="#61788A" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel></Button><Button x:Name="LightTask" Style="{StaticResource TaskCard}" Tag="light" Click="Symptom_Click"><StackPanel><TextBlock Text="Light is dark or wrong" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Compare settings and expected light patterns." Foreground="#61788A" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel></Button><Button x:Name="ScannerTask" Style="{StaticResource TaskCard}" Tag="scanner" Click="Symptom_Click"><StackPanel><TextBlock Text="Scanner stops the gate" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Identify the scanner and check its status." Foreground="#61788A" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel></Button><Button x:Name="UnknownTask" Style="{StaticResource TaskCard}" Tag="unknown" Click="Symptom_Click"><StackPanel><TextBlock Text="I’m not sure yet" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Work out which part needs attention." Foreground="#61788A" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel></Button></UniformGrid>
-     <DockPanel Margin="0,10,0,12"><TextBlock Text="Just need a file?" FontSize="22" FontWeight="SemiBold"/></DockPanel>
-     <UniformGrid Columns="3"><Button x:Name="LightFilesTask" Style="{StaticResource TaskCard}" Tag="light" Click="FindFiles_Click" MinHeight="80"><StackPanel><TextBlock Text="Light configurations" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="Assigned .signal files for your unit" FontSize="12" Foreground="#61788A" Margin="0,6,0,0"/></StackPanel></Button><Button x:Name="DrawingFilesTask" Style="{StaticResource TaskCard}" Tag="drawing" Click="FindFiles_Click" MinHeight="80"><StackPanel><TextBlock Text="Electrical drawings" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="Current schematics for your unit" FontSize="12" Foreground="#61788A" Margin="0,6,0,0"/></StackPanel></Button><Button x:Name="AllFilesTask" Style="{StaticResource TaskCard}" Tag="all" Click="FindFiles_Click" MinHeight="80"><StackPanel><TextBlock Text="All unit files" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="Configs, photos, manuals and tools" FontSize="12" Foreground="#61788A" Margin="0,6,0,0"/></StackPanel></Button></UniformGrid>
+     <DockPanel Margin="0,0,0,14">
+      <Image Source="{StaticResource GrangesHorizontal}" Width="200" Height="52" Stretch="Uniform" DockPanel.Dock="Right" Margin="20,0,0,0" AutomationProperties.Name="Gränges"/>
+      <StackPanel><TextBlock Text="Which unit are you working on?" FontSize="30" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Find it by asset number, location, or photograph. Select its photo to continue." Foreground="#536E81" FontSize="15" TextWrapping="Wrap" Margin="0,7,0,0"/></StackPanel>
+     </DockPanel>
+     <TextBlock Text="Search units" FontWeight="SemiBold" Margin="0,4,0,5"/>
+     <TextBox x:Name="UnitSearchBox" MinHeight="46" FontSize="18" TextChanged="UnitSearch_Changed" KeyDown="UnitSearch_KeyDown" ToolTip="Asset number, unit, location, model or description" AutomationProperties.Name="Search units by asset number or location"/>
+     <WrapPanel Margin="0,12,0,8"><Button x:Name="AllAreasButton" Content="All areas" Click="AllAreas_Click"/><WrapPanel x:Name="HomeCategoryPanel"/></WrapPanel>
+     <TextBlock x:Name="GalleryStatusText" Text="Loading units…" Foreground="#536E81" TextWrapping="Wrap" Margin="4,0,0,12"/>
+     <ItemsControl x:Name="UnitGallery"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate><DataTemplate>
+       <Button Click="UnitCard_Click" Tag="{Binding Unit}" HorizontalContentAlignment="Stretch" Padding="12" Margin="0,0,12,16" AutomationProperties.Name="{Binding Title}">
+        <StackPanel>
+         <Border Background="#EDF1F4" CornerRadius="8" Height="280" Padding="4"><Grid>
+          <Image Source="{Binding Photo}" Stretch="Uniform" AutomationProperties.Name="{Binding Title}"/>
+          <TextBlock Text="{Binding PhotoMessage}" TextWrapping="Wrap" TextAlignment="Center" Foreground="#61788A" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding Photo}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers><Setter Property="Visibility" Value="Collapsed"/></Style></TextBlock.Style></TextBlock>
+         </Grid></Border>
+         <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap" Margin="4,12,4,4"/>
+         <TextBlock Text="{Binding Location}" TextWrapping="Wrap" Foreground="#536E81" Margin="4,0,4,6"/>
+         <TextBlock Text="Open this unit →" FontWeight="SemiBold" Foreground="#176B87" Margin="4,6,4,2"/>
+        </StackPanel>
+       </Button>
+      </DataTemplate></ItemsControl.ItemTemplate>
+     </ItemsControl>
+     <TextBlock x:Name="GalleryEmptyText" Text="No matching units. Try another asset number or select All areas." TextWrapping="Wrap" Margin="4,20" Visibility="Collapsed" FontSize="18"/>
+     <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,18"><Button x:Name="PreviousUnitsButton" Content="← Previous units" Click="PreviousUnits_Click"/><TextBlock x:Name="GalleryPageText" VerticalAlignment="Center" Margin="14,0"/><Button x:Name="NextUnitsButton" Content="More units →" Click="NextUnits_Click"/></WrapPanel>
      <TextBlock x:Name="HomeSubtitleText" Foreground="#555" FontSize="15" Margin="0,4,0,10" TextWrapping="Wrap"/>
 
      <GroupBox Header="Search everything">
@@ -57,8 +78,7 @@
       </StackPanel>
      </GroupBox>
 
-     <TextBlock Text="Browse by area" FontSize="18" FontWeight="SemiBold" Margin="0,16,0,6"/>
-     <WrapPanel x:Name="HomeCategoryPanel"/>
+
 
      <Grid Margin="0,12,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
       <GroupBox Header="Quick help" Grid.Column="0"><StackPanel x:Name="QuickHelpPanel" Margin="8"/></GroupBox>
@@ -67,50 +87,43 @@
     </StackPanel>
    </ScrollViewer>
 
-   <!-- SYSTEMS -->
+   <!-- The unit workspace keeps the selected identity while tools open. -->
    <Grid x:Name="SystemsView" Visibility="Collapsed">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <TextBlock Text="Units &amp; files" FontSize="28" FontWeight="Bold"/>
-    <Grid Grid.Row="1" Margin="0,12,0,12">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <ComboBox x:Name="AreaBox" Height="36" FontSize="15" SelectionChanged="AreaBox_SelectionChanged"/>
-     <TextBox x:Name="SystemSearchBox" Grid.Column="2" Height="36" FontSize="16" VerticalContentAlignment="Center" ToolTip="Search asset number or gate manufacturer / system" TextChanged="SystemSearchBox_TextChanged"/>
-    </Grid>
-    <Grid Grid.Row="2">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <GroupBox Header="Safety Gates" Margin="0,0,10,0"><ListBox x:Name="AssetList" Margin="5" SelectionChanged="AssetList_SelectionChanged"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox></GroupBox>
-     <GroupBox Header="Units" Grid.Column="1" Margin="0,0,10,0"><ListBox x:Name="UnitList" Margin="5" SelectionChanged="UnitList_SelectionChanged"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding UnitDisplay}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox></GroupBox>
-     <ScrollViewer Grid.Column="2"><StackPanel Margin="8,0,0,0">
-      <StackPanel x:Name="NoUnitPanel" VerticalAlignment="Center" Margin="20,80,20,0">
-       <TextBlock Text="Select a safety gate, then choose a unit." FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap" HorizontalAlignment="Center"/>
-       <TextBlock Text="Your unit’s current files and tools appear here." TextWrapping="Wrap" Foreground="#666" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-      </StackPanel>
-      <StackPanel x:Name="UnitDetailPanel" Visibility="Collapsed">
-       <TextBlock x:Name="UnitTitleText" TextWrapping="Wrap" FontSize="24" FontWeight="Bold"/>
-       <TextBlock x:Name="UnitAreaText" Foreground="#555" Margin="0,2,0,10"/><WrapPanel><Button Content="Find this unit’s files" Style="{StaticResource PrimaryButton}" Click="UnitFiles_Click"/><Button Content="Troubleshoot" Click="TroubleshootSystem_Click"/></WrapPanel>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <DockPanel Margin="0,0,0,14"><Button x:Name="ChangeUnitButton" Content="← Change unit" Click="HomeNav_Click" DockPanel.Dock="Right"/><StackPanel><TextBlock Text="Your unit" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Confirm the photo and identity, then choose what you need." Foreground="#536E81" TextWrapping="Wrap" Margin="0,5,0,0"/></StackPanel></DockPanel>
+    <ScrollViewer x:Name="UnitWorkspaceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+     <StackPanel x:Name="NoUnitPanel" Margin="24"><TextBlock Text="Select a unit to see its photo, files and troubleshooting." FontSize="21" TextWrapping="Wrap"/><Button Content="Find a unit" Click="HomeNav_Click" HorizontalAlignment="Left" Margin="0,18,0,0"/></StackPanel>
+     <StackPanel x:Name="UnitDetailPanel" Visibility="Collapsed">
+      <TextBlock x:Name="UnitTitleText" FontSize="27" FontWeight="SemiBold" TextWrapping="Wrap"/>
+      <TextBlock x:Name="UnitAreaText" Foreground="#536E81" Margin="0,5,0,16" TextWrapping="Wrap"/>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.7*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
        <StackPanel>
-        <Border BorderBrush="#AAA" BorderThickness="1" Padding="4" Height="220"><Image x:Name="GateImage" Stretch="Uniform"/></Border>
-        <StackPanel Margin="0,12,0,0">
-         <TextBlock x:Name="AssetInfoText" FontSize="17" Margin="0,4"/>
-         <TextBlock x:Name="UnitInfoText" FontSize="17" Margin="0,4"/>
-         <TextBlock x:Name="TypeInfoText" FontSize="14" Foreground="#555" TextWrapping="Wrap" Margin="0,8,0,0"/>
-         <TextBlock x:Name="ModelInfoText" FontSize="14" Foreground="#555" TextWrapping="Wrap" Margin="0,4,0,0"/>
-         <TextBlock x:Name="LocationInfoText" FontSize="14" Foreground="#555" TextWrapping="Wrap" Margin="0,4,0,0"/>
-         <TextBlock Text="Shared notes" FontWeight="SemiBold" Margin="0,18,0,4"/>
-         <TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                  MinHeight="112" MaxHeight="150" Padding="8" TextChanged="SharedNotesBox_TextChanged"
-                  ToolTip="Type directly here. Notes auto-save to the shared Q: data and are visible to other users."/>
-         <TextBlock x:Name="SharedNotesStatusText" Foreground="#777" FontSize="11" Margin="2,4,0,0" Text="Shared notes auto-save."/>
-        </StackPanel>
+        <Button x:Name="EnlargePhotoButton" Click="EnlargePhoto_Click" Padding="8" Margin="0" HorizontalContentAlignment="Stretch" ToolTip="Open a large, uncropped view of this unit’s photos">
+         <Border Background="#E9EEF2" Height="430" CornerRadius="8"><Grid><Image x:Name="GateImage" Stretch="Uniform"/><TextBlock x:Name="UnitPhotoMessage" Text="Loading identification photo…" TextWrapping="Wrap" TextAlignment="Center" Foreground="#61788A" Margin="24" VerticalAlignment="Center" HorizontalAlignment="Center"/></Grid></Border>
+        </Button>
+        <Button Content="Enlarge / browse photos" Click="EnlargePhoto_Click" HorizontalAlignment="Left" Margin="0,8,0,14"/>
+        <TextBlock x:Name="AssetInfoText" FontSize="15" TextWrapping="Wrap"/>
+        <TextBlock x:Name="UnitInfoText" FontSize="15" TextWrapping="Wrap" Margin="0,4"/>
+        <TextBlock x:Name="TypeInfoText" TextWrapping="Wrap" Foreground="#536E81"/>
+        <TextBlock x:Name="ModelInfoText" TextWrapping="Wrap" Foreground="#536E81" Margin="0,4"/>
+        <TextBlock x:Name="LocationInfoText" TextWrapping="Wrap" Foreground="#536E81"/>
        </StackPanel>
-       <TextBlock Text="Files / Resources" FontSize="18" FontWeight="SemiBold" Margin="0,16,0,6"/>
-       <WrapPanel x:Name="SystemResourcePanel"/>
-       <Button Content="Troubleshoot This System" Click="TroubleshootSystem_Click" MinHeight="52" Margin="4,12,4,2"
-               FontSize="16" FontWeight="SemiBold" Background="#EAF2FB" BorderBrush="#1769AA" BorderThickness="1"/>
-       <TextBlock Text="Gate not opening, scanner fault, signal light issues, and other common problems" Foreground="#666" HorizontalAlignment="Center" Margin="0,2,0,4"/>
-      </StackPanel>
-     </StackPanel></ScrollViewer>
-    </Grid>
+       <StackPanel Grid.Column="2"><TextBlock Text="What do you need?" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,10"/>
+     <UniformGrid Columns="1"><Button x:Name="LightFilesTask" HorizontalContentAlignment="Left" Tag="light" Click="FindFiles_Click" MinHeight="48"><StackPanel><TextBlock Text="Light configurations" FontSize="16" FontWeight="SemiBold"/></StackPanel></Button><Button x:Name="DrawingFilesTask" HorizontalContentAlignment="Left" Tag="drawing" Click="FindFiles_Click" MinHeight="48"><StackPanel><TextBlock Text="Electrical drawings" FontSize="16" FontWeight="SemiBold"/></StackPanel></Button><Button x:Name="AllFilesTask" HorizontalContentAlignment="Left" Tag="all" Click="FindFiles_Click" MinHeight="48"><StackPanel><TextBlock Text="All unit files" FontSize="16" FontWeight="SemiBold"/></StackPanel></Button></UniformGrid>
+
+        <TextBlock Text="Troubleshoot this unit" FontSize="18" FontWeight="SemiBold" Margin="0,18,0,10"/>
+     <UniformGrid Columns="2" x:Name="SymptomPanel"><Button x:Name="GateOpenTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="gate-open" Click="Symptom_Click"><StackPanel><TextBlock Text="Gate won’t open" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="GateCloseTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="gate-close" Click="Symptom_Click"><StackPanel><TextBlock Text="Gate won’t close" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="ActuatorTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="actuator" Click="Symptom_Click"><StackPanel><TextBlock Text="Arm or actuator issue" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="LightTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="light" Click="Symptom_Click"><StackPanel><TextBlock Text="Light is dark or wrong" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="ScannerTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="scanner" Click="Symptom_Click"><StackPanel><TextBlock Text="Scanner stops the gate" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="UnknownTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="unknown" Click="Symptom_Click"><StackPanel><TextBlock Text="I’m not sure yet" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button></UniformGrid>
+
+       </StackPanel>
+      </Grid>
+      <GroupBox Header="Shared notes" Margin="0,20,0,10"><StackPanel><TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/><TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="#61788A" FontSize="12" Margin="2,6,0,0"/></StackPanel></GroupBox>
+      <Expander Header="More resources for this unit" Margin="0,10"><WrapPanel x:Name="SystemResourcePanel" Margin="0,12"/></Expander>
+     </StackPanel>
+     <Expander Header="Browse by asset and unit list" Margin="0,20,0,8"><StackPanel>
+      <Grid Margin="0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="AreaBox" SelectionChanged="AreaBox_SelectionChanged"/><TextBox x:Name="SystemSearchBox" Grid.Column="1" TextChanged="SystemSearchBox_TextChanged" Margin="10,0,0,0" ToolTip="Search within this area"/></Grid>
+      <Grid Height="230"><Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ListBox x:Name="AssetList" DisplayMemberPath="Display" SelectionChanged="AssetList_SelectionChanged"/><ListBox x:Name="UnitList" Grid.Column="1" DisplayMemberPath="UnitDisplay" Margin="10,0,0,0" SelectionChanged="UnitList_SelectionChanged"/></Grid>
+     </StackPanel></Expander>
+    </StackPanel></ScrollViewer>
    </Grid>
 
    <!-- MANUALS -->

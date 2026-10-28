@@ -12,13 +12,19 @@ public readonly record struct IdentificationPhotoResult(BitmapSource? Source, Id
 /// <summary>Loads a fresh, display-sized photo without holding its file open or blocking the UI.</summary>
 public static class IdentificationPhotoLoader
 {
-    // The largest preview is around 500 DIPs; allow ample detail on high-DPI displays.
+    // Workspace previews use 1280 px; gallery tiles request 640 and the large viewer 4096.
     public const int MaxPixelDimension = 1280;
 
     public static Task<IdentificationPhotoResult> LoadAsync(string path, CancellationToken cancellationToken = default) =>
-        Task.Run(() => Load(path, cancellationToken), cancellationToken);
+        LoadAsync(path, MaxPixelDimension, cancellationToken);
 
-    private static IdentificationPhotoResult Load(string path, CancellationToken cancellationToken)
+    public static Task<IdentificationPhotoResult> LoadAsync(string path, int maxPixelDimension, CancellationToken cancellationToken = default)
+    {
+        if (maxPixelDimension is < 192 or > 4096) throw new ArgumentOutOfRangeException(nameof(maxPixelDimension));
+        return Task.Run(() => Load(path, maxPixelDimension, cancellationToken), cancellationToken);
+    }
+
+    private static IdentificationPhotoResult Load(string path, int maxPixelDimension, CancellationToken cancellationToken)
     {
         try
         {
@@ -39,10 +45,10 @@ public static class IdentificationPhotoLoader
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            if (width > MaxPixelDimension || height > MaxPixelDimension)
+            if (width > maxPixelDimension || height > maxPixelDimension)
             {
-                if (width >= height) bitmap.DecodePixelWidth = MaxPixelDimension;
-                else bitmap.DecodePixelHeight = MaxPixelDimension;
+                if (width >= height) bitmap.DecodePixelWidth = maxPixelDimension;
+                else bitmap.DecodePixelHeight = maxPixelDimension;
             }
             bitmap.StreamSource = stream;
             bitmap.EndInit();
