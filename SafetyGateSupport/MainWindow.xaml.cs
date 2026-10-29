@@ -68,6 +68,7 @@ public partial class MainWindow : Window
             _dataGeneration++;
             CancelSearchIndexRefresh();
             CancelPhotoLoad();
+            _drawingListing?.Cancel(); _drawingRendering?.Cancel();
             _galleryCancellation?.Cancel(); _unitSearchTimer.Stop();
             _notesSaveTimer.Stop();
             _notesRefreshTimer.Stop();
@@ -471,12 +472,13 @@ public partial class MainWindow : Window
         TypeInfoText.Text = string.IsNullOrWhiteSpace(gate.EquipmentType) ? "" : "Type: " + gate.EquipmentType;
         ModelInfoText.Text = string.IsNullOrWhiteSpace(gate.Model) ? "" : "Model: " + gate.Model;
         LocationInfoText.Text = string.IsNullOrWhiteSpace(gate.Location) ? "" : "Location: " + gate.Location;
-        LoadPhoto(unit); LoadSharedNotes(unit); BuildResourceButtons(gate, unit);
+        LoadPhoto(unit); LoadSharedNotes(unit); BuildResourceButtons(gate, unit); LoadDrawings(gate, unit);
     }
 
     private void ClearUnit()
     {
         CancelPhotoLoad();
+        ClearDrawings();
         UnitTitleText.Text = "Select a unit"; UnitAreaText.Text = "";
         SaveSharedNotesNow(); _notesSystem = null; _sharedNotesDirty = false; _loadingSharedNotes = true; SharedNotesBox.Text = ""; _loadingSharedNotes = false;
         NoUnitPanel.Visibility = Visibility.Visible; UnitDetailPanel.Visibility = Visibility.Collapsed; GateImage.Source = null; SystemResourcePanel.Children.Clear();
@@ -593,7 +595,11 @@ public partial class MainWindow : Window
     {
         if (!_sharedDataReady) { MessageBox.Show("Set up or reconnect the shared data first.", "Shared data unavailable", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         if (SelectedUnit is not { } unit || SelectedGate is not { } gate) { ShowHome(); UnitSearchBox.Focus(); return; }
-        if (files) new UnitFilesWindow(_data, gate, unit, _resources, task) { Owner = this }.ShowDialog();
+        if (files)
+        {
+            new UnitFilesWindow(_data, gate, unit, _resources, task) { Owner = this }.ShowDialog();
+            if (!_isClosed && SelectedUnit?.Id == unit.Id) LoadDrawings(gate, unit);
+        }
         else
         {
             string flow = task switch { "light" => "builtin-light-v1", "actuator" => "builtin-actuator-v1", _ => "builtin-triage-v7" };

@@ -92,6 +92,8 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
+            ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
+            ("Windows PDF engine renders landscape and portrait pages without editing the source", NativePdfRendering),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
             ("Unit-first home opens the selected unit’s tools without a second picker", V7HomeTasks),
             ("Unit photo gallery filters, bounds decodes and rejects stale completions", GalleryFilteringAndPhotos),
@@ -337,7 +339,7 @@ internal static class Program
         await WaitUntil(() => HasColor(Control<Image>(main, "GateImage").Source, Colors.Blue), "Selected unit photo failed to load.");
         main.Width = 1000; main.Height = 680; main.UpdateLayout();
         var hero = Control<Image>(main, "GateImage");
-        Require(Control<Button>(main, "EnlargePhotoButton").ActualWidth > 400 && Math.Max(hero.ActualWidth, hero.ActualHeight) >= 400 && hero.Stretch == Stretch.Uniform, "Workspace photo is too small or cropped.");
+        Require(Control<Button>(main, "EnlargePhotoButton").ActualWidth > 200 && Math.Max(hero.ActualWidth, hero.ActualHeight) >= 240 && hero.Stretch == Stretch.Uniform, "Workspace photo is cropped or cannot be enlarged.");
         foreach (string task in new[] { "TroubleshootButton", "FilesButton" })
         {
             Exception? failure = null;
@@ -387,6 +389,74 @@ internal static class Program
         var gallery = Control<ItemsControl>(window, "UnitGallery");
         var card = Descendants<Button>(gallery).Single(b => b.Tag is SafetySystem u && u.Id == unit.Id);
         Click(card);
+    }
+
+    private static byte[] TestDrawingPdf()
+    {
+        string red = "1 0 0 rg 0 0 200 100 re f\n", blue = "0 0 1 rg 0 0 100 200 re f\n";
+        string[] objects =
+        [
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Resources << >> /Contents 4 0 R >>",
+            $"<< /Length {red.Length} >>\nstream\n{red}endstream",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 200] /Resources << >> /Contents 6 0 R >>",
+            $"<< /Length {blue.Length} >>\nstream\n{blue}endstream"
+        ];
+        var text = new StringBuilder("%PDF-1.4\n"); var offsets = new List<int>();
+        for (int n = 0; n < objects.Length; n++) { offsets.Add(text.Length); text.Append($"{n + 1} 0 obj\n{objects[n]}\nendobj\n"); }
+        int xref = text.Length;
+        text.Append($"xref\n0 {objects.Length + 1}\n0000000000 65535 f \n");
+        foreach (int offset in offsets) text.Append($"{offset:D10} 00000 n \n");
+        text.Append($"trailer\n<< /Size {objects.Length + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n");
+        return Encoding.ASCII.GetBytes(text.ToString());
+    }
+
+    private static async Task NativePdfRendering()
+    {
+        byte[] bytes = TestDrawingPdf(), original = bytes.ToArray();
+        var first = await DrawingPreviewService.RenderPdfAsync(bytes, 0, CancellationToken.None);
+        Equal(2, first.PageCount, "PDF page count"); Require(HasColor(first.Image, Colors.Red), "Landscape PDF page failed to render.");
+        Require(Math.Abs((double)first.Image.PixelWidth / first.Image.PixelHeight - 2) < 0.01, "Landscape drawing aspect ratio changed.");
+        var second = await DrawingPreviewService.RenderPdfAsync(bytes, 1, CancellationToken.None);
+        Require(HasColor(second.Image, Colors.Blue), "Portrait PDF page failed to render.");
+        Require(Math.Abs((double)second.Image.PixelWidth / second.Image.PixelHeight - 0.5) < 0.01, "Portrait drawing aspect ratio changed.");
+        Require(bytes.SequenceEqual(original), "Rendering altered the PDF bytes.");
+        using var cancel = new CancellationTokenSource(); cancel.Cancel();
+        await ExpectCancellation(DrawingPreviewService.RenderPdfAsync(bytes, 0, cancel.Token));
+    }
+
+    private static async Task InlineDrawingAndNotes()
+    {
+        var fixture = NewFixture();
+        var own = new ResourceDefinition { Id = "inline-own", GateId = fixture.Gate.Id, Label = "Electrical drawings", RelativeFolder = "inline/own", AppliesToUnitIds = [fixture.BlueUnit.Id] };
+        var other = new ResourceDefinition { Id = "inline-other", GateId = fixture.Gate.Id, Label = "Electrical drawings", RelativeFolder = "inline/other", AppliesToUnitIds = [fixture.RedUnit.Id] };
+        var resources = fixture.Data.LoadResources(); resources.AddRange([own, other]); fixture.Data.SaveResources(resources);
+        foreach (var resource in new[] { own, other })
+        {
+            string folder = fixture.Data.ResourceCurrentFolder(resource, fixture.Gate); Directory.CreateDirectory(folder);
+            File.WriteAllBytes(Path.Combine(folder, resource.Id + ".pdf"), TestDrawingPdf());
+        }
+        string archive = fixture.Data.ResourceArchiveFolder(own, fixture.Gate); Directory.CreateDirectory(archive); File.WriteAllBytes(Path.Combine(archive, "archive.pdf"), TestDrawingPdf());
+        var listing = AssignedDrawings.List(fixture.Data, fixture.Gate, fixture.BlueUnit, [own, other], CancellationToken.None);
+        Equal(1, listing.Files.Count, "Drawing lookup included an archive or other unit");
+        Require(listing.Files[0].Path.EndsWith("inline-own.pdf"), "Drawing lookup chose the wrong assignment.");
+        fixture.Data.SaveSystemNotes(fixture.BlueUnit, "Visible drawing test note");
+        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load.");
+        await SelectGalleryUnit(main, fixture.BlueUnit);
+        var image = Control<Image>(main, "DrawingImage");
+        await WaitUntil(() => HasColor(image.Source, Colors.Red), "Drawing did not display automatically after selecting the unit.");
+        Require(Control<TextBlock>(main, "DrawingFileText").Text.Contains("inline-own.pdf"), "Displayed drawing belongs to another unit.");
+        Require(Control<TextBox>(main, "SharedNotesBox").IsVisible && Control<TextBox>(main, "SharedNotesBox").Text == "Visible drawing test note", "Shared notes still require expanding or show the wrong unit.");
+        Click(Control<Button>(main, "NextDrawingPageButton"));
+        await WaitUntil(() => HasColor(image.Source, Colors.Blue), "Next drawing page failed.");
+        Equal("Page 2 of 2", Control<TextBlock>(main, "DrawingPageText").Text, "Drawing page indicator");
+        RapidSelect(Control<ListBox>(main, "UnitList"), fixture.RedUnit.Id, fixture.BlueUnit.Id);
+        await WaitUntil(() => Control<TextBlock>(main, "DrawingFileText").Text.Contains("inline-own.pdf") && HasColor(image.Source, Colors.Red), "Rapid selection retained an obsolete drawing or page.");
+        await SelectGalleryUnit(main, fixture.RedUnit);
+        await WaitUntil(() => Control<TextBlock>(main, "DrawingFileText").Text.Contains("inline-other.pdf") && HasColor(image.Source, Colors.Red), "Unit switch left the previous drawing visible.");
+        Control<ListBox>(main, "UnitList").SelectedItem = null; await DispatcherSettled();
+        Require(image.Source is null, "Deselection retained a previous unit’s drawing.");
     }
 
     private static async Task DirectDeviceActions()

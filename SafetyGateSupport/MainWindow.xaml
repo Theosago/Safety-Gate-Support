@@ -22,7 +22,7 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18">
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v7.2.0" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v7.3.0" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -94,24 +94,23 @@
     <ScrollViewer x:Name="UnitWorkspaceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <StackPanel x:Name="NoUnitPanel" Margin="24"><TextBlock Text="Select a unit to see its photo, files and troubleshooting." FontSize="21" TextWrapping="Wrap"/><Button Content="Find a unit" Click="HomeNav_Click" HorizontalAlignment="Left" Margin="0,18,0,0"/></StackPanel>
      <StackPanel x:Name="UnitDetailPanel" Visibility="Collapsed">
-      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.7*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
-       <StackPanel>
-        <Button x:Name="EnlargePhotoButton" Click="EnlargePhoto_Click" Padding="8" Margin="0" HorizontalContentAlignment="Stretch" ToolTip="Open a large, uncropped view of this unit’s photos">
-         <Border Background="#E9EEF2" Height="430" CornerRadius="8"><Grid><Image x:Name="GateImage" Stretch="Uniform"/><TextBlock x:Name="UnitPhotoMessage" Text="Loading identification photo…" TextWrapping="Wrap" TextAlignment="Center" Foreground="#61788A" Margin="24" VerticalAlignment="Center" HorizontalAlignment="Center"/></Grid></Border>
+      <WrapPanel Margin="0,0,0,12"><Button x:Name="TroubleshootButton" Content="Troubleshoot" Click="TroubleshootSimple_Click" Style="{StaticResource PrimaryButton}" MinHeight="38" HorizontalContentAlignment="Left"/>
+<Button x:Name="FilesButton" Content="Files &amp; drawings" Tag="all" Click="FindFiles_Click" MinHeight="38" HorizontalContentAlignment="Left"/>
+<Button x:Name="LightColumnButton" Content="Light column" Click="LightColumn_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Read, compare or upload this unit’s approved Siemens light configuration"/>
+<Button x:Name="ScannerButton" Content="Hokuyo scanner · USB status" Click="Scanner_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Read UAM scanner status or look up a display code"/>
+<Button x:Name="PlcButton" Content="PLC" Click="Plc_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="PLC information and files shared by every unit of this asset"/></WrapPanel>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.9*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
+       <GroupBox Header="Electrical drawing" Margin="0"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel><ComboBox x:Name="DrawingFileBox" DisplayMemberPath="Name" SelectionChanged="DrawingFile_Changed" Visibility="Collapsed" Margin="0,0,0,6"/><TextBlock x:Name="DrawingFileText" TextWrapping="Wrap" FontWeight="SemiBold"/><TextBlock x:Name="DrawingAssignmentText" TextWrapping="Wrap" Foreground="#61788A" FontSize="12" Margin="0,4,0,6"/>        <StackPanel><WrapPanel Margin="0,8,0,0"><Button x:Name="PreviousDrawingPageButton" Content="← Page" Click="PreviousDrawingPage_Click" IsEnabled="False"/><TextBlock x:Name="DrawingPageText" VerticalAlignment="Center" Margin="8,0"/><Button x:Name="NextDrawingPageButton" Content="Page →" Click="NextDrawingPage_Click" IsEnabled="False"/></WrapPanel><WrapPanel><Button x:Name="EnlargeDrawingButton" Content="Enlarge drawing" Click="EnlargeDrawing_Click" IsEnabled="False"/><Button x:Name="OpenDrawingButton" Content="Open original" Click="OpenDrawing_Click" IsEnabled="False"/></WrapPanel></StackPanel></StackPanel>
+        <Border Grid.Row="1" Height="420" Background="#E9EEF2"><Grid><Image x:Name="DrawingImage" Stretch="Uniform"/><TextBlock x:Name="DrawingMessage" Text="Loading electrical drawing…" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"/></Grid></Border>
+
+       </Grid></GroupBox>
+       <StackPanel Grid.Column="2">        <Button x:Name="EnlargePhotoButton" Click="EnlargePhoto_Click" Padding="8" Margin="0" HorizontalContentAlignment="Stretch" ToolTip="Open a large, uncropped view of this unit’s photos">
+         <Border Background="#E9EEF2" Height="250" CornerRadius="8"><Grid><Image x:Name="GateImage" Stretch="Uniform"/><TextBlock x:Name="UnitPhotoMessage" Text="Loading identification photo…" TextWrapping="Wrap" TextAlignment="Center" Foreground="#61788A" Margin="24" VerticalAlignment="Center" HorizontalAlignment="Center"/></Grid></Border>
         </Button>
         <Button Content="Enlarge / browse photos" Click="EnlargePhoto_Click" HorizontalAlignment="Left" Margin="0,8,0,14"/>
-       </StackPanel>
-       <StackPanel Grid.Column="2">
-        <TextBlock Text="How can we help?" FontSize="22" FontWeight="SemiBold" Margin="4,0,0,12"/>
-        <Button x:Name="TroubleshootButton" Content="Troubleshoot" Click="TroubleshootSimple_Click" Style="{StaticResource PrimaryButton}" MinHeight="56" HorizontalContentAlignment="Left"/>
-        <Button x:Name="FilesButton" Content="Files &amp; drawings" Tag="all" Click="FindFiles_Click" MinHeight="56" HorizontalContentAlignment="Left"/>
-        <TextBlock Text="Device tools" Foreground="#61788A" FontWeight="SemiBold" Margin="4,22,0,6"/>
-        <Button x:Name="LightColumnButton" Content="Light column" Click="LightColumn_Click" MinHeight="52" HorizontalContentAlignment="Left" ToolTip="Read, compare or upload this unit’s approved Siemens light configuration"/>
-        <Button x:Name="ScannerButton" Content="Hokuyo scanner · USB status" Click="Scanner_Click" MinHeight="52" HorizontalContentAlignment="Left" ToolTip="Read UAM scanner status or look up a display code"/>
-        <Button x:Name="PlcButton" Content="PLC" Click="Plc_Click" MinHeight="52" HorizontalContentAlignment="Left" ToolTip="PLC information and files shared by every unit of this asset"/>
-       </StackPanel>
+<GroupBox x:Name="SharedNotesPanel" Header="Shared notes" Margin="0,10,0,0"><StackPanel><TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/><TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="#61788A" FontSize="12" Margin="2,6,0,0"/></StackPanel></GroupBox></StackPanel>
       </Grid>
-      <Expander Header="Shared notes" Margin="0,20,0,10"><StackPanel><TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/><TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="#61788A" FontSize="12" Margin="2,6,0,0"/></StackPanel></Expander>
       <Expander Header="Unit details &amp; other resources" Margin="0,10"><StackPanel Margin="4,12">        <TextBlock x:Name="AssetInfoText" FontSize="15" TextWrapping="Wrap"/>
         <TextBlock x:Name="UnitInfoText" FontSize="15" TextWrapping="Wrap" Margin="0,4"/>
         <TextBlock x:Name="TypeInfoText" TextWrapping="Wrap" Foreground="#536E81"/>
