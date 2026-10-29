@@ -59,9 +59,8 @@ internal static class Program
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
             _ = RunChecksAsync();
-            Dispatcher.Run();
-            completionCode = _exitCode;
-            Console.WriteLine($"INFO Dispatcher completed; test result {completionCode}.");
+            completionCode = app.Run();
+            Console.WriteLine($"INFO WPF application completed; test result {completionCode}.");
         }
         catch (Exception exception)
         {
@@ -166,7 +165,7 @@ internal static class Program
         }
         finally
         {
-            Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+            Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => Application.Current.Shutdown(_exitCode)));
         }
     }
 

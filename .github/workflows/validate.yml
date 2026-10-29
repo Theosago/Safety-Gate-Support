@@ -46,7 +46,7 @@ jobs:
           Get-Content windows-validation.log | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if ($validationExitCode -ne 0) {
-            $failureTail = (Get-Content windows-validation.log -Tail 35) -join "`n"
+            $failureTail = "Native process exit code: $validationExitCode`n" + ((Get-Content windows-validation.log -Tail 35) -join "`n")
             $failureTail = $failureTail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
             Write-Output "::error title=Windows desktop validation log (exit $validationExitCode)::$failureTail"
           }
