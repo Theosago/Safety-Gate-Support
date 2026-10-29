@@ -9,6 +9,9 @@ public class SafetyGate
     public string Model { get; set; } = "";
     public string Location { get; set; } = "";
     public string EquipmentType { get; set; } = "";
+    public string PlcAddress { get; set; } = "";
+    public string PlcModel { get; set; } = "";
+    public string PlcNotes { get; set; } = "";
     public string Keywords { get; set; } = "";
 
     public string AssetKey => string.IsNullOrWhiteSpace(AssetNumber) ? "Unassigned" : AssetNumber.Trim();

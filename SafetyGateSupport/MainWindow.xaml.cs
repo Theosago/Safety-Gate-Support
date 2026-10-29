@@ -465,7 +465,7 @@ public partial class MainWindow : Window
         var gate = GateFor(unit); if (gate is null) { ClearUnit(); return; }
         NoUnitPanel.Visibility = Visibility.Collapsed; UnitDetailPanel.Visibility = Visibility.Visible;
         UnitTitleText.Text = $"{gate.Display} — {unit.UnitDisplay}";
-        UnitAreaText.Text = gate.Category;
+        UnitAreaText.Text = string.Join(" • ", new[] { gate.Category, gate.Location }.Where(s => !string.IsNullOrWhiteSpace(s)));
         AssetInfoText.Text = gate.AssetKey == "Unassigned" ? $"Safety Gate: {gate.ManufacturerDisplay}" : $"Asset: {gate.AssetKey}  •  {gate.ManufacturerDisplay}";
         UnitInfoText.Text = unit.UnitDisplay;
         TypeInfoText.Text = string.IsNullOrWhiteSpace(gate.EquipmentType) ? "" : "Type: " + gate.EquipmentType;
@@ -477,6 +477,7 @@ public partial class MainWindow : Window
     private void ClearUnit()
     {
         CancelPhotoLoad();
+        UnitTitleText.Text = "Select a unit"; UnitAreaText.Text = "";
         SaveSharedNotesNow(); _notesSystem = null; _sharedNotesDirty = false; _loadingSharedNotes = true; SharedNotesBox.Text = ""; _loadingSharedNotes = false;
         NoUnitPanel.Visibility = Visibility.Visible; UnitDetailPanel.Visibility = Visibility.Collapsed; GateImage.Source = null; SystemResourcePanel.Children.Clear();
     }
@@ -600,6 +601,20 @@ public partial class MainWindow : Window
             new TroubleshootWindow(_data, gate, unit, _resources, _flows, flow, node) { Owner = this }.ShowDialog();
         }
     }
+    private void TroubleshootSimple_Click(object sender, RoutedEventArgs e) => BeginTask("unknown");
+    private async void LightColumn_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is { } gate && SelectedUnit is { } unit) await SignalColumnService.OpenAsync(this, _data, gate, unit, _resources);
+    }
+    private void Scanner_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is { } gate && SelectedUnit is { } unit) new UamDiagnosticsWindow(_data, gate, unit) { Owner = this }.ShowDialog();
+    }
+    private void Plc_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is { } gate && SelectedUnit is { } unit) new PlcWindow(_data, gate, unit) { Owner = this }.ShowDialog();
+    }
+
     private void TroubleshootSystem_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedGate is { } gate && SelectedUnit is { } unit) new TroubleshootWindow(_data, gate, unit, _resources, _flows) { Owner = this }.ShowDialog();

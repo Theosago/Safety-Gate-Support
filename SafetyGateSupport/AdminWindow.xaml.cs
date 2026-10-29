@@ -104,7 +104,8 @@ public partial class AdminWindow : Window
 
     private void PopulateGate()
     {
-        if (_selectedGate is null) { GateAreaBox.SelectedItem = GateAreaFilterBox.SelectedItem; GateAssetBox.Text = ""; GateManufacturerBox.Text = "Safe2Cross"; GateModelBox.Text = GateLocationBox.Text = GateTypeBox.Text = GateKeywordsBox.Text = ""; return; }
+        if (_selectedGate is null) { PlcAddressBox.Text = PlcModelBox.Text = PlcNotesBox.Text = ""; GateAreaBox.SelectedItem = GateAreaFilterBox.SelectedItem; GateAssetBox.Text = ""; GateManufacturerBox.Text = "Safe2Cross"; GateModelBox.Text = GateLocationBox.Text = GateTypeBox.Text = GateKeywordsBox.Text = ""; return; }
+        PlcAddressBox.Text = _selectedGate.PlcAddress; PlcModelBox.Text = _selectedGate.PlcModel; PlcNotesBox.Text = _selectedGate.PlcNotes;
         GateAreaBox.SelectedItem = _selectedGate.Category; GateAssetBox.Text = _selectedGate.AssetNumber; GateManufacturerBox.Text = _selectedGate.Manufacturer; GateModelBox.Text = _selectedGate.Model; GateLocationBox.Text = _selectedGate.Location; GateTypeBox.Text = _selectedGate.EquipmentType; GateKeywordsBox.Text = _selectedGate.Keywords;
     }
     private void PopulateUnit()
@@ -112,6 +113,7 @@ public partial class AdminWindow : Window
         CleanupPendingPhotoTemp();
         UnitNumberBox.Text = _selectedUnit?.UnitNumber ?? "";
         UnitPhotoText.Text = _selectedUnit?.PrimaryPhoto ?? "";
+        GateUnitEditorScroll.ScrollToTop();
         _pendingPhotoSource = "";
         _pendingPhotoIsTemporary = false;
         LoadUnitPhotoPreview(_selectedUnit?.PrimaryPhoto ?? "", false);
@@ -165,7 +167,7 @@ public partial class AdminWindow : Window
         _photoPreviewCancellation = null;
     }
 
-    private void NewGate_Click(object sender, RoutedEventArgs e) { _selectedGate = null; _selectedUnit = null; _newGate = true; _newUnit = false; PopulateGate(); PopulateUnit(); GateAssetBox.Focus(); AdminStatusText.Text = "Enter the gate-level information, then save the gate. Add its units afterward."; }
+    private void NewGate_Click(object sender, RoutedEventArgs e) { _selectedGate = null; _selectedUnit = null; _newGate = true; _newUnit = false; PopulateGate(); PopulateUnit(); GateInformationExpander.IsExpanded = true; GateInformationExpander.UpdateLayout(); GateAssetBox.BringIntoView(); GateAssetBox.Focus(); AdminStatusText.Text = "Enter the gate-level information, then save the gate. Add its units afterward."; }
     private void SaveGate_Click(object sender, RoutedEventArgs e)
     {
         if (!_data.IsReady) { MessageBox.Show("Initialize shared data first."); return; }
@@ -177,6 +179,7 @@ public partial class AdminWindow : Window
         }
         if (_selectedGate is null) return;
         _selectedGate.Category = area; _selectedGate.AssetNumber = asset; _selectedGate.Manufacturer = manufacturer; _selectedGate.Model = GateModelBox.Text.Trim(); _selectedGate.Location = GateLocationBox.Text.Trim(); _selectedGate.EquipmentType = GateTypeBox.Text.Trim(); _selectedGate.Keywords = GateKeywordsBox.Text.Trim();
+        _selectedGate.PlcAddress = PlcAddressBox.Text.Trim(); _selectedGate.PlcModel = PlcModelBox.Text.Trim(); _selectedGate.PlcNotes = PlcNotesBox.Text.Trim();
         var savedGateId = _selectedGate.Id;
         _data.SaveGates(_gates); _data.LogAudit("Gate saved", savedGateId, details: _selectedGate.Display);
         ReloadAll(); SelectGateById(savedGateId); AdminStatusText.Text = "Gate information saved. Every unit under this gate uses this gate-level information.";

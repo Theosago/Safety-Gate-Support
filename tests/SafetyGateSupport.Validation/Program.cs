@@ -12,9 +12,9 @@ internal static class Program
 
     private static int Main(string[] args)
     {
-        if (args.Any(argument => argument is not "--include-known-issues" and not "--benchmark-search"))
+        if (args.Any(argument => argument is not "--include-known-issues" and not "--benchmark-search" and not "--include-home-preview"))
         {
-            Console.Error.WriteLine("Usage: SafetyGateSupport.Validation [--include-known-issues] [--benchmark-search]");
+            Console.Error.WriteLine("Usage: SafetyGateSupport.Validation [--include-known-issues] [--benchmark-search] [--include-home-preview]");
             return 2;
         }
         // --include-known-issues remains accepted for older setup instructions;
@@ -66,7 +66,8 @@ internal static class Program
             ];
             checks.AddRange(SearchChecks.Cases);
             checks.AddRange(SupportLibraryChecks.Cases);
-            checks.AddRange(HomePreviewChecks.Cases);
+            // Home preview checks are opt-in; normal builds do not create a preview profile.
+            if (args.Contains("--include-home-preview")) checks.AddRange(HomePreviewChecks.Cases);
             checks.Add(("Current-file snapshots retain shared-unit links and refresh files", CurrentFileSnapshots));
             checks.Add(("Cancelled file indexing stops before enumeration", CancelledFileIndexing));
             checks.Add(("Deferred data-service initialization leaves shared data untouched", DeferredInitialization));

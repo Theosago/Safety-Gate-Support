@@ -22,7 +22,7 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18">
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v7.1.0" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v7.2.0" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -90,34 +90,34 @@
    <!-- The unit workspace keeps the selected identity while tools open. -->
    <Grid x:Name="SystemsView" Visibility="Collapsed">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <DockPanel Margin="0,0,0,14"><Button x:Name="ChangeUnitButton" Content="← Change unit" Click="HomeNav_Click" DockPanel.Dock="Right"/><StackPanel><TextBlock Text="Your unit" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Confirm the photo and identity, then choose what you need." Foreground="#536E81" TextWrapping="Wrap" Margin="0,5,0,0"/></StackPanel></DockPanel>
+    <DockPanel Margin="0,0,0,14"><Button x:Name="ChangeUnitButton" Content="← Change unit" Click="HomeNav_Click" DockPanel.Dock="Right"/><StackPanel><TextBlock x:Name="UnitTitleText" Text="Select a unit" FontSize="27" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="UnitAreaText" Foreground="#536E81" Margin="0,5,0,0" TextWrapping="Wrap"/></StackPanel></DockPanel>
     <ScrollViewer x:Name="UnitWorkspaceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <StackPanel x:Name="NoUnitPanel" Margin="24"><TextBlock Text="Select a unit to see its photo, files and troubleshooting." FontSize="21" TextWrapping="Wrap"/><Button Content="Find a unit" Click="HomeNav_Click" HorizontalAlignment="Left" Margin="0,18,0,0"/></StackPanel>
      <StackPanel x:Name="UnitDetailPanel" Visibility="Collapsed">
-      <TextBlock x:Name="UnitTitleText" FontSize="27" FontWeight="SemiBold" TextWrapping="Wrap"/>
-      <TextBlock x:Name="UnitAreaText" Foreground="#536E81" Margin="0,5,0,16" TextWrapping="Wrap"/>
       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.7*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
        <StackPanel>
         <Button x:Name="EnlargePhotoButton" Click="EnlargePhoto_Click" Padding="8" Margin="0" HorizontalContentAlignment="Stretch" ToolTip="Open a large, uncropped view of this unit’s photos">
          <Border Background="#E9EEF2" Height="430" CornerRadius="8"><Grid><Image x:Name="GateImage" Stretch="Uniform"/><TextBlock x:Name="UnitPhotoMessage" Text="Loading identification photo…" TextWrapping="Wrap" TextAlignment="Center" Foreground="#61788A" Margin="24" VerticalAlignment="Center" HorizontalAlignment="Center"/></Grid></Border>
         </Button>
         <Button Content="Enlarge / browse photos" Click="EnlargePhoto_Click" HorizontalAlignment="Left" Margin="0,8,0,14"/>
-        <TextBlock x:Name="AssetInfoText" FontSize="15" TextWrapping="Wrap"/>
+       </StackPanel>
+       <StackPanel Grid.Column="2">
+        <TextBlock Text="How can we help?" FontSize="22" FontWeight="SemiBold" Margin="4,0,0,12"/>
+        <Button x:Name="TroubleshootButton" Content="Troubleshoot" Click="TroubleshootSimple_Click" Style="{StaticResource PrimaryButton}" MinHeight="56" HorizontalContentAlignment="Left"/>
+        <Button x:Name="FilesButton" Content="Files &amp; drawings" Tag="all" Click="FindFiles_Click" MinHeight="56" HorizontalContentAlignment="Left"/>
+        <TextBlock Text="Device tools" Foreground="#61788A" FontWeight="SemiBold" Margin="4,22,0,6"/>
+        <Button x:Name="LightColumnButton" Content="Light column" Click="LightColumn_Click" MinHeight="52" HorizontalContentAlignment="Left" ToolTip="Read, compare or upload this unit’s approved Siemens light configuration"/>
+        <Button x:Name="ScannerButton" Content="Hokuyo scanner · USB status" Click="Scanner_Click" MinHeight="52" HorizontalContentAlignment="Left" ToolTip="Read UAM scanner status or look up a display code"/>
+        <Button x:Name="PlcButton" Content="PLC" Click="Plc_Click" MinHeight="52" HorizontalContentAlignment="Left" ToolTip="PLC information and files shared by every unit of this asset"/>
+       </StackPanel>
+      </Grid>
+      <Expander Header="Shared notes" Margin="0,20,0,10"><StackPanel><TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/><TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="#61788A" FontSize="12" Margin="2,6,0,0"/></StackPanel></Expander>
+      <Expander Header="Unit details &amp; other resources" Margin="0,10"><StackPanel Margin="4,12">        <TextBlock x:Name="AssetInfoText" FontSize="15" TextWrapping="Wrap"/>
         <TextBlock x:Name="UnitInfoText" FontSize="15" TextWrapping="Wrap" Margin="0,4"/>
         <TextBlock x:Name="TypeInfoText" TextWrapping="Wrap" Foreground="#536E81"/>
         <TextBlock x:Name="ModelInfoText" TextWrapping="Wrap" Foreground="#536E81" Margin="0,4"/>
         <TextBlock x:Name="LocationInfoText" TextWrapping="Wrap" Foreground="#536E81"/>
-       </StackPanel>
-       <StackPanel Grid.Column="2"><TextBlock Text="What do you need?" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,10"/>
-     <UniformGrid Columns="1"><Button x:Name="LightFilesTask" HorizontalContentAlignment="Left" Tag="light" Click="FindFiles_Click" MinHeight="48"><StackPanel><TextBlock Text="Light configurations" FontSize="16" FontWeight="SemiBold"/></StackPanel></Button><Button x:Name="DrawingFilesTask" HorizontalContentAlignment="Left" Tag="drawing" Click="FindFiles_Click" MinHeight="48"><StackPanel><TextBlock Text="Electrical drawings" FontSize="16" FontWeight="SemiBold"/></StackPanel></Button><Button x:Name="AllFilesTask" HorizontalContentAlignment="Left" Tag="all" Click="FindFiles_Click" MinHeight="48"><StackPanel><TextBlock Text="All unit files" FontSize="16" FontWeight="SemiBold"/></StackPanel></Button></UniformGrid>
-
-        <TextBlock Text="Troubleshoot this unit" FontSize="18" FontWeight="SemiBold" Margin="0,18,0,10"/>
-     <UniformGrid Columns="2" x:Name="SymptomPanel"><Button x:Name="GateOpenTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="gate-open" Click="Symptom_Click"><StackPanel><TextBlock Text="Gate won’t open" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="GateCloseTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="gate-close" Click="Symptom_Click"><StackPanel><TextBlock Text="Gate won’t close" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="ActuatorTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="actuator" Click="Symptom_Click"><StackPanel><TextBlock Text="Arm or actuator issue" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="LightTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="light" Click="Symptom_Click"><StackPanel><TextBlock Text="Light is dark or wrong" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="ScannerTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="scanner" Click="Symptom_Click"><StackPanel><TextBlock Text="Scanner stops the gate" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button><Button x:Name="UnknownTask" Style="{StaticResource TaskCard}" MinHeight="76" Tag="unknown" Click="Symptom_Click"><StackPanel><TextBlock Text="I’m not sure yet" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel></Button></UniformGrid>
-
-       </StackPanel>
-      </Grid>
-      <GroupBox Header="Shared notes" Margin="0,20,0,10"><StackPanel><TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/><TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="#61788A" FontSize="12" Margin="2,6,0,0"/></StackPanel></GroupBox>
-      <Expander Header="More resources for this unit" Margin="0,10"><WrapPanel x:Name="SystemResourcePanel" Margin="0,12"/></Expander>
+<WrapPanel x:Name="SystemResourcePanel" Margin="0,12"/></StackPanel></Expander>
      </StackPanel>
      <Expander Header="Browse by asset and unit list" Margin="0,20,0,8"><StackPanel>
       <Grid Margin="0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="AreaBox" SelectionChanged="AreaBox_SelectionChanged"/><TextBox x:Name="SystemSearchBox" Grid.Column="1" TextChanged="SystemSearchBox_TextChanged" Margin="10,0,0,0" ToolTip="Search within this area"/></Grid>

@@ -1,7 +1,7 @@
 <Window x:Class="SafetyGateSupport.AdminWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Safety Gate Support - Setup Mode" Height="860" Width="1260" MinHeight="720" MinWidth="1050" WindowStartupLocation="CenterOwner">
+ Title="Safety Gate Support - Setup Mode" Height="780" Width="1260" MinHeight="640" MinWidth="1050" WindowStartupLocation="CenterOwner">
  <Grid Margin="16">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <StackPanel>
@@ -12,7 +12,7 @@
 
    <TabItem Header="Gates &amp; Units">
     <Grid Margin="12">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="160"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Grid.ColumnDefinitions><ColumnDefinition Width="240"/><ColumnDefinition Width="120"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Grid Grid.Column="0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
       <ComboBox x:Name="GateAreaFilterBox" Height="34" SelectionChanged="GateAreaFilterBox_SelectionChanged"/>
       <WrapPanel Grid.Row="1" Margin="0,6,0,6"><Button Content="+ New Gate" Click="NewGate_Click"/><Button Content="Delete Gate" Click="DeleteGate_Click"/></WrapPanel>
@@ -22,10 +22,27 @@
       <WrapPanel><Button Content="+ Unit" Click="NewUnit_Click"/><Button Content="Delete" Click="DeleteUnit_Click"/></WrapPanel>
       <ListBox x:Name="UnitListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="UnitDisplay" SelectionChanged="UnitListAdmin_SelectionChanged"/>
      </Grid>
-     <ScrollViewer Grid.Column="3"><StackPanel>
-      <GroupBox Header="Safety gate information — shared by every unit under this gate"><Grid Margin="10">
+     <ScrollViewer x:Name="GateUnitEditorScroll" Grid.Column="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+      <GroupBox Header="Selected unit" Margin="0,14,0,0"><Grid Margin="10">
        <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-       <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+       <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+       <TextBlock Text="Unit Number" VerticalAlignment="Center"/><TextBox x:Name="UnitNumberBox" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="2" Text="Identification Photo" VerticalAlignment="Center"/><StackPanel Grid.Row="2" Grid.Column="1"><WrapPanel><Button Content="Choose Photo..." Click="ChoosePhoto_Click"/><Button Content="Paste Image" Click="PastePhoto_Click" Margin="6,0,0,0"/></WrapPanel><TextBlock x:Name="UnitPhotoText" TextWrapping="Wrap" FontSize="12" Margin="4,4,0,0"/></StackPanel>
+       <Border x:Name="UnitPhotoPreviewBorder" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="10" Background="#F7F9FB" BorderBrush="#D6DCE2" BorderThickness="1" CornerRadius="4" Focusable="True" AllowDrop="True" PreviewKeyDown="UnitPhotoPreviewBorder_PreviewKeyDown" MouseLeftButtonDown="UnitPhotoPreviewBorder_MouseLeftButtonDown" DragOver="UnitPhotoPreviewBorder_DragOver" Drop="UnitPhotoPreviewBorder_Drop" ToolTip="Click this preview and press Ctrl+V to paste an image, or drag an image file here.">
+        <StackPanel>
+         <TextBlock Text="Identification photo preview" FontWeight="SemiBold" Margin="0,0,0,2"/>
+         <TextBlock Text="Click the preview and press Ctrl+V, use Paste Image, or drag and drop an image file." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"/>
+         <Border Height="260" Background="#ECEFF2" BorderBrush="#CDD3D9" BorderThickness="1">
+          <Grid><Image x:Name="UnitPhotoPreview" Stretch="Uniform"/><TextBlock Text="{Binding Text, ElementName=UnitPhotoPreviewStatus}" TextWrapping="Wrap" TextAlignment="Center" Margin="20" Foreground="#61788A" VerticalAlignment="Center"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Source, ElementName=UnitPhotoPreview}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
+         </Border>
+         <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Foreground="#666" TextWrapping="Wrap" Margin="0,6,0,0"/>
+        </StackPanel>
+       </Border>
+      </Grid></GroupBox>
+      <Button Content="Save Unit" Click="SaveUnit_Click" HorizontalAlignment="Left" Padding="18,8"/>
+      <Expander x:Name="GateInformationExpander" Header="Asset information and PLC settings" Margin="0,16,0,0"><StackPanel>      <GroupBox Header="Safety gate information — shared by every unit under this gate"><Grid Margin="10">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
        <TextBlock Text="Area" VerticalAlignment="Center"/><ComboBox x:Name="GateAreaBox" Grid.Column="1" Margin="3"/>
        <TextBlock Grid.Row="1" Text="Asset Number" VerticalAlignment="Center"/><TextBox x:Name="GateAssetBox" Grid.Row="1" Grid.Column="1" Margin="3"/>
        <TextBlock Grid.Row="2" Text="Manufacturer / System" VerticalAlignment="Center"/><TextBox x:Name="GateManufacturerBox" Grid.Row="2" Grid.Column="1" Margin="3" ToolTip="Examples: Safe2Cross, LiftMaster, LifeMaster"/>
@@ -33,25 +50,12 @@
        <TextBlock Grid.Row="4" Text="Location / Description" VerticalAlignment="Center"/><TextBox x:Name="GateLocationBox" Grid.Row="4" Grid.Column="1" Margin="3"/>
        <TextBlock Grid.Row="5" Text="Equipment Type" VerticalAlignment="Center"/><TextBox x:Name="GateTypeBox" Grid.Row="5" Grid.Column="1" Margin="3"/>
        <TextBlock Grid.Row="6" Text="Search Keywords" VerticalAlignment="Center"/><TextBox x:Name="GateKeywordsBox" Grid.Row="6" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="7" Text="PLC address / IP" VerticalAlignment="Center"/><TextBox x:Name="PlcAddressBox" Grid.Row="7" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="8" Text="PLC model" VerticalAlignment="Center"/><TextBox x:Name="PlcModelBox" Grid.Row="8" Grid.Column="1" Margin="3"/>
+       <TextBlock Grid.Row="9" Text="PLC notes" VerticalAlignment="Top"/><TextBox x:Name="PlcNotesBox" Grid.Row="9" Grid.Column="1" Margin="3" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70"/>
       </Grid></GroupBox>
       <Button Content="Save Gate Information" Click="SaveGate_Click" HorizontalAlignment="Left" Padding="18,8"/>
-      <GroupBox Header="Selected unit" Margin="0,14,0,0"><Grid Margin="10">
-       <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-       <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-       <TextBlock Text="Unit Number" VerticalAlignment="Center"/><TextBox x:Name="UnitNumberBox" Grid.Column="1" Margin="3"/>
-       <TextBlock Grid.Row="1" Text="Identification Photo" VerticalAlignment="Center"/><WrapPanel Grid.Row="1" Grid.Column="1"><Button Content="Choose Photo..." Click="ChoosePhoto_Click"/><Button Content="Paste Image" Click="PastePhoto_Click" Margin="6,0,0,0"/><TextBlock x:Name="UnitPhotoText" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,0,0,0"/></WrapPanel>
-       <Border x:Name="UnitPhotoPreviewBorder" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="10" Background="#F7F9FB" BorderBrush="#D6DCE2" BorderThickness="1" CornerRadius="4" Focusable="True" AllowDrop="True" PreviewKeyDown="UnitPhotoPreviewBorder_PreviewKeyDown" MouseLeftButtonDown="UnitPhotoPreviewBorder_MouseLeftButtonDown" DragOver="UnitPhotoPreviewBorder_DragOver" Drop="UnitPhotoPreviewBorder_Drop" ToolTip="Click this preview and press Ctrl+V to paste an image, or drag an image file here.">
-        <StackPanel>
-         <TextBlock Text="Identification photo preview" FontWeight="SemiBold" Margin="0,0,0,2"/>
-         <TextBlock Text="Click the preview and press Ctrl+V, use Paste Image, or drag and drop an image file." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"/>
-         <Border Height="260" Background="#ECEFF2" BorderBrush="#CDD3D9" BorderThickness="1">
-          <Image x:Name="UnitPhotoPreview" Stretch="Uniform"/>
-         </Border>
-         <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Foreground="#666" TextWrapping="Wrap" Margin="0,6,0,0"/>
-        </StackPanel>
-       </Border>
-      </Grid></GroupBox>
-      <Button Content="Save Unit" Click="SaveUnit_Click" HorizontalAlignment="Left" Padding="18,8"/>
+</StackPanel></Expander>
       <Border Background="#F4F7FA" BorderBrush="#D6DCE2" BorderThickness="1" Padding="10" Margin="0,14,0,0">
        <TextBlock Text="Drawings and other resources are configured on the Buttons / Resources tab. A single resource can be linked to multiple units, so paired units can share the exact same drawing and archive." TextWrapping="Wrap" Foreground="#444"/>
       </Border>

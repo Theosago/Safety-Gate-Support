@@ -86,12 +86,12 @@ internal static class Program
             ("Missing and corrupt photos return distinct nonfatal results", PhotoFailures),
             ("Pre-canceled photo requests cannot return a photo or a missing-file result", PhotoCancellation),
             ("Main window loads the real inventory after construction and searches it", MainWindowStartup),
-            ("Home preview boots local starter inventory and identifies its isolated profile", HomePreviewStartup),
-            ("Home preview signal window permits previews while keeping USB operations disabled", HomePreviewColumnWindow),
+
             ("An invalid resource folder cannot discard indexed shared notes", NotesIndexSurvivesInvalidResource),
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
-            ("Setup preview rapid selection and deselection stay correct", AdminPhotoSelection),
+            ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
+            ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
             ("Unit-first home opens the selected unit’s tools without a second picker", V7HomeTasks),
             ("Unit photo gallery filters, bounds decodes and rejects stale completions", GalleryFilteringAndPhotos),
@@ -103,7 +103,7 @@ internal static class Program
             ("Integrated column tool requires explicit assigned file selection and keeps observation state accurate", IntegratedColumnWindow),
             ("Unit light resource exposes the built-in USB action", IntegratedLightResource),
             ("UAM diagnostics opens idle and manual lookup never changes USB status", UamDiagnosticsStartup),
-            ("Home preview UAM diagnostics keeps USB disabled after device selection", UamPreview),
+
             ("UAM device-change notification refreshes stale USB selection without opening ports", UamHotPlugRefresh),
             ("UAM resource exposes diagnostics without adding it to a light resource", UamResource),
             ("Support library loads imported documentation on demand and filters filenames", SupportLibraryWindowStartup),
@@ -113,7 +113,7 @@ internal static class Program
             ("Siemens USB check refuses a different model before requesting configuration", SiemensModelMismatch),
             ("Siemens USB check preserves an HTTP error without retries or reset requests", SiemensHttpFailure),
             ("A canceled Siemens USB check saves its report without sending requests", SiemensCancellation),
-            ("V7 real WPF screens render to preview images", V7Screenshots)
+
         ];
 
         var passed = 0;
@@ -332,13 +332,13 @@ internal static class Program
         await WaitUntil(() => main.IsEnabled, "Unit-first home did not finish loading.");
         Equal(Visibility.Visible, Control<ScrollViewer>(main, "HomeView").Visibility, "Home must open directly to unit selection");
         Require(Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "The opening screen has no units.");
-        Require(!Control<Button>(main, "GateOpenTask").IsVisible, "Troubleshooting must follow unit selection.");
+        Require(!Control<Button>(main, "TroubleshootButton").IsVisible, "Troubleshooting must follow unit selection.");
         await SelectGalleryUnit(main, fixture.BlueUnit);
         await WaitUntil(() => HasColor(Control<Image>(main, "GateImage").Source, Colors.Blue), "Selected unit photo failed to load.");
         main.Width = 1000; main.Height = 680; main.UpdateLayout();
         var hero = Control<Image>(main, "GateImage");
         Require(Control<Button>(main, "EnlargePhotoButton").ActualWidth > 400 && Math.Max(hero.ActualWidth, hero.ActualHeight) >= 400 && hero.Stretch == Stretch.Uniform, "Workspace photo is too small or cropped.");
-        foreach (string task in new[] { "GateOpenTask", "LightFilesTask" })
+        foreach (string task in new[] { "TroubleshootButton", "FilesButton" })
         {
             Exception? failure = null;
             bool completed = false;
@@ -350,13 +350,13 @@ internal static class Program
                 {
                     if (deadline.Elapsed > TimeSpan.FromSeconds(12)) throw new InvalidOperationException("Unit task did not open its destination.");
                     Require(!Application.Current.Windows.OfType<TroubleshootPickerWindow>().Any(), "The selected unit was requested again.");
-                    if (task == "GateOpenTask" && Application.Current.Windows.OfType<TroubleshootWindow>().SingleOrDefault() is { } guide)
+                    if (task == "TroubleshootButton" && Application.Current.Windows.OfType<TroubleshootWindow>().SingleOrDefault() is { } guide)
                     {
                         Track(guide);
-                        Equal("What happens when opening is requested?", Control<TextBlock>(guide, "StepPromptText").Text, "Symptom did not reach its guide");
+                        Equal("What can you observe?", Control<TextBlock>(guide, "StepPromptText").Text, "Troubleshoot did not open the problem chooser");
                         completed = true; timer.Stop(); guide.Close();
                     }
-                    else if (task == "LightFilesTask" && Application.Current.Windows.OfType<UnitFilesWindow>().SingleOrDefault() is { } files)
+                    else if (task == "FilesButton" && Application.Current.Windows.OfType<UnitFilesWindow>().SingleOrDefault() is { } files)
                     {
                         Track(files);
                         Require(Control<TextBlock>(files, "UnitText").Text.Contains(fixture.BlueUnit.UnitDisplay), "File shortcut lost the selected unit.");
@@ -387,6 +387,47 @@ internal static class Program
         var gallery = Control<ItemsControl>(window, "UnitGallery");
         var card = Descendants<Button>(gallery).Single(b => b.Tag is SafetySystem u && u.Id == unit.Id);
         Click(card);
+    }
+
+    private static async Task DirectDeviceActions()
+    {
+        var fixture = NewFixture();
+        fixture.Gate.PlcAddress = "192.0.2.15"; fixture.Gate.PlcModel = "Recorded PLC"; fixture.Gate.PlcNotes = "Asset-level test notes";
+        var gates = fixture.Data.LoadGates(); var saved = gates.Single(g => g.Id == fixture.Gate.Id);
+        saved.PlcAddress = fixture.Gate.PlcAddress; saved.PlcModel = fixture.Gate.PlcModel; saved.PlcNotes = fixture.Gate.PlcNotes; fixture.Data.SaveGates(gates);
+        Equal(saved.PlcAddress, fixture.Data.LoadGates().Single(g => g.Id == saved.Id).PlcAddress, "PLC details persistence");
+        var first = PlcWindow.FilesFor(saved); var second = PlcWindow.FilesFor(new SafetyGate { Id = saved.Id, AssetNumber = "renamed" });
+        Equal(first.RelativeFolder, second.RelativeFolder, "Renaming an asset moved its PLC files");
+        Require(first.AppliesTo(fixture.BlueUnit.Id) && first.AppliesTo(fixture.RedUnit.Id), "Asset PLC files were restricted to one unit.");
+        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main window did not load.");
+        await SelectGalleryUnit(main, fixture.BlueUnit); main.UpdateLayout();
+        foreach (string action in new[] { "ScannerButton", "PlcButton" })
+        {
+            Require(Control<Button>(main, action).IsVisible, "Device action is hidden.");
+            Exception? failure = null; bool visited = false;
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+            timer.Tick += (_, _) =>
+            {
+                try
+                {
+                    if (action == "ScannerButton" && Application.Current.Windows.OfType<UamDiagnosticsWindow>().SingleOrDefault() is { } scanner)
+                    {
+                        Track(scanner); Require(Control<TextBlock>(scanner, "ContextText").Text.Contains(fixture.BlueUnit.UnitDisplay), "Scanner lost the selected unit.");
+                        Require(!Control<Button>(scanner, "CancelButton").IsEnabled, "Opening scanner tools started a USB read.");
+                        visited = true; timer.Stop(); scanner.Close();
+                    }
+                    else if (action == "PlcButton" && Application.Current.Windows.OfType<PlcWindow>().SingleOrDefault() is { } plc)
+                    {
+                        Track(plc); Equal("192.0.2.15", Control<TextBox>(plc, "AddressText").Text, "PLC showed the wrong asset address");
+                        visited = true; timer.Stop(); plc.Close();
+                    }
+                }
+                catch (Exception error) { failure = error; timer.Stop(); foreach (var w in Application.Current.Windows.Cast<Window>().Where(w => w != main).ToArray()) w.Close(); }
+            };
+            timer.Start(); try { Click(Control<Button>(main, action)); } finally { timer.Stop(); }
+            if (failure is not null) throw failure;
+            Require(visited, "Direct device action did not open.");
+        }
     }
 
     private static async Task GalleryFilteringAndPhotos()
@@ -439,7 +480,7 @@ internal static class Program
     private static async Task V7InputSwitches()
     {
         string path = Path.Combine(NewDirectory(), "DEMO ONLY.signal"); File.WriteAllBytes(path, HomePreviewService.SampleConfiguration());
-        var window = Track(new global::SiemensUsbCheck.MainWindow("DEMO / Unit 1", new[] { path }, previewOnly: true));
+        var window = Track(new global::SiemensUsbCheck.MainWindow("Validation / Unit 1", new[] { path }));
         ShowOffscreen(window); Control<ComboBox>(window, "AssignedFilesCombo").SelectedIndex = 0;
         await WaitUntil(() => Control<Panel>(window, "SegmentPreviewPanel").Children.Count == 9, "Visual light preview did not load.");
         for (int state = 0; state < 64; state++)
@@ -454,7 +495,7 @@ internal static class Program
         Equal(Colors.Lime, ((SolidColorBrush)swatch.Background).Color, "Green example swatch");
         SetPreviewInputs(window, 8);
         Require(Control<TextBlock>(window, "SoundPreviewText").Text.Contains("configured"), "Sound-only combination was shown as silent.");
-        Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "UploadButton").IsEnabled, "Preview switches enabled USB.");
+        Require(!Control<Button>(window, "UploadButton").IsEnabled, "Viewing input switches enabled an upload.");
     }
 
     private static async Task V7TroubleshootingRoutes()
@@ -869,9 +910,15 @@ internal static class Program
         gates.SelectedItem = gates.Items.Cast<SafetyGate>().Single(gate => gate.Id == fixture.Gate.Id);
         var units = Control<ListBox>(window, "UnitListAdmin");
         RapidSelect(units, fixture.RedUnit.Id, fixture.BlueUnit.Id);
+        window.Height = 720; window.UpdateLayout();
         var photo = Control<Image>(window, "UnitPhotoPreview");
         await WaitUntil(() => HasColor(photo.Source, Colors.Blue), "Setup preview did not keep the final selected unit's blue photo.");
         Equal(fixture.BlueUnit.UnitNumber, Control<TextBox>(window, "UnitNumberBox").Text, "Setup selected unit number");
+        window.UpdateLayout();
+        var viewport = Control<ScrollViewer>(window, "GateUnitEditorScroll");
+        var top = photo.TranslatePoint(new Point(0, 0), viewport);
+        Require(photo.IsVisible && photo.ActualHeight > 200 && top.Y >= 0 && top.Y + photo.ActualHeight <= viewport.ActualHeight,
+            "Setup loaded a photo but placed it outside the visible editor viewport.");
         units.SelectedItem = units.Items.Cast<SafetySystem>().Single(unit => unit.Id == fixture.RedUnit.Id);
         units.SelectedItem = null;
         await DispatcherSettled();

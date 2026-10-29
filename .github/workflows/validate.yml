@@ -35,8 +35,6 @@ jobs:
       - name: Validate read-only Hokuyo framing and failure handling
         run: dotnet run --project tests/SafetyGateSupport.HokuyoValidation/SafetyGateSupport.HokuyoValidation.csproj -c Release
       - name: Run Windows desktop regression checks
-        env:
-          SAFETYGATE_UI_SNAPSHOTS: ${{ github.workspace }}/artifacts/ui-preview
         shell: pwsh
         run: |
           dotnet run --project tests/SafetyGateSupport.WindowsValidation/SafetyGateSupport.WindowsValidation.csproj -c Release 2>&1 | Tee-Object -FilePath windows-validation.log
@@ -60,36 +58,32 @@ jobs:
           Copy-Item tools/SiemensUsbCheck/README.md artifacts/siemens-usb-check/README.md
           Copy-Item docs/WINDOWS_QUICK_START.md artifacts/win-x64/README.md
           Copy-Item docs/HOKUYO_USB_DIAGNOSTICS.md artifacts/win-x64/HOKUYO_USB_DIAGNOSTICS.md
-      - name: Package and smoke-test home preview
+      - name: Smoke-test the normal published app with isolated settings
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path artifacts/home-preview -Force | Out-Null
-          Copy-Item artifacts/win-x64/* artifacts/home-preview/ -Recurse
-          Rename-Item artifacts/home-preview/SafetyGateSupport.exe SafetyGateSupportPreview.exe
-          Remove-Item artifacts/home-preview/SafetyGateSupport.exe.sha256
-          Copy-Item docs/HOME_PREVIEW.md artifacts/home-preview/README.md -Force
-          $previewHash = (Get-FileHash artifacts/home-preview/SafetyGateSupportPreview.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$previewHash  SafetyGateSupportPreview.exe" | Set-Content artifacts/home-preview/SafetyGateSupportPreview.exe.sha256 -Encoding ascii
-          $normalSettings = Join-Path $env:LOCALAPPDATA 'SafetyGateSupport/settings.json'
-          $normalHash = if (Test-Path $normalSettings) { (Get-FileHash $normalSettings).Hash } else { $null }
-          $preview = Start-Process -FilePath (Resolve-Path artifacts/home-preview/SafetyGateSupportPreview.exe) -PassThru
+          $smokeRoot = Join-Path $env:RUNNER_TEMP ('SafetyGateSupport-Smoke-' + [guid]::NewGuid().ToString('N'))
+          $sharedRoot = Join-Path $smokeRoot 'Shared'
+          Expand-Archive -LiteralPath SafetyGateSupport/SeedData.zip -DestinationPath $sharedRoot
+          $settingsPath = Join-Path $env:LOCALAPPDATA 'SafetyGateSupport/settings.json'
+          New-Item -ItemType Directory -Path (Split-Path $settingsPath) -Force | Out-Null
+          $previousSettings = if (Test-Path $settingsPath) { [IO.File]::ReadAllBytes($settingsPath) } else { $null }
           try {
+            @{ SharedRoot = $sharedRoot } | ConvertTo-Json | Set-Content $settingsPath -Encoding utf8
+            $app = Start-Process -FilePath (Resolve-Path artifacts/win-x64/SafetyGateSupport.exe) -PassThru
             $deadline = (Get-Date).AddSeconds(45)
-            $sample = Join-Path $env:LOCALAPPDATA 'SafetyGateSupport/HomePreview/Data/HomePreview/SampleUnit/LightConfig/Current/DEMO ONLY - not for equipment.signal'
             do {
               Start-Sleep -Milliseconds 250
-              $preview.Refresh()
-              if ($preview.HasExited) { throw 'Published home preview exited before startup completed.' }
-            } until (($preview.MainWindowTitle -like '*Home Preview*' -and (Test-Path $sample)) -or (Get-Date) -gt $deadline)
-            if ($preview.MainWindowTitle -notlike '*Home Preview*' -or !(Test-Path $sample)) { throw 'Published home preview did not open its local sample profile.' }
-            $afterHash = if (Test-Path $normalSettings) { (Get-FileHash $normalSettings).Hash } else { $null }
-            if ($afterHash -ne $normalHash) { throw 'Home preview modified normal app settings.' }
-            Write-Host 'Published preview executable opened the local profile and sample without changing normal settings.'
+              $app.Refresh()
+              if ($app.HasExited) { throw 'Published app exited before startup completed.' }
+            } until (($app.MainWindowHandle -ne 0 -and $app.MainWindowTitle -like 'Safety Gate Support*') -or (Get-Date) -gt $deadline)
+            if ($app.MainWindowHandle -eq 0 -or $app.MainWindowTitle -like '*Home Preview*') { throw 'Normal app did not open correctly.' }
+            Write-Host 'Normal published app opened with isolated settings and starter inventory.'
           } finally {
-            if (!$preview.HasExited) {
-              $null = $preview.CloseMainWindow()
-              if (!$preview.WaitForExit(10000)) { $preview.Kill(); $preview.WaitForExit() }
+            if ($app -and !$app.HasExited) {
+              $null = $app.CloseMainWindow()
+              if (!$app.WaitForExit(10000)) { $app.Kill(); $app.WaitForExit() }
             }
+            if ($null -ne $previousSettings) { [IO.File]::WriteAllBytes($settingsPath, $previousSettings) } else { Remove-Item $settingsPath -ErrorAction SilentlyContinue }
           }
       - name: Upload downloadable Windows app
         uses: actions/upload-artifact@v4
@@ -103,19 +97,5 @@ jobs:
         with:
           name: SiemensUsbCheck-Windows-x64
           path: artifacts/siemens-usb-check/
-          if-no-files-found: error
-          retention-days: 30
-      - name: Upload home preview
-        uses: actions/upload-artifact@v4
-        with:
-          name: SafetyGateSupport-Home-Preview-Windows-x64
-          path: artifacts/home-preview/
-          if-no-files-found: error
-          retention-days: 30
-      - name: Upload rendered v7 screens
-        uses: actions/upload-artifact@v4
-        with:
-          name: SafetyGateSupport-V7-Screenshots
-          path: artifacts/ui-preview/
           if-no-files-found: error
           retention-days: 30
