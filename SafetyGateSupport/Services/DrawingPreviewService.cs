@@ -29,8 +29,11 @@ public static class DrawingPreviewService
     public static Task<Page> RenderPdfAsync(byte[] bytes, int pageNumber, CancellationToken token) => Task.Run(async () =>
     {
         token.ThrowIfCancellationRequested();
-        using var source = new MemoryStream(bytes, writable: false);
-        using var random = source.AsRandomAccessStream();
+        // The native document can retain its input adapter after rendering returns.
+        // These objects own only managed memory: let the document's COM references
+        // keep them alive rather than closing the stream before native teardown.
+        var source = new MemoryStream(bytes, writable: false);
+        var random = source.AsRandomAccessStream();
         var document = await PdfDocument.LoadFromStreamAsync(random).AsTask(token);
         if (pageNumber < 0 || pageNumber >= document.PageCount) throw new ArgumentOutOfRangeException(nameof(pageNumber));
         using var page = document.GetPage((uint)pageNumber);

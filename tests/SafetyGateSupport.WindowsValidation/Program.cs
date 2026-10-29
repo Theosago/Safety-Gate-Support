@@ -84,6 +84,7 @@ internal static class Program
             else
                 Console.Error.WriteLine($"Failure evidence retained at {_runRoot}");
         }
+        GC.Collect(); GC.WaitForPendingFinalizers();
         Console.WriteLine($"INFO Native validation process returning {completionCode}.");
         return completionCode;
     }

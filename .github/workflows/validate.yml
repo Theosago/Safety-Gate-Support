@@ -48,7 +48,7 @@ jobs:
           if ($validationExitCode -ne 0) {
             $failureTail = (Get-Content windows-validation.log -Tail 35) -join "`n"
             $failureTail = $failureTail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
-            Write-Output "::error title=Windows desktop validation log::$failureTail"
+            Write-Output "::error title=Windows desktop validation log (exit $validationExitCode)::$failureTail"
           }
           exit $validationExitCode
       - name: Publish self-contained Windows x64 app
