@@ -99,7 +99,7 @@ internal static class Program
             ("V7 symptom routes start the selected guide and retain site edits", V7TroubleshootingRoutes),
             ("V7 unit picker searches across areas by default", V7PickerSearch),
             ("V7 unit files exclude other-unit and archived configurations", V7AssignedFiles),
-            ("V7 six input switches preview all combinations without enabling USB", V7InputSwitches),
+            ("Normal light tool renders all 64 input combinations and retains upload gates", V7InputSwitches),
             ("Integrated column tool requires explicit assigned file selection and keeps observation state accurate", IntegratedColumnWindow),
             ("Unit light resource exposes the built-in USB action", IntegratedLightResource),
             ("UAM diagnostics opens idle and manual lookup never changes USB status", UamDiagnosticsStartup),
@@ -481,7 +481,9 @@ internal static class Program
     {
         string path = Path.Combine(NewDirectory(), "DEMO ONLY.signal"); File.WriteAllBytes(path, HomePreviewService.SampleConfiguration());
         var window = Track(new global::SiemensUsbCheck.MainWindow("Validation / Unit 1", new[] { path }));
-        ShowOffscreen(window); Control<ComboBox>(window, "AssignedFilesCombo").SelectedIndex = 0;
+        ShowOffscreen(window);
+        await WaitUntil(() => Control<Button>(window, "RefreshButton").IsEnabled, "Normal light tool did not finish passive discovery.");
+        Control<ComboBox>(window, "AssignedFilesCombo").SelectedIndex = 0;
         await WaitUntil(() => Control<Panel>(window, "SegmentPreviewPanel").Children.Count == 9, "Visual light preview did not load.");
         for (int state = 0; state < 64; state++)
         {

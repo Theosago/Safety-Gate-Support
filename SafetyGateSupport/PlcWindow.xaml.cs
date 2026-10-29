@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using SafetyGateSupport.Models;
 using SafetyGateSupport.Services;
@@ -19,14 +20,19 @@ public partial class PlcWindow : Window
     }
     public static ResourceDefinition FilesFor(SafetyGate gate) => new()
     {
-        Id = $"asset-plc-{gate.Id}", GateId = gate.Id, Label = "PLC files", Kind = "ManagedFiles",
+        Id = $"asset-plc-{gate.Id}", GateId = gate.Id, Label = "PLC files — all asset units", Kind = "ManagedFiles",
         RelativeFolder = $"PLC/{gate.Id}", AllowUserUpload = true, ArchiveMode = "SameName",
         Description = $"PLC files for {gate.AssetDisplay}. Shared by all units of this asset. Previous same-name files are archived when updated."
     };
     private void Files_Click(object sender, RoutedEventArgs e)
     {
         var resource = FilesFor(_gate);
-        new ResourceWindow(_data, _gate, _unit, resource) { Owner = this }.ShowDialog();
+        try { new ResourceWindow(_data, _gate, _unit, resource) { Owner = this }.ShowDialog(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Unable to open this asset’s PLC files. Check shared-drive access and folder permissions.\n\n" + error.Message,
+                "PLC files unavailable", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }
