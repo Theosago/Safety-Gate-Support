@@ -38,13 +38,14 @@ public partial class UnitFilesWindow : Window
             {
                 var files = new List<AssignedFile>();
                 var unavailable = new List<string>();
-                foreach (var resource in _resources.Where(r => r.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) || r.Kind.Equals("Photos", StringComparison.OrdinalIgnoreCase)))
+                var currentResources = _data.ResourcesFor(_gate, _unit, _data.LoadResources().Concat(_resources).GroupBy(r => r.Id).Select(g => g.First()));
+                foreach (var resource in currentResources.Where(r => r.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) || r.Kind.Equals("Photos", StringComparison.OrdinalIgnoreCase)))
                 {
                     try
                     {
                         string folder = resource.Kind.Equals("Photos", StringComparison.OrdinalIgnoreCase) ? _data.ResourceBaseFolder(resource, _gate) : _data.ResourceCurrentFolder(resource, _gate);
                         // Enumerate directly: a missing or inaccessible assignment must remain visible as unavailable.
-                        foreach (string path in Directory.EnumerateFiles(folder).Where(p => !Path.GetFileName(p).Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)))
+                        foreach (string path in _data.GetResourceFiles(resource, _gate).Where(p => !Path.GetFileName(p).Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)))
                         {
                             string kind = SignalColumnService.IsLightResource(resource) ? "light" : resource.LaunchAction.Equals("UAM", StringComparison.OrdinalIgnoreCase) ? "scanner" : resource.Label.Contains("Drawing", StringComparison.OrdinalIgnoreCase) || resource.Label.Contains("Schematic", StringComparison.OrdinalIgnoreCase) ? "drawing" : "other";
                             files.Add(new(Path.GetFileName(path), path, resource.Label, kind));

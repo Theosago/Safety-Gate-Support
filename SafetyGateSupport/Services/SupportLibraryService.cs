@@ -32,8 +32,8 @@ public static class SupportLibraryService
     {
         source = Path.GetFullPath(source); root = Path.GetFullPath(root);
         var extension = Path.GetExtension(source).ToLowerInvariant();
-        if (extension is not (".zip" or ".pdf" or ".docx" or ".signal" or ".hux"))
-            throw new NotSupportedException("Import PDF, DOCX, .signal, .hux, or ZIP files. Portable software must be supplied as a complete ZIP folder.");
+        if (extension is not (".zip" or ".pdf" or ".dwg" or ".docx" or ".signal" or ".hux"))
+            throw new NotSupportedException("Import PDF, DWG, DOCX, .signal, .hux, or ZIP files. Portable software must be supplied as a complete ZIP folder.");
         CheckPath(root); Directory.CreateDirectory(root); CheckPath(root);
         string staging = Path.Combine(root, ".import-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(staging);

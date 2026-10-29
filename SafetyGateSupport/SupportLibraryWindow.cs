@@ -14,7 +14,7 @@ public sealed class SupportLibraryWindow : Window
 {
     private readonly DataService _data;
     private readonly TextBox _search = new() { Margin = new Thickness(0, 6, 0, 6), MinHeight = 32 };
-    private readonly ListBox _files = new() { DisplayMemberPath = "Display" };
+    private readonly ListBox _files = new() { DisplayMemberPath = "Display", SelectionMode = SelectionMode.Extended };
     private readonly ComboBox _units = new() { DisplayMemberPath = "AdminDisplay", MinWidth = 300 };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) };
     private readonly WrapPanel _actions = new();
@@ -22,6 +22,7 @@ public sealed class SupportLibraryWindow : Window
     private List<LibraryFile> _all = new();
     private List<SafetyGate> _gates = new();
     private CancellationTokenSource? _operation;
+    private bool _pairUpdateBusy;
     private bool _closeAfterOperation;
 
     public SupportLibraryWindow(DataService data, SafetyGate? gate = null, SafetySystem? unit = null)
@@ -76,13 +77,13 @@ public sealed class SupportLibraryWindow : Window
     private void Filter()
     {
         var query = _search.Text.Trim();
-        _files.ItemsSource = _all.Where(f => Path.GetExtension(f.FullPath).ToLowerInvariant() is ".signal" or ".hux" or ".pdf" or ".docx" or ".exe")
+        _files.ItemsSource = _all.Where(f => Path.GetExtension(f.FullPath).ToLowerInvariant() is ".signal" or ".hux" or ".pdf" or ".dwg" or ".docx" or ".exe")
             .Where(f => query.Length == 0 || f.Display.Contains(query, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f.RelativePath).ToList();
     }
     private async void Import_Click(object sender, RoutedEventArgs e)
     {
         if (_operation is not null) return;
-        var dialog = new OpenFileDialog { Multiselect = true, Title = "Import support documents, configuration files, or complete software ZIPs", Filter = "Support files|*.zip;*.pdf;*.docx;*.signal;*.hux" };
+        var dialog = new OpenFileDialog { Multiselect = true, Title = "Import support documents, configuration files, or complete software ZIPs", Filter = "Support files|*.zip;*.pdf;*.dwg;*.docx;*.signal;*.hux" };
         if (dialog.ShowDialog(this) != true) return;
         using var cancellation = new CancellationTokenSource(); _operation = cancellation;
         foreach (UIElement child in _importToolbar.Children) child.IsEnabled = ReferenceEquals(child, _cancel);
@@ -154,21 +155,37 @@ public sealed class SupportLibraryWindow : Window
     {
         if (_files.SelectedItem is not LibraryFile file || _units.SelectedItem is not SafetySystem unit) { _status.Text = "Select a file and the exact unit first."; return; }
         var gate = _gates.FirstOrDefault(g => g.Id == unit.GateId) ?? throw new InvalidOperationException("The selected unit has no gate.");
+        var selected = _files.SelectedItems.Cast<LibraryFile>().ToArray();
+        if (selected.Any(f => Path.GetExtension(f.FullPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(f.FullPath).Equals(".dwg", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (string.IsNullOrWhiteSpace(gate.AssetFolder)) throw new InvalidOperationException("Organize asset folders in Setup first. Drawing updates now use one PDF/DWG pair in the asset’s Electrical Drawings folder.");
+            if (selected.Length != 2 || selected.Count(f => Path.GetExtension(f.FullPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 || selected.Count(f => Path.GetExtension(f.FullPath).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1) throw new InvalidOperationException("Select both the PDF and DWG for this print using Ctrl+click, then assign the pair to the exact unit.");
+            var resource = _data.LoadResources().FirstOrDefault(r => r.GateId == gate.Id && r.StorageCategory == "Electrical Drawings") ?? throw new InvalidOperationException("The asset drawing collection is missing. Refresh the storage layout first.");
+            if (MessageBox.Show(this, "Assign this PDF/DWG pair to " + gate.AssetDisplay + " / " + unit.UnitDisplay + "?\n\nExisting identical pairs are shared without another copy. To update a previous revision, use Replace selected print pair in its file list.", "Assign print pair", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            AssignPairAsync(resource, gate, unit, selected.Select(f => f.FullPath).ToArray()); return;
+        }
         var extension = Path.GetExtension(file.FullPath).ToLowerInvariant();
         string type = extension switch { ".signal" => "Light Configuration", ".hux" => "Scanner Configuration", ".pdf" => "Electrical Drawings", _ => throw new NotSupportedException("Assign a .signal, .hux, or PDF drawing. Other documents remain available from the library.") };
         if (extension == ".signal") PreparedSignalUpload.Load(file.FullPath);
-        if (MessageBox.Show(this, $"Assign '{file.RelativePath}' as {type} for\n{gate.Display} / {unit.UnitDisplay}?\n\nConfirm the source documentation identifies this exact unit. This does not program hardware. The previous file in this imported assignment is archived; existing resource assignments are preserved.", "Confirm unit assignment", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-        var resources = _data.LoadResources();
-        string id = "library-" + type.Replace(" ", "-").ToLowerInvariant() + "-" + unit.Id;
-        var resource = resources.FirstOrDefault(r => r.Id == id);
-        bool created = resource is null;
-        resource ??= new ResourceDefinition { Id = id, GateId = gate.Id, Label = type + " (imported)", Kind = "ManagedFiles", AppliesToUnitIds = new() { unit.Id }, RelativeFolder = "Library/Assignments/" + Guid.NewGuid().ToString("N"), ArchiveMode = "All", LaunchAction = extension == ".signal" ? "Siemens" : extension == ".hux" ? "UAM" : "None", SortOrder = 15, Description = "Explicitly assigned from the support library; confirm revisions against site documentation." };
-        _data.AddOrUpdateResource(resource, gate, unit, file.FullPath);
-        if (created) { resources.Add(resource); _data.SaveResources(resources); }
+        if (MessageBox.Show(this, $"Assign '{file.RelativePath}' as {type} for\n{gate.Display} / {unit.UnitDisplay}?\n\nConfirm the source documentation identifies this exact unit. This does not program hardware. This links the file to the selected unit. Identical files are reused. To revise an existing sheet, use Replace selected file in its file list; unrelated sheets will not be archived.", "Confirm unit assignment", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        string category = type == "Light Configuration" ? "Light Configurations" : type == "Scanner Configuration" ? "Scanner Configurations" : "Electrical Drawings";
+        _data.AssignAssetFile(gate, unit, file.FullPath, category);
         _status.Text = $"Assigned {file.Name} to {gate.AssetDisplay} / {unit.UnitDisplay}. Open the unit resource to compare/upload; no USB device was opened.";
+    }
+    private async void AssignPairAsync(ResourceDefinition resource, SafetyGate gate, SafetySystem unit, string[] files)
+    {
+        _pairUpdateBusy = true; IsEnabled = false; _status.Text = "Staging and checking both companions…";
+        try
+        {
+            var result = await Task.Run(() => _data.SaveDrawingPair(resource.ForUnit(unit.Id), gate, unit, files));
+            _status.Text = result.ReviewNote.Length > 0 ? result.ReviewNote : "Print pair linked. Use Applies to units to select additional units covered by this same print.";
+        }
+        catch (Exception error) { MessageBox.Show(this, error.Message, "Unable to assign print pair", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { _pairUpdateBusy = false; IsEnabled = true; }
     }
     protected override void OnClosing(CancelEventArgs e)
     {
+        if (_pairUpdateBusy) { e.Cancel = true; _status.Text = "Wait for both drawing companions to finish publishing."; }
         if (_operation is not null) { e.Cancel = true; _closeAfterOperation = true; _operation.Cancel(); _status.Text = "Canceling before closing…"; }
         base.OnClosing(e);
     }

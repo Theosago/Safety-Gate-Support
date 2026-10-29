@@ -11,7 +11,7 @@ using SafetyGateSupport.Models;
 
 namespace SafetyGateSupport.Services;
 
-public class DataService
+public partial class DataService
 {
     private readonly JsonSerializerOptions _read = new() { PropertyNameCaseInsensitive = true };
     private readonly JsonSerializerOptions _write = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
@@ -290,6 +290,7 @@ public class DataService
 
     private void SaveJsonWithBackup<T>(string path, T value)
     {
+        using var lease = AcquireAssetWriteLock();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var backups = Path.Combine(Path.GetDirectoryName(path)!, "Backups");
         Directory.CreateDirectory(backups);
@@ -312,7 +313,7 @@ public class DataService
 
     public string ToRelative(string fullPath) => Path.GetRelativePath(SharedRoot, fullPath).Replace(Path.DirectorySeparatorChar, '/');
 
-    public string GateRoot(SafetyGate gate) => $"Gates/{gate.Id}";
+    public string GateRoot(SafetyGate gate) => string.IsNullOrWhiteSpace(gate.AssetFolder) ? $"Gates/{gate.Id}" : gate.AssetFolder;
     public string UnitRoot(SafetyGate gate, SafetySystem unit) => $"{GateRoot(gate)}/Units/{unit.Id}";
 
     public void EnsureUnitFolders(SafetyGate gate, SafetySystem unit)
@@ -340,7 +341,7 @@ public class DataService
 
     public List<ResourceDefinition> ResourcesFor(SafetyGate gate, SafetySystem unit, IEnumerable<ResourceDefinition>? resources = null) =>
         (resources ?? LoadResources()).Where(r => r.IsVisible && r.GateId.Equals(gate.Id, StringComparison.OrdinalIgnoreCase) && r.AppliesTo(unit.Id))
-            .OrderBy(r => r.SortOrder).ThenBy(r => r.Label).ToList();
+            .OrderBy(r => r.SortOrder).ThenBy(r => r.Label).Select(r => r.ForUnit(unit.Id)).ToList();
 
     public string ResourceBaseFolder(ResourceDefinition resource, SafetyGate gate)
     {
@@ -353,11 +354,11 @@ public class DataService
     public string ResourceCurrentFolder(ResourceDefinition resource, SafetyGate gate)
     {
         var baseFolder = ResourceBaseFolder(resource, gate);
-        if (resource.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase)) return Path.Combine(baseFolder, "Current");
+        if (resource.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) && resource.StorageMode != "Asset") return Path.Combine(baseFolder, "Current");
         return baseFolder;
     }
 
-    public string ResourceArchiveFolder(ResourceDefinition resource, SafetyGate gate) => Path.Combine(ResourceBaseFolder(resource, gate), "Archive");
+    public string ResourceArchiveFolder(ResourceDefinition resource, SafetyGate gate) => resource.StorageMode == "Asset" ? Path.Combine(Resolve(GateRoot(gate)), "Archive", AssetFileLayout.Category(resource)) : Path.Combine(ResourceBaseFolder(resource, gate), "Archive");
 
     public void EnsureResourceFolders(ResourceDefinition resource, SafetyGate gate)
     {
@@ -365,13 +366,14 @@ public class DataService
         Directory.CreateDirectory(baseFolder);
         if (resource.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase))
         {
-            Directory.CreateDirectory(Path.Combine(baseFolder, "Current"));
-            Directory.CreateDirectory(Path.Combine(baseFolder, "Archive"));
+            Directory.CreateDirectory(ResourceCurrentFolder(resource, gate));
+            Directory.CreateDirectory(ResourceArchiveFolder(resource, gate));
         }
     }
 
     public string AddOrUpdateResource(ResourceDefinition resource, SafetyGate gate, SafetySystem? unit, string sourceFile)
     {
+        if (resource.StorageMode == "Asset") return AddAssetFile(resource, gate, unit, sourceFile);
         EnsureResourceFolders(resource, gate);
         var current = ResourceCurrentFolder(resource, gate);
         var archive = ResourceArchiveFolder(resource, gate);
@@ -469,6 +471,7 @@ public class DataService
 
     public void SaveSystemNotes(SafetySystem s, string text)
     {
+        using var lease = AcquireAssetWriteLock();
         var gate = GateFor(s);
         if (gate is not null) EnsureUnitFolders(gate, s); else EnsureSystemFolders(s);
         var path = SystemNotesPath(s);
@@ -551,7 +554,7 @@ public class DataService
                 cancellationToken.ThrowIfCancellationRequested();
                 // Resolve from the snapshot without mutating a resource shared with the UI.
                 var relative = string.IsNullOrWhiteSpace(resource.RelativeFolder) ? $"{GateRoot(gate)}/Resources/{resource.Id}" : resource.RelativeFolder;
-                var folder = Path.Combine(Resolve(relative), "Current");
+                var folder = resource.StorageMode == "Asset" ? Resolve(relative) : Path.Combine(Resolve(relative), "Current");
                 if (!filesByFolder.TryGetValue(folder, out var files))
                 {
                     try { files = Directory.GetFiles(folder); }
@@ -559,7 +562,7 @@ public class DataService
                     catch (UnauthorizedAccessException) { files = Array.Empty<string>(); }
                     filesByFolder[folder] = files;
                 }
-                foreach (var file in files)
+                foreach (var file in files.Where(f => resource.IncludesFile(Path.GetFileName(f))))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     yield return (unit, resource.Label, file);

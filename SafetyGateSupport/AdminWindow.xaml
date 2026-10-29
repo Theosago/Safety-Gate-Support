@@ -204,6 +204,8 @@
      <TextBlock Text="Shared data location" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Every computer should point to the same shared folder. Default: Q:\SafetyGateSupport" Foreground="#555" Margin="0,4,0,6"/>
      <TextBox x:Name="SharedRootBox" Height="34"/><WrapPanel><Button Content="Choose Folder..." Click="ChooseSharedRoot_Click"/><Button Content="Initialize Starter Data" Click="Initialize_Click"/></WrapPanel>
      <Separator Margin="0,16"/>
+     <Button x:Name="OrganizeAssetFoldersButton" Content="Organize asset folders…" Click="OrganizeAssetFolders_Click" HorizontalAlignment="Left"/>
+     <TextBlock Text="Preview a readable asset folder layout, merge identical copies, and review conflicting revisions before applying. Existing files and metadata are backed up." TextWrapping="Wrap" Foreground="#61788A" Margin="0,6,0,14"/>
      <TextBlock Text="Application distribution" FontWeight="SemiBold" FontSize="17"/>
      <TextBlock Text="Recommended: keep the published SafetyGateSupport.exe in Q:\SafetyGateSupport\Application and give users a shortcut to that master copy. This build does not self-modify or auto-update." Foreground="#555" TextWrapping="Wrap" Margin="0,4,0,6"/>
      <Separator Margin="0,16"/>

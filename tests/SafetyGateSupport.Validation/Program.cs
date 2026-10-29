@@ -66,6 +66,7 @@ internal static class Program
             ];
             checks.AddRange(SearchChecks.Cases);
             checks.AddRange(SupportLibraryChecks.Cases);
+            checks.AddRange(AssetStorageChecks.Cases);
             // Home preview checks are opt-in; normal builds do not create a preview profile.
             if (args.Contains("--include-home-preview")) checks.AddRange(HomePreviewChecks.Cases);
             checks.Add(("Current-file snapshots retain shared-unit links and refresh files", CurrentFileSnapshots));

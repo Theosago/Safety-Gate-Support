@@ -11,6 +11,12 @@
     <Compile Include="../../SafetyGateSupport/Services/GuidedTroubleshooting.cs" Link="Services/GuidedTroubleshooting.cs" />
     <Compile Include="../../SafetyGateSupport/Services/SupportLibraryService.cs" Link="Services/SupportLibraryService.cs" />
     <ProjectReference Include="../../SafetyGateSupport.Siemens/SafetyGateSupport.Siemens.csproj" />
+    <Compile Include="../../SafetyGateSupport/Services/DataService.DrawingPairs.cs" Link="Services/DataService.DrawingPairs.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/DrawingPairStatus.cs" Link="Services/DrawingPairStatus.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/DataService.AssetFiles.cs" Link="Services/DataService.AssetFiles.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/AssetFileLayout.cs" Link="Services/AssetFileLayout.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/AssetStorageMigration.cs" Link="Services/AssetStorageMigration.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/AssignedDrawings.cs" Link="Services/AssignedDrawings.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.cs" Link="Services/DataService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/SearchService.cs" Link="Services/SearchService.cs" />
     <EmbeddedResource Include="../../SafetyGateSupport/SeedData.zip" LogicalName="SafetyGateSupport.Validation.SeedData.zip" />

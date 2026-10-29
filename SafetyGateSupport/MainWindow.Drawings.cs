@@ -9,6 +9,52 @@ namespace SafetyGateSupport;
 
 public partial class MainWindow
 {
+    private CancellationTokenSource? _drawingPairCheck;
+    private string? _drawingDwg;
+    private string _drawingFingerprint = "";
+    private bool _checkingDrawingFiles;
+    private readonly System.Windows.Threading.DispatcherTimer _drawingWatch = new() { Interval = TimeSpan.FromSeconds(15) };
+    private void InitializeDrawingMonitor()
+    {
+        _drawingWatch.Tick += async (_, _) =>
+        {
+            if (_checkingDrawingFiles || _setupModeOpen || _isClosed || !SystemsView.IsVisible || _drawingPath.Length == 0 || SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
+            _checkingDrawingFiles = true; string path = _drawingPath, baseline = _drawingFingerprint; string? dwg = _drawingDwg;
+            try
+            {
+                string current = await Task.Run(() => DrawingFingerprint(path, dwg));
+                if (!_isClosed && SelectedUnit?.Id == unit.Id && path == _drawingPath && baseline.Length > 0 && current != baseline) LoadDrawings(gate, unit);
+            }
+            catch { /* A failed share probe is explained by the next explicit preview read. */ }
+            finally { _checkingDrawingFiles = false; }
+        };
+        _drawingWatch.Start();
+    }
+    private static string DrawingFingerprint(string pdf, string? dwg)
+    {
+        static string Stamp(string? path) { if (path is null) return "none"; var file = new FileInfo(path); return file.Exists ? $"{file.Length}:{file.LastWriteTimeUtc.Ticks}" : "missing"; }
+        return Stamp(pdf) + "|" + Stamp(dwg);
+    }
+    private async void CheckDrawingPair(AssignedDrawings.FileItem file)
+    {
+        if (file.Resource is null || SelectedGate is not { } gate) return;
+        _drawingPairCheck?.Cancel(); var source = new CancellationTokenSource(); _drawingPairCheck = source; var token = source.Token;
+        DrawingPairStatusText.Text = "Checking PDF/DWG companions…";
+        try
+        {
+            var status = await Task.Run(() => DrawingPairStatus.Check(_data, gate, file.Resource, file.Path, token), token);
+            if (_isClosed || token.IsCancellationRequested || _drawingPath != file.Path) return;
+            _drawingDwg = status.DwgPath;
+            DrawingPairStatusText.Text = status.Message; DrawingPairStatusText.Foreground = new SolidColorBrush(status.NeedsAttention ? Color.FromRgb(150, 88, 19) : Color.FromRgb(65, 100, 115));
+            var fingerprint = await Task.Run(() => DrawingFingerprint(file.Path, status.DwgPath), token);
+            if (!token.IsCancellationRequested && !_isClosed && _drawingPath == file.Path) { _drawingFingerprint = fingerprint; UpdateDrawingControls(); }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception error) { if (!_isClosed && !token.IsCancellationRequested) DrawingPairStatusText.Text = "Cannot check companion revisions: " + error.Message; }
+        finally { if (ReferenceEquals(_drawingPairCheck, source)) _drawingPairCheck = null; source.Dispose(); }
+    }
+    private void OpenDwg_Click(object sender, RoutedEventArgs e) { if (_drawingDwg is not null) FileLauncherService.Open(_drawingDwg); }
+
     private CancellationTokenSource? _drawingListing;
     private CancellationTokenSource? _drawingRendering;
     private string _drawingPath = "";
@@ -19,6 +65,7 @@ public partial class MainWindow
     private void ClearDrawings()
     {
         _drawingListing?.Cancel(); _drawingListing = null;
+        _drawingPairCheck?.Cancel(); _drawingPairCheck = null; _drawingDwg = null; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
         _drawingRendering?.Cancel(); _drawingRendering = null;
         _settingDrawingFiles = true; DrawingFileBox.ItemsSource = null; _settingDrawingFiles = false;
         _drawingPath = ""; _drawingBytes = null; _drawingPage = _drawingPageCount = 0;
@@ -34,7 +81,7 @@ public partial class MainWindow
         DrawingMessage.Text = "Loading this unit’s assigned electrical drawings…";
         try
         {
-            var resources = _resources.ToArray();
+            var resources = await Task.Run(_data.LoadResources, token);
             var listing = await Task.Run(() => AssignedDrawings.List(_data, gate, unit, resources, token), token);
             if (_isClosed || token.IsCancellationRequested) return;
             DrawingFileBox.Visibility = listing.Files.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
@@ -52,9 +99,11 @@ public partial class MainWindow
     private async void DrawingFile_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_settingDrawingFiles || DrawingFileBox.SelectedItem is not AssignedDrawings.FileItem file) return;
+        _drawingPairCheck?.Cancel(); _drawingDwg = null; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
         _drawingPath = file.Path; _drawingBytes = null; _drawingPage = 0; _drawingPageCount = 0;
         DrawingFileText.Text = file.Name; DrawingFileText.ToolTip = file.Path;
         await RenderDrawingPageAsync();
+        if (!_isClosed && ReferenceEquals(DrawingFileBox.SelectedItem, file)) CheckDrawingPair(file);
     }
     private async Task RenderDrawingPageAsync()
     {
@@ -108,11 +157,23 @@ public partial class MainWindow
         PreviousDrawingPageButton.IsEnabled = idle && _drawingPage > 0;
         NextDrawingPageButton.IsEnabled = idle && _drawingPage + 1 < _drawingPageCount;
         OpenDrawingButton.IsEnabled = _drawingPath.Length > 0;
+        OpenDwgButton.IsEnabled = _drawingDwg is not null && File.Exists(_drawingDwg);
         EnlargeDrawingButton.IsEnabled = DrawingImage.Source is not null;
     }
     private async void PreviousDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage == 0) return; _drawingPage--; await RenderDrawingPageAsync(); }
     private async void NextDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage + 1 >= _drawingPageCount) return; _drawingPage++; await RenderDrawingPageAsync(); }
     private void OpenDrawing_Click(object sender, RoutedEventArgs e) { if (_drawingPath.Length > 0) FileLauncherService.Open(_drawingPath); }
+    private async void UpdateDrawing_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
+        var resources = await Task.Run(_data.LoadResources);
+        var choices = _data.ResourcesFor(gate, unit, resources).Where(AssignedDrawings.IsDrawing).ToList();
+        var resource = choices.FirstOrDefault(r => Path.GetDirectoryName(_drawingPath)?.Equals(_data.ResourceCurrentFolder(r, gate), StringComparison.OrdinalIgnoreCase) == true) ?? choices.FirstOrDefault();
+        if (resource is null) { MessageBox.Show(this, "Add this asset’s drawing collection in Setup or link a drawing from Support library first."); return; }
+        new ResourceWindow(_data, gate, unit, resource, _drawingPath) { Owner = this }.ShowDialog();
+        if (!_isClosed && SelectedUnit?.Id == unit.Id) LoadDrawings(gate, unit);
+    }
+
     private void EnlargeDrawing_Click(object sender, RoutedEventArgs e)
     {
         if (DrawingImage.Source is null) return;

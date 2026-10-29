@@ -9,6 +9,7 @@ public class SafetyGate
     public string Model { get; set; } = "";
     public string Location { get; set; } = "";
     public string EquipmentType { get; set; } = "";
+    public string AssetFolder { get; set; } = "";
     public string PlcAddress { get; set; } = "";
     public string PlcModel { get; set; } = "";
     public string PlcNotes { get; set; } = "";

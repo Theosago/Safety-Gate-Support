@@ -14,9 +14,10 @@ public static class SignalColumnService
         try
         {
             var current = await Task.Run(data.LoadResources);
-            var assigned = current.Concat(resources).GroupBy(r => r.Id).Select(g => g.First()).Where(r => r.IsVisible && r.GateId == gate.Id && r.AppliesTo(unit.Id) && IsLightResource(r)).ToList();
-            var paths = await Task.Run(() => assigned.Select(r => data.ResourceCurrentFolder(r, gate)).Distinct(StringComparer.OrdinalIgnoreCase)
-                .Where(Directory.Exists).SelectMany(f => Directory.EnumerateFiles(f, "*", SearchOption.TopDirectoryOnly))
+            var assigned = data.ResourcesFor(gate, unit, current.Concat(resources).GroupBy(r => r.Id).Select(g => g.First()))
+                .Where(IsLightResource).ToList();
+            var paths = await Task.Run(() => assigned.SelectMany(r =>
+                Directory.Exists(data.ResourceCurrentFolder(r, gate)) ? data.GetResourceFiles(r, gate) : Array.Empty<string>())
                 .Where(p => Path.GetExtension(p).Equals(".signal", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToArray());
             new SiemensUsbCheck.MainWindow($"{gate.Display} / {unit.UnitDisplay}", paths, previewOnly: data.IsHomePreview) { Owner = owner, WindowStartupLocation = WindowStartupLocation.CenterOwner }.ShowDialog();
         }

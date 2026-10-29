@@ -18,7 +18,7 @@ public partial class PlcWindow : Window
         AddressText.Text = string.IsNullOrWhiteSpace(gate.PlcAddress) ? "Not recorded yet" : gate.PlcAddress;
         NotesText.Text = string.IsNullOrWhiteSpace(gate.PlcNotes) ? "No PLC notes recorded for this asset." : gate.PlcNotes;
     }
-    public static ResourceDefinition FilesFor(SafetyGate gate) => new()
+    public static ResourceDefinition FilesFor(SafetyGate gate) => !string.IsNullOrWhiteSpace(gate.AssetFolder) ? AssetFileLayout.Create(gate, "PLC") : new()
     {
         Id = $"asset-plc-{gate.Id}", GateId = gate.Id, Label = "PLC files — all asset units", Kind = "ManagedFiles",
         RelativeFolder = $"PLC/{gate.Id}", AllowUserUpload = true, ArchiveMode = "SameName",

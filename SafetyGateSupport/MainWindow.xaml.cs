@@ -53,7 +53,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _data = data;
-        InitializeUnitGallery();
+        InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
         _notesRefreshTimer.Tick += NotesRefreshTimer_Tick;
@@ -68,7 +68,7 @@ public partial class MainWindow : Window
             _dataGeneration++;
             CancelSearchIndexRefresh();
             CancelPhotoLoad();
-            _drawingListing?.Cancel(); _drawingRendering?.Cancel();
+            _drawingListing?.Cancel(); _drawingRendering?.Cancel(); _drawingPairCheck?.Cancel(); _drawingWatch.Stop();
             _galleryCancellation?.Cancel(); _unitSearchTimer.Stop();
             _notesSaveTimer.Stop();
             _notesRefreshTimer.Stop();

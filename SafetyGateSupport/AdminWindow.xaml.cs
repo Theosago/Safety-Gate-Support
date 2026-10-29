@@ -167,12 +167,18 @@ public partial class AdminWindow : Window
         _photoPreviewCancellation = null;
     }
 
+    private void OrganizeAssetFolders_Click(object sender, RoutedEventArgs e)
+    {
+        new StorageMigrationWindow(_data) { Owner = this }.ShowDialog(); ReloadAll();
+    }
+
     private void NewGate_Click(object sender, RoutedEventArgs e) { _selectedGate = null; _selectedUnit = null; _newGate = true; _newUnit = false; PopulateGate(); PopulateUnit(); GateInformationExpander.IsExpanded = true; GateInformationExpander.UpdateLayout(); GateAssetBox.BringIntoView(); GateAssetBox.Focus(); AdminStatusText.Text = "Enter the gate-level information, then save the gate. Add its units afterward."; }
     private void SaveGate_Click(object sender, RoutedEventArgs e)
     {
         if (!_data.IsReady) { MessageBox.Show("Initialize shared data first."); return; }
         var area = GateAreaBox.SelectedItem as string; if (string.IsNullOrWhiteSpace(area)) { MessageBox.Show("Choose an area."); return; }
         var asset = GateAssetBox.Text.Trim(); var manufacturer = GateManufacturerBox.Text.Trim(); if (string.IsNullOrWhiteSpace(manufacturer)) manufacturer = "Unspecified";
+        bool creatingGate = _newGate;
         if (_newGate)
         {
             _selectedGate = new SafetyGate { Id = Guid.NewGuid().ToString("N") }; _gates.Add(_selectedGate); _newGate = false;
@@ -180,8 +186,15 @@ public partial class AdminWindow : Window
         if (_selectedGate is null) return;
         _selectedGate.Category = area; _selectedGate.AssetNumber = asset; _selectedGate.Manufacturer = manufacturer; _selectedGate.Model = GateModelBox.Text.Trim(); _selectedGate.Location = GateLocationBox.Text.Trim(); _selectedGate.EquipmentType = GateTypeBox.Text.Trim(); _selectedGate.Keywords = GateKeywordsBox.Text.Trim();
         _selectedGate.PlcAddress = PlcAddressBox.Text.Trim(); _selectedGate.PlcModel = PlcModelBox.Text.Trim(); _selectedGate.PlcNotes = PlcNotesBox.Text.Trim();
+        if (creatingGate)
+        {
+            string folder = AssetFileLayout.SuggestedRoot(_selectedGate);
+            if (_gates.Any(g => g != _selectedGate && g.AssetFolder.Equals(folder, StringComparison.OrdinalIgnoreCase))) folder += " - " + AssetFileLayout.SafeName(area + " - " + manufacturer);
+            if (_gates.Any(g => g != _selectedGate && g.AssetFolder.Equals(folder, StringComparison.OrdinalIgnoreCase))) { MessageBox.Show("Use a distinct asset number or location before creating its file folder."); _gates.Remove(_selectedGate); _selectedGate = null; _newGate = true; return; }
+            _selectedGate.AssetFolder = folder;
+        }
         var savedGateId = _selectedGate.Id;
-        _data.SaveGates(_gates); _data.LogAudit("Gate saved", savedGateId, details: _selectedGate.Display);
+        _data.SaveGates(_gates); if (creatingGate) _data.WriteAssetFileIndex(_selectedGate); _data.LogAudit("Gate saved", savedGateId, details: _selectedGate.Display);
         ReloadAll(); SelectGateById(savedGateId); AdminStatusText.Text = "Gate information saved. Every unit under this gate uses this gate-level information.";
     }
     private void SelectGateById(string id)
@@ -209,8 +222,9 @@ public partial class AdminWindow : Window
         var wasNew = _newUnit;
         if (_newUnit)
         {
-            var id = Guid.NewGuid().ToString("N"); var root = $"Gates/{_selectedGate.Id}/Units/{id}";
+            var id = Guid.NewGuid().ToString("N"); var root = string.IsNullOrWhiteSpace(_selectedGate.AssetFolder) ? $"Gates/{_selectedGate.Id}/Units/{id}" : _selectedGate.AssetFolder;
             _selectedUnit = new SafetySystem { Id = id, GateId = _selectedGate.Id, UnitNumber = string.IsNullOrWhiteSpace(number) ? null : number, SystemFolder = root, PhotosFolder = root + "/Photos", NotesFolder = root + "/Notes" };
+            if (!string.IsNullOrWhiteSpace(_selectedGate.AssetFolder)) { _selectedUnit.PhotosFolder = root + "/Photos/" + AssetFileLayout.SafeName("Unit " + number); _selectedUnit.NotesFolder = root + "/Notes/" + AssetFileLayout.SafeName("Unit " + number); }
             _data.EnsureUnitFolders(_selectedGate, _selectedUnit); _units.Add(_selectedUnit); _newUnit = false;
         }
         if (_selectedUnit is null) return;
@@ -234,6 +248,13 @@ public partial class AdminWindow : Window
             Id = Guid.NewGuid().ToString("N"), GateId = gate.Id, Label = label, Kind = kind, AppliesToUnitIds = new() { unit.Id }, IsVisible = true, AllowUserUpload = upload, LaunchAction = launch, ArchiveMode = archive, SortOrder = sort, Keywords = keywords,
             RelativeFolder = kind == "Photos" ? unit.PhotosFolder : ""
         };
+        if (!string.IsNullOrWhiteSpace(gate.AssetFolder))
+        {
+            foreach (string category in new[] { "Electrical Drawings", "Light Configurations", "Scanner Configurations" })
+                if (!_resources.Any(r => r.GateId == gate.Id && r.StorageMode == "Asset" && AssetFileLayout.Category(r) == category)) _resources.Add(AssetFileLayout.Create(gate, category));
+            _resources.Add(Make("Photos", "Photos", 60, "photos images pictures")); _resources.Add(Make("Manuals", "Manuals", 40, "manual documentation")); _resources.Add(Make("Parts / BOM", "Parts", 50, "parts bom"));
+            _data.SaveResources(_resources); return;
+        }
         _resources.Add(Make("Electrical Drawings", "ManagedFiles", 10, "drawing electrical wiring schematic print", true));
         _resources.Add(Make("Light Configuration", "ManagedFiles", 20, "light signal tower 8wd46 configuration", false, "Siemens", "All"));
         _resources.Add(Make("Scanner Configuration", "ManagedFiles", 30, "scanner safety laser uam configuration", false, "UAM", "All"));
@@ -384,6 +405,7 @@ public partial class AdminWindow : Window
     private void NewResource_Click(object sender, RoutedEventArgs e) { if (ResourceGateBox.SelectedItem is not SafetyGate) { MessageBox.Show("Choose a gate first."); return; } _selectedResource = null; _newResource = true; PopulateResource(); ResourceLabelBox.Focus(); }
     private void PopulateResource()
     {
+        ResourceTargetBox.IsReadOnly = _selectedResource?.StorageMode == "Asset";
         ResourceLabelBox.Text = _selectedResource?.Label ?? ""; ResourceKindBox.SelectedItem = _selectedResource?.Kind ?? "ManagedFiles"; ResourceVisibleCheck.IsChecked = _selectedResource?.IsVisible ?? true; ResourceUploadCheck.IsChecked = _selectedResource?.AllowUserUpload ?? false; ResourceArchiveBox.SelectedItem = _selectedResource?.ArchiveMode ?? "SameExtension"; ResourceLaunchBox.SelectedItem = _selectedResource?.LaunchAction ?? "None"; ResourceTargetBox.Text = _selectedResource is null ? "" : (_selectedResource.Kind is "Url" or "Folder" ? _selectedResource.Target : _selectedResource.RelativeFolder); ResourceDescriptionBox.Text = _selectedResource?.Description ?? ""; ResourceKeywordsBox.Text = _selectedResource?.Keywords ?? ""; ResourceSortBox.Text = (_selectedResource?.SortOrder ?? 100).ToString();
         ResourceUnitsList.SelectedItems.Clear();
         if (_selectedResource is not null && ResourceUnitsList.ItemsSource is IEnumerable<SafetySystem> units)
@@ -397,10 +419,20 @@ public partial class AdminWindow : Window
     {
         if (ResourceGateBox.SelectedItem is not SafetyGate gate) { MessageBox.Show("Choose a gate first."); return; }
         var label = ResourceLabelBox.Text.Trim(); if (string.IsNullOrWhiteSpace(label)) { MessageBox.Show("Enter a button label."); return; }
+        if (_newResource && !string.IsNullOrWhiteSpace(gate.AssetFolder) && (ResourceKindBox.SelectedItem as string) == "ManagedFiles")
+        {
+            var probe = new ResourceDefinition { Label = label, LaunchAction = ResourceLaunchBox.SelectedItem as string ?? "None" };
+            if (_resources.Any(r => r.GateId == gate.Id && r.StorageMode == "Asset" && AssetFileLayout.Category(r) == AssetFileLayout.Category(probe))) { MessageBox.Show("This asset already has that file collection. Add or replace files in the existing collection instead of creating another button."); return; }
+        }
         if (_newResource) { _selectedResource = new ResourceDefinition { Id = Guid.NewGuid().ToString("N"), GateId = gate.Id }; _resources.Add(_selectedResource); _newResource = false; }
         if (_selectedResource is null) return;
         _selectedResource.GateId = gate.Id; _selectedResource.Label = label; _selectedResource.Kind = ResourceKindBox.SelectedItem as string ?? "ManagedFiles"; _selectedResource.IsVisible = ResourceVisibleCheck.IsChecked == true; _selectedResource.AllowUserUpload = ResourceUploadCheck.IsChecked == true && _selectedResource.Kind == "ManagedFiles"; _selectedResource.ArchiveMode = ResourceArchiveBox.SelectedItem as string ?? "SameExtension"; _selectedResource.LaunchAction = ResourceLaunchBox.SelectedItem as string ?? "None"; _selectedResource.Description = ResourceDescriptionBox.Text.Trim(); _selectedResource.Keywords = ResourceKeywordsBox.Text.Trim(); _selectedResource.SortOrder = int.TryParse(ResourceSortBox.Text, out var sort) ? sort : 100; _selectedResource.AppliesToUnitIds = ResourceUnitsList.SelectedItems.Cast<SafetySystem>().Select(u => u.Id).ToList();
-        var target = ResourceTargetBox.Text.Trim(); if (_selectedResource.Kind is "Url" or "Folder") _selectedResource.Target = target; else { _selectedResource.RelativeFolder = target; if (_selectedResource.Kind == "ManagedFiles" && string.IsNullOrWhiteSpace(_selectedResource.RelativeFolder)) _selectedResource.RelativeFolder = $"Gates/{gate.Id}/Resources/{_selectedResource.Id}"; }
+        if (_selectedResource.Kind == "ManagedFiles" && !string.IsNullOrWhiteSpace(gate.AssetFolder) && _selectedResource.StorageMode != "Asset")
+        {
+            _selectedResource.StorageCategory = AssetFileLayout.Category(_selectedResource); _selectedResource.StorageMode = "Asset";
+            _selectedResource.RelativeFolder = gate.AssetFolder + "/" + _selectedResource.StorageCategory;
+        }
+        var target = ResourceTargetBox.Text.Trim(); if (_selectedResource.StorageMode == "Asset") { /* Folder changes use the reviewed organizer. */ } else if (_selectedResource.Kind is "Url" or "Folder") _selectedResource.Target = target; else { _selectedResource.RelativeFolder = target; if (_selectedResource.Kind == "ManagedFiles" && string.IsNullOrWhiteSpace(_selectedResource.RelativeFolder)) _selectedResource.RelativeFolder = $"Gates/{gate.Id}/Resources/{_selectedResource.Id}"; }
         if (_selectedResource.Kind is "ManagedFiles" or "Photos") _data.EnsureResourceFolders(_selectedResource, gate); _data.SaveResources(_resources); _data.LogAudit("Resource button saved", gate.Id, resourceId: _selectedResource.Id, details: $"{_selectedResource.Label} ({_selectedResource.Kind})"); RefreshResourceList(); AdminStatusText.Text = "Button/resource saved. Changes appear for users without rebuilding the EXE.";
     }
     private void DeleteResource_Click(object sender, RoutedEventArgs e) { if (_selectedResource is null) return; if (MessageBox.Show($"Delete the '{_selectedResource.Label}' button from the app index?\n\nIts files will NOT be deleted.", "Delete button", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return; var id = _selectedResource.Id; var gateId = _selectedResource.GateId; _resources.Remove(_selectedResource); _data.SaveResources(_resources); _data.LogAudit("Resource button removed", gateId, resourceId: id, details: _selectedResource.Label); _selectedResource = null; RefreshResourceList(); }

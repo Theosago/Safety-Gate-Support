@@ -105,6 +105,7 @@ internal static class Program
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
             ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
+            ("Organized shared print pairs display their PDF automatically and detect independent DWG changes", PairedDrawingPreview),
             ("Bundled PDF engine renders landscape and portrait pages without editing the source", NativePdfRendering),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
             ("Unit-first home opens the selected unit’s tools without a second picker", V7HomeTasks),
@@ -475,6 +476,49 @@ internal static class Program
         await WaitUntil(() => Control<TextBlock>(main, "DrawingFileText").Text.Contains("inline-other.pdf") && HasColor(image.Source, Colors.Red), "Unit switch left the previous drawing visible.");
         Control<ListBox>(main, "UnitList").SelectedItem = null; await DispatcherSettled();
         Require(image.Source is null, "Deselection retained a previous unit’s drawing.");
+    }
+
+    private static async Task PairedDrawingPreview()
+    {
+        var fixture = NewFixture();
+        fixture.Data.SaveGates([fixture.Gate]); fixture.Data.SaveSystems([fixture.RedUnit, fixture.BlueUnit]);
+        var legacy = new ResourceDefinition { Id = "shared-pair", GateId = fixture.Gate.Id, Label = "Electrical Drawings", RelativeFolder = "legacy-pair", AppliesToUnitIds = [fixture.RedUnit.Id, fixture.BlueUnit.Id], AllowUserUpload = true };
+        fixture.Data.SaveResources([legacy]); fixture.Data.EnsureResourceFolders(legacy, fixture.Gate);
+        string initial = Path.Combine(fixture.Data.ResourceCurrentFolder(legacy, fixture.Gate), "Shared.pdf"); File.WriteAllBytes(initial, TestDrawingPdf());
+        var plan = await Task.Run(() => AssetStorageMigration.Build(fixture.Data));
+        await Task.Run(() => AssetStorageMigration.Apply(fixture.Data, plan));
+        var gate = fixture.Data.LoadGates().Single(); var resource = fixture.Data.LoadResources().Single(r => r.StorageCategory == "Electrical Drawings");
+        string original = fixture.Data.GetResourceFiles(resource.ForUnit(fixture.BlueUnit.Id), gate).Single();
+        string incoming = NewDirectory(), pdf = Path.Combine(incoming, "Bench print.pdf"), dwg = Path.Combine(incoming, "Bench source.dwg");
+        File.WriteAllBytes(pdf, TestDrawingPdf()); File.WriteAllText(dwg, "Synthetic CAD companion; this test does not open CAD.");
+        var upload = await Task.Run(() => fixture.Data.SaveDrawingPair(resource.ForUnit(fixture.BlueUnit.Id), gate, fixture.BlueUnit, [pdf, dwg], original));
+        resource = fixture.Data.LoadResources().Single(r => r.Id == resource.Id);
+        string beforeRecords = File.ReadAllText(fixture.Data.ResourcesFile);
+        File.AppendAllText(pdf, "\n "); File.AppendAllText(dwg, "new revision");
+        // The DWG can be read for backup, but cannot be replaced while this handle is open.
+        // The already-staged PDF must be rolled back if publishing its companion fails.
+        using (var heldDwg = new FileStream(upload.DwgPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            bool refused = false;
+            try { await Task.Run(() => fixture.Data.SaveDrawingPair(resource.ForUnit(fixture.BlueUnit.Id), gate, fixture.BlueUnit, [pdf, dwg], upload.PdfPath)); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { refused = true; }
+            Require(refused && File.ReadAllBytes(upload.PdfPath).SequenceEqual(TestDrawingPdf()) && File.ReadAllText(fixture.Data.ResourcesFile) == beforeRecords, "A locked DWG left a partial drawing revision published.");
+        }
+        Require(fixture.Data.GetResourceFiles(resource.ForUnit(fixture.RedUnit.Id), gate).Contains(upload.PdfPath), "Paired update lost the other shared unit.");
+        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load after storage organization.");
+        await SelectGalleryUnit(main, fixture.BlueUnit);
+        var image = Control<Image>(main, "DrawingImage"); var status = Control<TextBlock>(main, "DrawingPairStatusText");
+        await WaitUntil(() => HasColor(image.Source, Colors.Red) && status.Text.Contains("uploaded together"), "Uploaded PDF did not display with its companion status.");
+        Require(Control<Button>(main, "OpenDwgButton").IsEnabled, "DWG companion action is unavailable.");
+        // Use the production watcher with a short test interval, without waiting 15 seconds.
+        var timer = (DispatcherTimer)typeof(MainWindow).GetField("_drawingWatch", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!;
+        await WaitUntil(() => ((string)typeof(MainWindow).GetField("_drawingFingerprint", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!).Length > 0, "Companion fingerprint was not recorded.");
+        timer.Interval = TimeSpan.FromMilliseconds(40);
+        File.AppendAllText(upload.DwgPath, " independently changed");
+        await WaitUntil(() => status.Text.Contains("DWG changed, but the PDF has not"), "Visible drawing did not warn about the independently changed DWG.");
+        Require(HasColor(image.Source, Colors.Red), "Companion warning hid the available PDF.");
+        await SelectGalleryUnit(main, fixture.RedUnit);
+        await WaitUntil(() => status.Text.Contains("DWG changed, but the PDF has not") && HasColor(image.Source, Colors.Red), "Other shared unit did not show the same print and warning.");
     }
 
     private static async Task DirectDeviceActions()
