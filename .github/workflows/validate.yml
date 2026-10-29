@@ -40,6 +40,7 @@ jobs:
           $ErrorActionPreference = 'Continue'
           dotnet run --project tests/SafetyGateSupport.WindowsValidation/SafetyGateSupport.WindowsValidation.csproj -c Release 2>&1 | Tee-Object -FilePath windows-validation.log
           $validationExitCode = $LASTEXITCODE
+          Write-Output "Native validation process exit code: $validationExitCode"
           '### Native Windows validation' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```text' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           Get-Content windows-validation.log | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

@@ -47,6 +47,7 @@ internal static class Program
             Environment.Exit(1);
         }, null, TimeSpan.FromMinutes(3), Timeout.InfiniteTimeSpan);
 
+        int completionCode = 2;
         try
         {
             var app = new App();
@@ -59,21 +60,32 @@ internal static class Program
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
             _ = RunChecksAsync();
             Dispatcher.Run();
-            return _exitCode;
+            completionCode = _exitCode;
+            Console.WriteLine($"INFO Dispatcher completed; test result {completionCode}.");
         }
         catch (Exception exception)
         {
             Console.Error.WriteLine($"SETUP FAILED: {exception}");
             ReportWorkflowError("Windows validation setup", exception);
-            return 2;
+            completionCode = 2;
         }
         finally
         {
             if (_exitCode == 0)
-                Directory.Delete(_runRoot, recursive: true);
+            {
+                try { Directory.Delete(_runRoot, recursive: true); Console.WriteLine("INFO Isolated validation files removed."); }
+                catch (Exception error)
+                {
+                    Console.WriteLine($"FAIL Validation cleanup: {error}");
+                    ReportWorkflowError("Windows validation cleanup", error);
+                    completionCode = 1;
+                }
+            }
             else
                 Console.Error.WriteLine($"Failure evidence retained at {_runRoot}");
         }
+        Console.WriteLine($"INFO Native validation process returning {completionCode}.");
+        return completionCode;
     }
 
     private static async Task RunChecksAsync()
