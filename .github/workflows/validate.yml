@@ -37,12 +37,18 @@ jobs:
       - name: Run Windows desktop regression checks
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Continue'
           dotnet run --project tests/SafetyGateSupport.WindowsValidation/SafetyGateSupport.WindowsValidation.csproj -c Release 2>&1 | Tee-Object -FilePath windows-validation.log
           $validationExitCode = $LASTEXITCODE
           '### Native Windows validation' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```text' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           Get-Content windows-validation.log | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          if ($validationExitCode -ne 0) {
+            $failureTail = (Get-Content windows-validation.log -Tail 35) -join "`n"
+            $failureTail = $failureTail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Windows desktop validation log::$failureTail"
+          }
           exit $validationExitCode
       - name: Publish self-contained Windows x64 app
         run: dotnet publish SafetyGateSupport/SafetyGateSupport.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/win-x64

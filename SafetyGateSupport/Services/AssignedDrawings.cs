@@ -28,7 +28,7 @@ public static class AssignedDrawings
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException) { unavailable.Add(resource.Label); }
         }
         return new(files.DistinctBy(f => f.Path, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(f => System.IO.Path.GetExtension(f.Path).Equals(".pdf", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .OrderBy(f => System.IO.Path.GetExtension(f.Path).ToLowerInvariant() switch { ".pdf" => 0, ".dwg" or ".dxf" => 2, _ => 1 })
             .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToArray(), unavailable);
     }
 }

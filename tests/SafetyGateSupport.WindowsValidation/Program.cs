@@ -438,8 +438,12 @@ internal static class Program
             File.WriteAllBytes(Path.Combine(folder, resource.Id + ".pdf"), TestDrawingPdf());
         }
         string archive = fixture.Data.ResourceArchiveFolder(own, fixture.Gate); Directory.CreateDirectory(archive); File.WriteAllBytes(Path.Combine(archive, "archive.pdf"), TestDrawingPdf());
+        string ownFolder = fixture.Data.ResourceCurrentFolder(own, fixture.Gate);
+        File.WriteAllText(Path.Combine(ownFolder, "aaa-cad.dwg"), "Not opened by this test");
+        WriteImage(Path.Combine(ownFolder, "bbb-image.png"), 600, 400, Colors.Green);
         var listing = AssignedDrawings.List(fixture.Data, fixture.Gate, fixture.BlueUnit, [own, other], CancellationToken.None);
-        Equal(1, listing.Files.Count, "Drawing lookup included an archive or other unit");
+        Equal(3, listing.Files.Count, "Drawing lookup included an archive or other unit");
+        Require(listing.Files[1].Path.EndsWith("bbb-image.png") && listing.Files[2].Path.EndsWith("aaa-cad.dwg"), "A CAD file hid an available inline drawing.");
         Require(listing.Files[0].Path.EndsWith("inline-own.pdf"), "Drawing lookup chose the wrong assignment.");
         fixture.Data.SaveSystemNotes(fixture.BlueUnit, "Visible drawing test note");
         var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load.");
