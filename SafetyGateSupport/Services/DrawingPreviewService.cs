@@ -1,11 +1,11 @@
 using System.IO;
 using System.Windows.Media.Imaging;
-using Windows.Data.Pdf;
-using Windows.Storage.Streams;
+using PDFtoImage;
+using SkiaSharp;
 
 namespace SafetyGateSupport.Services;
 
-/// <summary>Renders a local PDF snapshot with the Windows PDF engine; no browser/runtime installer.</summary>
+/// <summary>Renders a local PDF snapshot with the bundled PDF engine; no browser/runtime installer.</summary>
 public static class DrawingPreviewService
 {
     public const int MaxFileBytes = 64 * 1024 * 1024;
@@ -26,26 +26,25 @@ public static class DrawingPreviewService
         return copy.ToArray();
     }, token);
 
+    private static readonly SemaphoreSlim PdfRenderer = new(1);
     public static Task<Page> RenderPdfAsync(byte[] bytes, int pageNumber, CancellationToken token) => Task.Run(async () =>
     {
-        token.ThrowIfCancellationRequested();
-        // The native document can retain its input adapter after rendering returns.
-        // These objects own only managed memory: let the document's COM references
-        // keep them alive rather than closing the stream before native teardown.
-        var source = new MemoryStream(bytes, writable: false);
-        var random = source.AsRandomAccessStream();
-        var document = await PdfDocument.LoadFromStreamAsync(random).AsTask(token);
-        if (pageNumber < 0 || pageNumber >= document.PageCount) throw new ArgumentOutOfRangeException(nameof(pageNumber));
-        using var page = document.GetPage((uint)pageNumber);
-        using var rendered = new InMemoryRandomAccessStream();
-        double scale = Math.Min(2000 / page.Size.Width, 2000 / page.Size.Height);
-        await page.RenderToStreamAsync(rendered, new PdfPageRenderOptions
+        await PdfRenderer.WaitAsync(token);
+        try
         {
-            DestinationWidth = (uint)Math.Max(1, page.Size.Width * scale), DestinationHeight = (uint)Math.Max(1, page.Size.Height * scale)
-        }).AsTask(token);
-        token.ThrowIfCancellationRequested();
-        using var imageStream = rendered.AsStreamForRead(); imageStream.Position = 0;
-        var image = new BitmapImage(); image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.StreamSource = imageStream; image.EndInit(); image.Freeze();
-        return new Page(image, (int)document.PageCount);
+            token.ThrowIfCancellationRequested();
+            int pageCount = Conversion.GetPageCount(bytes);
+            if (pageNumber < 0 || pageNumber >= pageCount) throw new ArgumentOutOfRangeException(nameof(pageNumber));
+            var size = Conversion.GetPageSizes(bytes).ElementAt(pageNumber);
+            double scale = Math.Min(2000 / size.Width, 2000 / size.Height);
+            using var bitmap = Conversion.ToImage(bytes, page: pageNumber, options: new RenderOptions(
+                Width: Math.Max(1, (int)(size.Width * scale)), Height: Math.Max(1, (int)(size.Height * scale))));
+            token.ThrowIfCancellationRequested();
+            using var encoded = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+            using var imageStream = encoded.AsStream();
+            var image = new BitmapImage(); image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.StreamSource = imageStream; image.EndInit(); image.Freeze();
+            return new Page(image, pageCount);
+        }
+        finally { PdfRenderer.Release(); }
     }, token);
 }

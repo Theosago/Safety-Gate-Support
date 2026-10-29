@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -16,7 +15,11 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="SeedData.zip" />
+    <Content Include="../docs/third-party/**/*" Link="ThirdPartyNotices/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <ProjectReference Include="../SafetyGateSupport.Hokuyo/SafetyGateSupport.Hokuyo.csproj" />
     <ProjectReference Include="../SafetyGateSupport.Siemens.Desktop/SafetyGateSupport.Siemens.Desktop.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="PDFtoImage" Version="5.4.0" />
   </ItemGroup>
 </Project>

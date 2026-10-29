@@ -35,6 +35,8 @@ jobs:
       - name: Validate read-only Hokuyo framing and failure handling
         run: dotnet run --project tests/SafetyGateSupport.HokuyoValidation/SafetyGateSupport.HokuyoValidation.csproj -c Release
       - name: Run Windows desktop regression checks
+        env:
+          SAFETYGATE_PDF_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/pdf-smoke.pdf
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
@@ -65,6 +67,17 @@ jobs:
           Copy-Item tools/SiemensUsbCheck/README.md artifacts/siemens-usb-check/README.md
           Copy-Item docs/WINDOWS_QUICK_START.md artifacts/win-x64/README.md
           Copy-Item docs/HOKUYO_USB_DIAGNOSTICS.md artifacts/win-x64/HOKUYO_USB_DIAGNOSTICS.md
+      - name: Smoke-test the bundled PDF renderer in the published executable
+        shell: pwsh
+        run: |
+          $resultPath = Join-Path $env:RUNNER_TEMP ('pdf-preview-' + [guid]::NewGuid().ToString('N') + '.json')
+          $fixturePath = (Resolve-Path artifacts/pdf-smoke.pdf).Path
+          $pdfCheck = Start-Process -FilePath (Resolve-Path artifacts/win-x64/SafetyGateSupport.exe) -ArgumentList @('--validate-pdf-preview', ('"' + $fixturePath + '"'), ('"' + $resultPath + '"')) -PassThru
+          if (!$pdfCheck.WaitForExit(45000)) { $pdfCheck.Kill(); throw 'Published PDF engine did not finish cleanly.' }
+          if ($pdfCheck.ExitCode -ne 0 -or !(Test-Path $resultPath)) { throw "Published PDF engine failed with exit $($pdfCheck.ExitCode)." }
+          $result = Get-Content $resultPath -Raw | ConvertFrom-Json
+          if ($result.PageCount -ne 2 -or $result.PixelWidth -ne 2000 -or $result.PixelHeight -ne 1000) { throw 'Published PDF rendering returned unexpected dimensions or page count.' }
+          Write-Host 'Published executable rendered the PDF using its bundled native libraries and exited cleanly.'
       - name: Smoke-test the normal published app with isolated settings
         shell: pwsh
         run: |

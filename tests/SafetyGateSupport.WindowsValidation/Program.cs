@@ -105,7 +105,7 @@ internal static class Program
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
             ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
-            ("Windows PDF engine renders landscape and portrait pages without editing the source", NativePdfRendering),
+            ("Bundled PDF engine renders landscape and portrait pages without editing the source", NativePdfRendering),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
             ("Unit-first home opens the selected unit’s tools without a second picker", V7HomeTasks),
             ("Unit photo gallery filters, bounds decodes and rejects stale completions", GalleryFilteringAndPhotos),
@@ -165,7 +165,7 @@ internal static class Program
         }
         finally
         {
-            Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => Application.Current.Shutdown(_exitCode)));
+            _ = Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => Application.Current.Shutdown(_exitCode)));
         }
     }
 
@@ -427,6 +427,8 @@ internal static class Program
     private static async Task NativePdfRendering()
     {
         byte[] bytes = TestDrawingPdf(), original = bytes.ToArray();
+        string? packageFixture = Environment.GetEnvironmentVariable("SAFETYGATE_PDF_SMOKE_FIXTURE");
+        if (!string.IsNullOrWhiteSpace(packageFixture)) { Directory.CreateDirectory(Path.GetDirectoryName(packageFixture)!); File.WriteAllBytes(packageFixture, bytes); }
         var first = await DrawingPreviewService.RenderPdfAsync(bytes, 0, CancellationToken.None);
         Equal(2, first.PageCount, "PDF page count"); Require(HasColor(first.Image, Colors.Red), "Landscape PDF page failed to render.");
         Require(Math.Abs((double)first.Image.PixelWidth / first.Image.PixelHeight - 2) < 0.01, "Landscape drawing aspect ratio changed.");
