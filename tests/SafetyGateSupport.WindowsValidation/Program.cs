@@ -103,6 +103,7 @@ internal static class Program
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
+            ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
             ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
             ("Organized shared print pairs display their PDF automatically and detect independent DWG changes", PairedDrawingPreview),
@@ -1032,6 +1033,31 @@ internal static class Program
         assets.SelectedItem = null;
         await DispatcherSettled();
         Require(photo.Source is null && !Control<Button>(window, "StartButton").IsEnabled, "Clearing the gate allowed an obsolete picker preview or start button.");
+    }
+
+    private static async Task AreaRenameRegression()
+    {
+        var fixture = NewFixture();
+        var window = Track(new AdminWindow(fixture.Data)); ShowOffscreen(window);
+        var tabs = Descendants<TabControl>(window).First();
+        tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(tab => Equals(tab.Header, "Areas"));
+        var areas = Control<ListBox>(window, "AreaList"); var name = Control<TextBox>(window, "AreaNameBox");
+        string old = fixture.Gate.Category, renamed = old + " renamed";
+        areas.SelectedItem = old; await DispatcherSettled(); name.Text = renamed;
+        Click(Control<Button>(window, "RenameAreaButton"));
+        await WaitUntil(() => window.IsEnabled && fixture.Data.LoadCategories().Contains(renamed), "Area rename did not complete.");
+        await DispatcherSettled();
+        Require(!fixture.Data.LoadCategories().Contains(old) && fixture.Data.LoadGates().Where(g => g.Category == renamed).Any(g => g.Id == fixture.Gate.Id), "Area rename lost the asset assignment.");
+        Require(fixture.Data.LoadSystems().Single(u => u.Id == fixture.BlueUnit.Id).Category == renamed, "Unit retained its old area.");
+        string categoriesBefore = File.ReadAllText(fixture.Data.CategoriesFile), gatesBefore = File.ReadAllText(fixture.Data.GatesFile), unitsBefore = File.ReadAllText(fixture.Data.SystemsFile);
+        areas.SelectedItem = renamed; name.Text = renamed + " blocked";
+        using (var held = new FileStream(fixture.Data.GatesFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            Click(Control<Button>(window, "RenameAreaButton"));
+            await WaitUntil(() => window.IsEnabled, "Setup did not recover from a locked shared record.");
+            await DispatcherSettled();
+            Require(File.ReadAllText(fixture.Data.CategoriesFile) == categoriesBefore && File.ReadAllText(fixture.Data.GatesFile) == gatesBefore && File.ReadAllText(fixture.Data.SystemsFile) == unitsBefore, "Failed rename left a partially renamed area.");
+        }
     }
 
     private static async Task AdminPhotoSelection()

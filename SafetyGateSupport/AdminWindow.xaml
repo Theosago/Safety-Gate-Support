@@ -195,7 +195,7 @@
    <TabItem Header="Areas">
     <Grid Margin="14"><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <ListBox x:Name="AreaList" SelectionChanged="AreaList_SelectionChanged"/>
-     <StackPanel Grid.Column="2"><TextBlock Text="Area name"/><TextBox x:Name="AreaNameBox" Height="34" Margin="0,4,0,8"/><WrapPanel><Button Content="Add" Click="AddArea_Click"/><Button Content="Rename" Click="RenameArea_Click"/><Button Content="Delete" Click="DeleteArea_Click"/></WrapPanel><TextBlock Text="An area cannot be deleted while gates are assigned to it." Foreground="#666" TextWrapping="Wrap" Margin="4,12,0,0"/></StackPanel>
+     <StackPanel Grid.Column="2"><TextBlock Text="Area name"/><TextBox x:Name="AreaNameBox" Height="34" Margin="0,4,0,8"/><WrapPanel><Button Content="Add" Click="AddArea_Click"/><Button x:Name="RenameAreaButton" Content="Rename" Click="RenameArea_Click"/><Button Content="Delete" Click="DeleteArea_Click"/></WrapPanel><TextBlock Text="An area cannot be deleted while gates are assigned to it." Foreground="#666" TextWrapping="Wrap" Margin="4,12,0,0"/></StackPanel>
     </Grid>
    </TabItem>
 
