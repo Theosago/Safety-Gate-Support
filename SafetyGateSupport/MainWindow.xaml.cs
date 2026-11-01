@@ -68,7 +68,7 @@ public partial class MainWindow : Window
             _dataGeneration++;
             CancelSearchIndexRefresh();
             CancelPhotoLoad(); CancelPartPhotos(); _stockroomRefresh?.Cancel();
-            _drawingListing?.Cancel(); _drawingRendering?.Cancel(); _drawingPairCheck?.Cancel(); _drawingWatch.Stop();
+            _drawingListing?.Cancel(); _drawingRendering?.Cancel(); _drawingOrientationCancellation?.Cancel(); _drawingPairCheck?.Cancel(); _drawingWatch.Stop();
             _galleryCancellation?.Cancel(); _unitSearchTimer.Stop();
             _notesSaveTimer.Stop();
             _notesRefreshTimer.Stop();

@@ -9,9 +9,9 @@
     <RootNamespace>SafetyGateSupport</RootNamespace>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
-    <Version>8.1.0</Version>
-    <AssemblyVersion>8.1.0.0</AssemblyVersion>
-    <FileVersion>8.1.0.0</FileVersion>
+    <Version>8.1.1</Version>
+    <AssemblyVersion>8.1.1.0</AssemblyVersion>
+    <FileVersion>8.1.1.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
@@ -22,6 +22,17 @@
     <ProjectReference Include="../SafetyGateSupport.Siemens.Desktop/SafetyGateSupport.Siemens.Desktop.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="TesseractOCR" Version="5.5.2" GeneratePathProperty="true" ExcludeAssets="all" />
+    <PackageReference Include="NtvLibs.MSVCP.msvcp140.runtime.win-x64" Version="14.42.34430" GeneratePathProperty="true" ExcludeAssets="all" />
+    <PackageReference Include="NtvLibs.MSVCP.vcruntime140.runtime.win-x64" Version="14.42.34430" GeneratePathProperty="true" ExcludeAssets="all" />
+    <PackageReference Include="NtvLibs.MSVCP.vcruntime140_1.runtime.win-x64" Version="14.42.34430" GeneratePathProperty="true" ExcludeAssets="all" />
     <PackageReference Include="PDFtoImage" Version="5.4.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Ocr/README.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="Ocr/tessdata/eng.traineddata" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="$(PkgTesseractOCR)/x64/tesseract.exe;$(PkgTesseractOCR)/x64/tesseract55.dll;$(PkgTesseractOCR)/x64/leptonica-1.85.0.dll" Link="Ocr/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="$(PkgNtvLibs_MSVCP_msvcp140_runtime_win-x64)/runtimes/win-x64/native/*.dll;$(PkgNtvLibs_MSVCP_vcruntime140_runtime_win-x64)/runtimes/win-x64/native/*.dll;$(PkgNtvLibs_MSVCP_vcruntime140_1_runtime_win-x64)/runtimes/win-x64/native/*.dll" Link="Ocr/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 </Project>

@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Fixtures/DrawingPdfFixture.cs" Link="Fixtures/DrawingPdfFixture.cs" />
     <ProjectReference Include="../../SafetyGateSupport/SafetyGateSupport.csproj" />
     <ProjectReference Include="../../tools/SiemensUsbCheck/SiemensUsbCheck.csproj" />
   </ItemGroup>

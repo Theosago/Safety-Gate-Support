@@ -107,10 +107,11 @@ internal static class Program
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
-            ("Electrical PDFs automatically display landscape and saved flips survive unit changes", AutomaticDrawingOrientation),
+            ("Electrical PDFs detect reading direction automatically and open click-to-zoom without manual controls", AutomaticDrawingOrientation),
             ("Unit equipment choices hide optional configuration actions without removing files", UnitEquipmentActions),
             ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
             ("Organized shared print pairs display their PDF automatically and detect independent DWG changes", PairedDrawingPreview),
+            ("Scanned drawings use bundled local OCR to detect upside-down and sideways reading direction", ScannedDrawingOrientation),
             ("Bundled PDF engine renders landscape and portrait pages without editing the source", NativePdfRendering),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
             ("Unit-first home opens the selected unit’s tools without a second picker", V7HomeTasks),
@@ -464,23 +465,52 @@ internal static class Program
         var fixture = NewFixture();
         var resource = new ResourceDefinition { Id = "orientation", GateId = fixture.Gate.Id, Label = "Electrical Drawings", RelativeFolder = "orientation", AppliesToUnitIds = [fixture.BlueUnit.Id] };
         fixture.Data.SaveResources([resource]); fixture.Data.EnsureResourceFolders(resource, fixture.Gate);
-        string path = Path.Combine(fixture.Data.ResourceCurrentFolder(resource, fixture.Gate), "drawing.pdf"); byte[] original = TestDrawingPdf(); File.WriteAllBytes(path, original);
+        string folder = fixture.Data.ResourceCurrentFolder(resource, fixture.Gate), upside = Path.Combine(folder, "01-upside-down.pdf"), sideways = Path.Combine(folder, "02-sideways.pdf");
+        byte[] original = SafetyGateSupport.TestFixtures.DrawingPdfFixture.TextPage(180); File.WriteAllBytes(upside, original);
+        File.WriteAllBytes(sideways, SafetyGateSupport.TestFixtures.DrawingPdfFixture.TextPage(90));
+        // Previous manual preferences cannot override the new automatic detector.
+        fixture.Data.SaveDrawingView(fixture.BlueUnit.Id, fixture.Data.DrawingViewKey(upside, 0), 0);
         var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
         var image = Control<Image>(main, "DrawingImage");
-        await WaitUntil(() => HasColor(image.Source, Colors.Red), "Landscape page was not displayed.");
-        Require(((BitmapSource)image.Source).PixelWidth > ((BitmapSource)image.Source).PixelHeight, "Landscape page was rotated to portrait.");
-        Click(Control<Button>(main, "NextDrawingPageButton"));
-        await WaitUntil(() => HasColor(image.Source, Colors.Blue), "Portrait source page did not display.");
-        Require(((BitmapSource)image.Source).PixelWidth > ((BitmapSource)image.Source).PixelHeight, "Portrait PDF page was not automatically made horizontal.");
-        Click(Control<Button>(main, "FlipDrawingButton"));
-        await WaitUntil(() => Control<TextBlock>(main, "DrawingOrientationText").Text.Contains("Saved for"), "Page flip was not saved.");
-        string key = fixture.Data.DrawingViewKey(path, 1);
-        Require(fixture.Data.LoadDrawingViews(fixture.BlueUnit.Id)[key] == 270 && fixture.Data.LoadDrawingViews(fixture.RedUnit.Id).Count == 0, "Page correction was not isolated to the selected unit.");
-        await SelectGalleryUnit(main, fixture.RedUnit); await SelectGalleryUnit(main, fixture.BlueUnit);
-        await WaitUntil(() => HasColor(image.Source, Colors.Red), "Reopened unit did not load its first page."); Click(Control<Button>(main, "NextDrawingPageButton"));
-        await WaitUntil(() => HasColor(image.Source, Colors.Blue) && Control<TextBlock>(main, "DrawingOrientationText").Text == "Saved page orientation", "Page correction was lost on reopening the unit.");
-        Require(File.ReadAllBytes(path).SequenceEqual(original), "View orientation rewrote the source PDF.");
+        await WaitUntil(() => image.Source is TransformedBitmap { Transform: RotateTransform { Angle: 180 } }, "Upside-down PDF text was not corrected automatically.");
+        Require(main.FindName("FlipDrawingButton") is null && main.FindName("EnlargeDrawingButton") is null && main.FindName("OpenDwgButton") is null, "Manual/enlarge/DWG buttons remain on the drawing page.");
+        Require(((System.Windows.Documents.Hyperlink)main.FindName("DownloadPdfLink")).IsEnabled, "PDF download link is missing.");
+        Exception? failure = null; bool zoomed = false; var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+        timer.Tick += (_, _) =>
+        {
+            if (Application.Current.Windows.OfType<DrawingZoomWindow>().SingleOrDefault() is not { } zoom) return;
+            timer.Stop(); Track(zoom);
+            try { zoom.Fit(); double fit = zoom.Zoom; zoom.ZoomAt(2, new Point(300, 200)); Require(zoom.Zoom > fit, "Drawing viewer did not zoom at the cursor."); zoom.Fit(); Require(Math.Abs(zoom.Zoom - fit) < 0.01, "Fit did not restore the full drawing."); zoomed = true; }
+            catch (Exception error) { failure = error; }
+            finally { zoom.Close(); }
+        };
+        timer.Start();
+        try { Control<Border>(main, "DrawingPreviewSurface").RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonUpEvent }); }
+        finally { timer.Stop(); }
+        if (failure is not null) throw failure; Require(zoomed, "Clicking the drawing did not open the zoom viewer.");
+        Control<ComboBox>(main, "DrawingFileBox").SelectedIndex = 1;
+        await WaitUntil(() => image.Source is TransformedBitmap { Transform: RotateTransform { Angle: 90 } }, "Sideways PDF text was not corrected automatically.");
+        Require(((BitmapSource)image.Source).PixelWidth > ((BitmapSource)image.Source).PixelHeight && File.ReadAllBytes(upside).SequenceEqual(original), "Automatic orientation altered the original or failed to keep the print horizontal.");
     }
+    private static async Task ScannedDrawingOrientation()
+    {
+        string cache = NewDirectory();
+        foreach (int angle in new[] { 180, 90, 270 })
+        {
+            var bytes = SafetyGateSupport.TestFixtures.DrawingPdfFixture.TextPage(angle);
+            var page = await DrawingPreviewService.RenderPdfAsync(bytes, 0, CancellationToken.None);
+            // Deliberately omit PDF text: this is the scanned/image-only code path.
+            var result = await DrawingOrientationService.DetectAsync(page.Image, null, 0, cache, CancellationToken.None);
+            Require(result.Angle == angle && result.Method == "Local text recognition" && result.Confidence > 0, $"Scanned text at {angle} was not automatically corrected: {result}.");
+            var cached = await DrawingOrientationService.DetectAsync(page.Image, null, 0, cache, CancellationToken.None);
+            Require(cached.Cached && cached.Angle == angle, "OCR reading direction was not cached.");
+            if (angle == 180 && Environment.GetEnvironmentVariable("SAFETYGATE_OCR_SMOKE_FIXTURE") is { Length: > 0 } target)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(page.Image)); using var file = File.Create(target); encoder.Save(file);
+            }
+        }
+    }
+
     private static async Task UnitEquipmentActions()
     {
         var fixture = NewFixture(); var units = fixture.Data.LoadSystems();
@@ -568,7 +598,7 @@ internal static class Program
         await SelectGalleryUnit(main, fixture.BlueUnit);
         var image = Control<Image>(main, "DrawingImage"); var status = Control<TextBlock>(main, "DrawingPairStatusText");
         await WaitUntil(() => HasColor(image.Source, Colors.Red) && status.Text.Contains("uploaded together"), "Uploaded PDF did not display with its companion status.");
-        Require(Control<Button>(main, "OpenDwgButton").IsEnabled, "DWG companion action is unavailable.");
+        Require(((System.Windows.Documents.Hyperlink)main.FindName("DownloadDwgLink")).IsEnabled, "DWG companion download link is unavailable.");
         // Use the production watcher with a short test interval, without waiting 15 seconds.
         var timer = (DispatcherTimer)typeof(MainWindow).GetField("_drawingWatch", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!;
         await WaitUntil(() => ((string)typeof(MainWindow).GetField("_drawingFingerprint", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!).Length > 0, "Companion fingerprint was not recorded.");

@@ -14,12 +14,12 @@ public static class DrawingPreviewService
     public static Task<byte[]> ReadAsync(string path, CancellationToken token) => Task.Run(async () =>
     {
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 81920, useAsync: true);
-        if (file.Length > MaxFileBytes) throw new InvalidDataException("This drawing is too large for the inline preview. Use Open original.");
+        if (file.Length > MaxFileBytes) throw new InvalidDataException("This drawing is too large for the inline preview. Use the PDF download link.");
         using var copy = new MemoryStream();
         var buffer = new byte[81920]; int count;
         while ((count = await file.ReadAsync(buffer, token)) > 0)
         {
-            if (copy.Length + count > MaxFileBytes) throw new InvalidDataException("This drawing exceeds the inline preview limit. Use Open original.");
+            if (copy.Length + count > MaxFileBytes) throw new InvalidDataException("This drawing exceeds the inline preview limit. Use the PDF download link.");
             copy.Write(buffer, 0, count);
         }
         token.ThrowIfCancellationRequested();

@@ -1,0 +1,12 @@
+Drawing orientation components
+
+PdfPig 0.1.16, https://github.com/UglyToad/PdfPig (Apache 2.0).
+TesseractOCR package 5.5.2, https://github.com/Sicos1977/TesseractOCR (Apache 2.0).
+Copyright 2012-2021 Charles Weld; Copyright 2021-2023 Kees van Spelde.
+Tesseract OCR engine, https://github.com/tesseract-ocr/tesseract (Apache 2.0).
+Leptonica, https://github.com/DanBloomberg/leptonica (BSD-style; license included).
+English model from https://github.com/tesseract-ocr/tessdata_fast (Apache 2.0).
+Microsoft C++ app-local runtime distribution: see MSVC notices/license.
+
+The OCR resources are redistributed unmodified from the pinned packages and
+upstream model commit identified in Ocr/README.txt. No cloud OCR service is used.

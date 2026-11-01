@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Input;
+using Microsoft.Win32;
 using SafetyGateSupport.Models;
 using SafetyGateSupport.Services;
 
@@ -12,11 +14,7 @@ public partial class MainWindow
 {
     private CancellationTokenSource? _drawingPairCheck;
     private string? _drawingDwg;
-    private BitmapSource? _drawingUnrotated;
-    private int _drawingAngle;
-    private string _drawingViewKey = "";
-    private Dictionary<string, int> _drawingViews = new();
-    private bool _savingDrawingView;
+    private CancellationTokenSource? _drawingOrientationCancellation;
     private string _drawingFingerprint = "";
     private bool _checkingDrawingFiles;
     private readonly System.Windows.Threading.DispatcherTimer _drawingWatch = new() { Interval = TimeSpan.FromSeconds(15) };
@@ -59,7 +57,6 @@ public partial class MainWindow
         catch (Exception error) { if (!_isClosed && !token.IsCancellationRequested) DrawingPairStatusText.Text = "Cannot check companion revisions: " + error.Message; }
         finally { if (ReferenceEquals(_drawingPairCheck, source)) _drawingPairCheck = null; source.Dispose(); }
     }
-    private void OpenDwg_Click(object sender, RoutedEventArgs e) { if (_drawingDwg is not null) FileLauncherService.Open(_drawingDwg); }
 
     private CancellationTokenSource? _drawingListing;
     private CancellationTokenSource? _drawingRendering;
@@ -74,7 +71,7 @@ public partial class MainWindow
         _drawingPairCheck?.Cancel(); _drawingPairCheck = null; _drawingDwg = null; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
         _drawingRendering?.Cancel(); _drawingRendering = null;
         _settingDrawingFiles = true; DrawingFileBox.ItemsSource = null; _settingDrawingFiles = false;
-        _drawingUnrotated = null; _drawingViewKey = ""; DrawingOrientationText.Text = "";
+        _drawingOrientationCancellation?.Cancel(); DrawingOrientationText.Text = "";
         _drawingPath = ""; _drawingBytes = null; _drawingPage = _drawingPageCount = 0;
         DrawingImage.Source = null; DrawingFileText.Text = ""; DrawingPageText.Text = ""; DrawingAssignmentText.Text = "";
         DrawingMessage.Text = "Select a unit to see its assigned electrical drawing."; DrawingMessage.Visibility = Visibility.Visible;
@@ -88,15 +85,13 @@ public partial class MainWindow
         DrawingMessage.Text = "Loading this unit’s assigned electrical drawings…";
         try
         {
-            var views = await Task.Run(() => _data.LoadDrawingViews(unit.Id), token);
             var resources = await Task.Run(_data.LoadResources, token);
             var listing = await Task.Run(() => AssignedDrawings.List(_data, gate, unit, resources, token), token);
             if (_isClosed || token.IsCancellationRequested) return;
-            _drawingViews = views;
             DrawingFileBox.Visibility = listing.Files.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
             _settingDrawingFiles = true; DrawingFileBox.ItemsSource = listing.Files; _settingDrawingFiles = false;
             if (listing.Files.Count == 0)
-                DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The assigned drawing folder is unavailable. Check shared-drive access. Use Files & drawings to review the assignment." : "No current electrical drawing is assigned to this unit. Use Files & drawings to add or review its drawing.";
+                DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The assigned drawing folder is unavailable. Check shared-drive access. Use Electrical Schematics to review the assignment." : "No current electrical drawing is assigned to this unit. Use Electrical Schematics to add or review its drawing.";
             else DrawingFileBox.SelectedIndex = 0;
             DrawingAssignmentText.Text = listing.Unavailable.Count > 0 ? "Unavailable drawing folders: " + string.Join(", ", listing.Unavailable) : listing.Files.Count > 1 ? $"{listing.Files.Count} assigned drawings. Select another above if needed." : "";
         }
@@ -119,7 +114,7 @@ public partial class MainWindow
         _drawingRendering?.Cancel();
         var source = new CancellationTokenSource(); _drawingRendering = source; var token = source.Token;
         string path = _drawingPath; int page = _drawingPage;
-        _drawingUnrotated = null; DrawingImage.Source = null; DrawingMessage.Text = "Loading drawing…"; DrawingMessage.Visibility = Visibility.Visible; UpdateDrawingControls();
+        _drawingOrientationCancellation?.Cancel(); DrawingImage.Source = null; DrawingMessage.Text = "Loading drawing…"; DrawingMessage.Visibility = Visibility.Visible; UpdateDrawingControls();
         try
         {
             if (Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
@@ -128,21 +123,21 @@ public partial class MainWindow
                 token.ThrowIfCancellationRequested(); _drawingBytes = bytes;
                 var result = await DrawingPreviewService.RenderPdfAsync(bytes, page, token);
                 if (_isClosed || token.IsCancellationRequested) return;
-                await DisplayDrawingImageAsync(result.Image, path, page, token); _drawingPageCount = result.PageCount;
+                DisplayDrawingImage(result.Image, path, page, bytes); _drawingPageCount = result.PageCount;
                 DrawingPageText.Text = $"Page {page + 1} of {result.PageCount}";
             }
             else if (new[] { ".dwg", ".dxf" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
             {
-                DrawingMessage.Text = "This CAD drawing needs its installed viewer. Use Open original, or assign a PDF for an inline preview.";
+                DrawingMessage.Text = "This CAD drawing needs its installed viewer. Use the download link, or assign a PDF for an inline preview.";
                 DrawingPageText.Text = "CAD drawing"; return;
             }
             else
             {
                 var result = await IdentificationPhotoLoader.LoadAsync(path, 2000, token);
                 if (_isClosed || token.IsCancellationRequested) return;
-                if (result.Source is not null) await DisplayDrawingImageAsync(result.Source, path, page, token);
+                if (result.Source is not null) DisplayDrawingImage(result.Source, path, page, null);
                 _drawingPageCount = 1; DrawingPageText.Text = "Image drawing";
-                if (result.Source is null) { DrawingMessage.Text = "This drawing image is unavailable or could not be displayed. Use Open original to inspect the file."; return; }
+                if (result.Source is null) { DrawingMessage.Text = "This drawing image is unavailable or could not be displayed. Use the download link to inspect the file."; return; }
             }
             DrawingMessage.Visibility = Visibility.Collapsed;
         }
@@ -151,7 +146,7 @@ public partial class MainWindow
         {
             if (!_isClosed && !token.IsCancellationRequested)
             {
-                DrawingMessage.Text = "Drawing preview unavailable. " + error.Message + " Use Open original or check the file assignment.";
+                DrawingMessage.Text = "Drawing preview unavailable. " + error.Message + " Use the download link or check the file assignment.";
                 DrawingPageText.Text = "";
             }
         }
@@ -164,48 +159,53 @@ public partial class MainWindow
     private void UpdateDrawingControls()
     {
         bool idle = _drawingRendering is null;
-        FlipDrawingButton.IsEnabled = idle && !_savingDrawingView && _drawingUnrotated is not null;
         PreviousDrawingPageButton.IsEnabled = idle && _drawingPage > 0;
         NextDrawingPageButton.IsEnabled = idle && _drawingPage + 1 < _drawingPageCount;
-        OpenDrawingButton.IsEnabled = _drawingPath.Length > 0;
-        OpenDwgButton.IsEnabled = _drawingDwg is not null && File.Exists(_drawingDwg);
-        EnlargeDrawingButton.IsEnabled = DrawingImage.Source is not null;
+        DownloadPdfLink.IsEnabled = Path.GetExtension(_drawingPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+        DownloadDwgLink.IsEnabled = _drawingDwg is not null;
     }
-    private async Task DisplayDrawingImageAsync(BitmapSource image, string path, int page, CancellationToken token)
+    private void DisplayDrawingImage(BitmapSource image, string path, int page, byte[]? pdf)
     {
-        string key = await Task.Run(() => _data.DrawingViewKey(path, page), token); token.ThrowIfCancellationRequested();
-        _drawingUnrotated = image; _drawingViewKey = key;
-        bool saved = _drawingViews.TryGetValue(key, out var angle) && angle is 0 or 90 or 180 or 270;
-        _drawingAngle = saved ? angle : image.PixelHeight > image.PixelWidth ? 90 : 0;
-        DrawingImage.Source = RotateDrawingImage(image, _drawingAngle);
-        DrawingOrientationText.Text = saved ? "Saved page orientation" : "Automatic landscape orientation";
+        _drawingOrientationCancellation?.Cancel(); var source = new CancellationTokenSource(); _drawingOrientationCancellation = source;
+        DrawingImage.Source = DrawingOrientationService.Rotate(image, image.PixelHeight > image.PixelWidth ? 90 : 0);
+        DrawingMessage.Visibility = Visibility.Collapsed; DrawingOrientationText.Text = "Detecting reading direction…";
+        _ = ApplyAutomaticOrientationAsync(image, pdf, page, path, source);
     }
-    private static BitmapSource RotateDrawingImage(BitmapSource image, int angle)
+    private async Task ApplyAutomaticOrientationAsync(BitmapSource image, byte[]? pdf, int page, string path, CancellationTokenSource source)
     {
-        if (angle == 0) return image;
-        var rotated = new TransformedBitmap(image, new RotateTransform(angle)); rotated.Freeze(); return rotated;
-    }
-    private async void FlipDrawing_Click(object sender, RoutedEventArgs e)
-    {
-        if (_drawingUnrotated is not { } image || SelectedUnit is not { } unit || _savingDrawingView) return;
-        int before = _drawingAngle, angle = (before + 180) % 360; string key = _drawingViewKey;
-        _savingDrawingView = true; _drawingAngle = angle; DrawingImage.Source = RotateDrawingImage(image, angle); UpdateDrawingControls();
-        DrawingOrientationText.Text = "Saving page orientation…";
         try
         {
-            await Task.Run(() => _data.SaveDrawingView(unit.Id, key, angle));
-            if (!_isClosed && SelectedUnit?.Id == unit.Id && _drawingViewKey == key) { _drawingViews[key] = angle; DrawingOrientationText.Text = "Saved for this unit and page"; }
+            var result = await DrawingOrientationService.DetectAsync(image, pdf, page, _data.DrawingOrientationCache, source.Token);
+            if (_isClosed || source.IsCancellationRequested || _drawingPath != path || _drawingPage != page) return;
+            DrawingImage.Source = DrawingOrientationService.Rotate(image, result.Angle);
+            DrawingOrientationText.Text = result.Confidence > 0 ? "Reading direction detected automatically" : "Landscape preview; not enough readable text to determine reading direction.";
         }
-        catch (Exception error)
+        catch (OperationCanceledException) { }
+        catch (Exception) { if (!_isClosed && !source.IsCancellationRequested && _drawingPath == path && _drawingPage == page) DrawingOrientationText.Text = "Landscape preview; text direction could not be determined."; }
+        finally { if (ReferenceEquals(_drawingOrientationCancellation, source)) _drawingOrientationCancellation = null; source.Dispose(); }
+    }
+    private void DrawingPreview_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (DrawingImage.Source is null) return;
+        new DrawingZoomWindow(DrawingFileText.Text + " • " + DrawingPageText.Text, DrawingImage) { Owner = this }.ShowDialog(); e.Handled = true;
+    }
+    private async void DownloadDrawing_Click(object sender, RoutedEventArgs e)
+    {
+        string? source = ReferenceEquals(sender, DownloadDwgLink) ? _drawingDwg : _drawingPath;
+        if (string.IsNullOrWhiteSpace(source)) return;
+        var dialog = new SaveFileDialog { Title = "Save a copy of the drawing", FileName = Path.GetFileName(source), Filter = Path.GetExtension(source).Equals(".dwg", StringComparison.OrdinalIgnoreCase) ? "DWG drawing|*.dwg" : "PDF drawing|*.pdf", AddExtension = true, OverwritePrompt = true };
+        if (dialog.ShowDialog(this) != true) return;
+        try
         {
-            if (!_isClosed && SelectedUnit?.Id == unit.Id && _drawingViewKey == key) { _drawingAngle = before; DrawingImage.Source = RotateDrawingImage(image, before); DrawingOrientationText.Text = "Orientation was not saved: " + error.Message; }
+            if (Path.GetFullPath(source).Equals(Path.GetFullPath(dialog.FileName), StringComparison.OrdinalIgnoreCase)) { DrawingAssignmentText.Text = "This is already the source file's location."; return; }
+            await Task.Run(() => DataService.AtomicCopy(source, dialog.FileName, true));
+            if (!_isClosed) DrawingAssignmentText.Text = "Drawing copy saved.";
         }
-        finally { _savingDrawingView = false; if (!_isClosed) UpdateDrawingControls(); }
+        catch (Exception error) { if (!_isClosed) DrawingAssignmentText.Text = "The drawing copy could not be saved: " + error.Message; }
     }
 
     private async void PreviousDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage == 0) return; _drawingPage--; await RenderDrawingPageAsync(); }
     private async void NextDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage + 1 >= _drawingPageCount) return; _drawingPage++; await RenderDrawingPageAsync(); }
-    private void OpenDrawing_Click(object sender, RoutedEventArgs e) { if (_drawingPath.Length > 0) FileLauncherService.Open(_drawingPath); }
     private async void UpdateDrawing_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
@@ -217,13 +217,4 @@ public partial class MainWindow
         if (!_isClosed && SelectedUnit?.Id == unit.Id) LoadDrawings(gate, unit);
     }
 
-    private void EnlargeDrawing_Click(object sender, RoutedEventArgs e)
-    {
-        if (DrawingImage.Source is null) return;
-        var image = new Image { Source = DrawingImage.Source, Stretch = Stretch.Uniform, Margin = new Thickness(12) };
-        var close = new Button { Content = "Close · Esc", IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right };
-        var panel = new DockPanel(); DockPanel.SetDock(close, Dock.Top); panel.Children.Add(close); panel.Children.Add(image);
-        var window = new Window { Owner = this, Title = DrawingFileText.Text + " • " + DrawingPageText.Text, WindowState = WindowState.Maximized, Content = panel, Background = Brushes.White };
-        close.Click += (_, _) => window.Close(); window.ShowDialog();
-    }
 }

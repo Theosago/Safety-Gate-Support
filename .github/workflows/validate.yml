@@ -36,6 +36,7 @@ jobs:
         run: dotnet run --project tests/SafetyGateSupport.HokuyoValidation/SafetyGateSupport.HokuyoValidation.csproj -c Release
       - name: Run Windows desktop regression checks
         env:
+          SAFETYGATE_OCR_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/ocr-smoke.png
           SAFETYGATE_PDF_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/pdf-smoke.pdf
         shell: pwsh
         run: |
@@ -78,6 +79,22 @@ jobs:
           $result = Get-Content $resultPath -Raw | ConvertFrom-Json
           if ($result.PageCount -ne 2 -or $result.PixelWidth -ne 2000 -or $result.PixelHeight -ne 1000) { throw 'Published PDF rendering returned unexpected dimensions or page count.' }
           Write-Host 'Published executable rendered the PDF using its bundled native libraries and exited cleanly.'
+      - name: Verify bundled OCR files and automatic scanned-drawing orientation
+        shell: pwsh
+        run: |
+          $model = 'artifacts/win-x64/Ocr/tessdata/eng.traineddata'
+          if ((Get-FileHash $model -Algorithm SHA256).Hash -ne '7D4322BD2A7749724879683FC3912CB542F19906C83BCC1A52132556427170B2') { throw 'OCR language data checksum mismatch' }
+          foreach ($runtime in 'msvcp140.dll','vcruntime140.dll','vcruntime140_1.dll') {
+            $signature = Get-AuthenticodeSignature (Join-Path 'artifacts/win-x64/Ocr' $runtime)
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*Microsoft*') { throw "Invalid Microsoft runtime signature: $runtime" }
+          }
+          $resultPath = Join-Path $env:RUNNER_TEMP ('drawing-ocr-' + [guid]::NewGuid().ToString('N') + '.json')
+          $inputPath = (Resolve-Path 'artifacts/ocr-smoke.png').Path
+          $ocrCheck = Start-Process -FilePath (Resolve-Path 'artifacts/win-x64/SafetyGateSupport.exe') -ArgumentList @('--validate-drawing-orientation', "`"$inputPath`"", "`"$resultPath`"") -PassThru
+          if (!$ocrCheck.WaitForExit(45000)) { $ocrCheck.Kill(); throw 'Published drawing OCR did not finish cleanly' }
+          if ($ocrCheck.ExitCode -ne 0 -or !(Test-Path $resultPath)) { throw "Published drawing OCR failed: $($ocrCheck.ExitCode)" }
+          $result = Get-Content $resultPath -Raw | ConvertFrom-Json
+          if ($result.Angle -ne 180 -or $result.Confidence -le 0) { throw 'Published drawing OCR did not correct the upside-down print' }
       - name: Smoke-test the normal published app with isolated settings
         shell: pwsh
         run: |

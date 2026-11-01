@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Fixtures/DrawingPdfFixture.cs" Link="Fixtures/DrawingPdfFixture.cs" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
     <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <Compile Include="../../SafetyGateSupport/Models/*.cs" Link="Models/%(Filename)%(Extension)" />
     <Compile Include="../../SafetyGateSupport/Services/HomePreviewService.cs" Link="Services/HomePreviewService.cs" />
@@ -24,6 +26,7 @@
     <Compile Include="../../SafetyGateSupport/Services/DataService.DrawingViews.cs" Link="Services/DataService.DrawingViews.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.PartsCatalog.cs" Link="Services/DataService.PartsCatalog.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.cs" Link="Services/DataService.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/PdfTextOrientation.cs" Link="Services/PdfTextOrientation.cs" />
     <Compile Include="../../SafetyGateSupport/Services/SearchService.cs" Link="Services/SearchService.cs" />
     <EmbeddedResource Include="../../SafetyGateSupport/Catalog/Safe2CrossParts.json" LogicalName="SafetyGateSupport.Validation.Catalog.Safe2CrossParts.json" />
     <EmbeddedResource Include="../../SafetyGateSupport/SeedData.zip" LogicalName="SafetyGateSupport.Validation.SeedData.zip" />

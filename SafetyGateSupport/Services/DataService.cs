@@ -18,6 +18,7 @@ public partial class DataService
     private readonly string _localSettingsPath;
     private AppSettings _settings;
 
+    public string DrawingOrientationCache => Path.Combine(Path.GetDirectoryName(_localSettingsPath)!, "DrawingOrientation");
     public bool IsHomePreview { get; init; }
     public string SharedRoot => _settings.SharedRoot;
     public string SystemsFile => Path.Combine(SharedRoot, "Data", "systems.json"); // unit records

@@ -68,6 +68,7 @@ internal static class Program
             checks.AddRange(SupportLibraryChecks.Cases);
             checks.AddRange(AssetStorageChecks.Cases);
             checks.AddRange(AreaChecks.Cases);
+            checks.Add(("PDF reading direction detects upside-down and sideways text including page rotation metadata", DrawingOrientationChecks.Check));
             checks.AddRange(PartsPageChecks.Cases);
             checks.Add(("Supplied parts import upgrades existing catalogs without duplicates or lost site edits", PartsCatalogChecks.Check));
             // Home preview checks are opt-in; normal builds do not create a preview profile.
