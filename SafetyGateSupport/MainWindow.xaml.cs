@@ -488,14 +488,18 @@ public partial class MainWindow : Window
     private void BuildResourceButtons(SafetyGate gate, SafetySystem unit)
     {
         SystemResourcePanel.Children.Clear();
-        foreach (var resource in _data.ResourcesFor(gate, unit, _resources))
-        {
-            var button = new Button { Content = resource.Label, Tag = resource.Id, MinHeight = 44, Width = 198, ToolTip = resource.Description };
-            button.Click += ResourceButton_Click;
-            SystemResourcePanel.Children.Add(button);
-        }
-        if (SystemResourcePanel.Children.Count == 0)
-            SystemResourcePanel.Children.Add(new TextBlock { Text = "No resource buttons are configured for this unit.", Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(6) });
+        LightColumnButton.Visibility = unit.ShowLightConfiguration ? Visibility.Visible : Visibility.Collapsed;
+        ScannerButton.Visibility = unit.ShowScannerConfiguration ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void UnitManuals_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
+        _manualFilterGateId = gate.Id; _manualFilterUnitId = unit.Id; ShowManuals(); RefreshManuals();
+    }
+    private void UnitParts_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
+        _partFilterGateId = gate.Id; _partFilterUnitId = unit.Id; ShowParts(); RefreshParts();
     }
 
     private async void SupportLibrary_Click(object sender, RoutedEventArgs e)
@@ -615,7 +619,10 @@ public partial class MainWindow : Window
     }
     private void Scanner_Click(object sender, RoutedEventArgs e)
     {
-        if (SelectedGate is { } gate && SelectedUnit is { } unit) new UamDiagnosticsWindow(_data, gate, unit) { Owner = this }.ShowDialog();
+        if (SelectedGate is not { } gate || SelectedUnit is not { } unit || !unit.ShowScannerConfiguration) return;
+        var resource = _resources.FirstOrDefault(r => r.GateId == gate.Id && r.AppliesTo(unit.Id) && r.LaunchAction.Equals("UAM", StringComparison.OrdinalIgnoreCase));
+        if (resource is null) { new UamDiagnosticsWindow(_data, gate, unit) { Owner = this }.ShowDialog(); return; }
+        new ResourceWindow(_data, gate, unit, resource) { Owner = this }.ShowDialog();
     }
     private void Plc_Click(object sender, RoutedEventArgs e)
     {

@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using SafetyGateSupport.Models;
 using SafetyGateSupport.Services;
 
@@ -11,6 +12,11 @@ public partial class MainWindow
 {
     private CancellationTokenSource? _drawingPairCheck;
     private string? _drawingDwg;
+    private BitmapSource? _drawingUnrotated;
+    private int _drawingAngle;
+    private string _drawingViewKey = "";
+    private Dictionary<string, int> _drawingViews = new();
+    private bool _savingDrawingView;
     private string _drawingFingerprint = "";
     private bool _checkingDrawingFiles;
     private readonly System.Windows.Threading.DispatcherTimer _drawingWatch = new() { Interval = TimeSpan.FromSeconds(15) };
@@ -68,6 +74,7 @@ public partial class MainWindow
         _drawingPairCheck?.Cancel(); _drawingPairCheck = null; _drawingDwg = null; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
         _drawingRendering?.Cancel(); _drawingRendering = null;
         _settingDrawingFiles = true; DrawingFileBox.ItemsSource = null; _settingDrawingFiles = false;
+        _drawingUnrotated = null; _drawingViewKey = ""; DrawingOrientationText.Text = "";
         _drawingPath = ""; _drawingBytes = null; _drawingPage = _drawingPageCount = 0;
         DrawingImage.Source = null; DrawingFileText.Text = ""; DrawingPageText.Text = ""; DrawingAssignmentText.Text = "";
         DrawingMessage.Text = "Select a unit to see its assigned electrical drawing."; DrawingMessage.Visibility = Visibility.Visible;
@@ -81,9 +88,11 @@ public partial class MainWindow
         DrawingMessage.Text = "Loading this unit’s assigned electrical drawings…";
         try
         {
+            var views = await Task.Run(() => _data.LoadDrawingViews(unit.Id), token);
             var resources = await Task.Run(_data.LoadResources, token);
             var listing = await Task.Run(() => AssignedDrawings.List(_data, gate, unit, resources, token), token);
             if (_isClosed || token.IsCancellationRequested) return;
+            _drawingViews = views;
             DrawingFileBox.Visibility = listing.Files.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
             _settingDrawingFiles = true; DrawingFileBox.ItemsSource = listing.Files; _settingDrawingFiles = false;
             if (listing.Files.Count == 0)
@@ -110,7 +119,7 @@ public partial class MainWindow
         _drawingRendering?.Cancel();
         var source = new CancellationTokenSource(); _drawingRendering = source; var token = source.Token;
         string path = _drawingPath; int page = _drawingPage;
-        DrawingImage.Source = null; DrawingMessage.Text = "Loading drawing…"; DrawingMessage.Visibility = Visibility.Visible; UpdateDrawingControls();
+        _drawingUnrotated = null; DrawingImage.Source = null; DrawingMessage.Text = "Loading drawing…"; DrawingMessage.Visibility = Visibility.Visible; UpdateDrawingControls();
         try
         {
             if (Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
@@ -119,7 +128,7 @@ public partial class MainWindow
                 token.ThrowIfCancellationRequested(); _drawingBytes = bytes;
                 var result = await DrawingPreviewService.RenderPdfAsync(bytes, page, token);
                 if (_isClosed || token.IsCancellationRequested) return;
-                DrawingImage.Source = result.Image; _drawingPageCount = result.PageCount;
+                await DisplayDrawingImageAsync(result.Image, path, page, token); _drawingPageCount = result.PageCount;
                 DrawingPageText.Text = $"Page {page + 1} of {result.PageCount}";
             }
             else if (new[] { ".dwg", ".dxf" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
@@ -131,7 +140,8 @@ public partial class MainWindow
             {
                 var result = await IdentificationPhotoLoader.LoadAsync(path, 2000, token);
                 if (_isClosed || token.IsCancellationRequested) return;
-                DrawingImage.Source = result.Source; _drawingPageCount = 1; DrawingPageText.Text = "Image drawing";
+                if (result.Source is not null) await DisplayDrawingImageAsync(result.Source, path, page, token);
+                _drawingPageCount = 1; DrawingPageText.Text = "Image drawing";
                 if (result.Source is null) { DrawingMessage.Text = "This drawing image is unavailable or could not be displayed. Use Open original to inspect the file."; return; }
             }
             DrawingMessage.Visibility = Visibility.Collapsed;
@@ -154,12 +164,45 @@ public partial class MainWindow
     private void UpdateDrawingControls()
     {
         bool idle = _drawingRendering is null;
+        FlipDrawingButton.IsEnabled = idle && !_savingDrawingView && _drawingUnrotated is not null;
         PreviousDrawingPageButton.IsEnabled = idle && _drawingPage > 0;
         NextDrawingPageButton.IsEnabled = idle && _drawingPage + 1 < _drawingPageCount;
         OpenDrawingButton.IsEnabled = _drawingPath.Length > 0;
         OpenDwgButton.IsEnabled = _drawingDwg is not null && File.Exists(_drawingDwg);
         EnlargeDrawingButton.IsEnabled = DrawingImage.Source is not null;
     }
+    private async Task DisplayDrawingImageAsync(BitmapSource image, string path, int page, CancellationToken token)
+    {
+        string key = await Task.Run(() => _data.DrawingViewKey(path, page), token); token.ThrowIfCancellationRequested();
+        _drawingUnrotated = image; _drawingViewKey = key;
+        bool saved = _drawingViews.TryGetValue(key, out var angle) && angle is 0 or 90 or 180 or 270;
+        _drawingAngle = saved ? angle : image.PixelHeight > image.PixelWidth ? 90 : 0;
+        DrawingImage.Source = RotateDrawingImage(image, _drawingAngle);
+        DrawingOrientationText.Text = saved ? "Saved page orientation" : "Automatic landscape orientation";
+    }
+    private static BitmapSource RotateDrawingImage(BitmapSource image, int angle)
+    {
+        if (angle == 0) return image;
+        var rotated = new TransformedBitmap(image, new RotateTransform(angle)); rotated.Freeze(); return rotated;
+    }
+    private async void FlipDrawing_Click(object sender, RoutedEventArgs e)
+    {
+        if (_drawingUnrotated is not { } image || SelectedUnit is not { } unit || _savingDrawingView) return;
+        int before = _drawingAngle, angle = (before + 180) % 360; string key = _drawingViewKey;
+        _savingDrawingView = true; _drawingAngle = angle; DrawingImage.Source = RotateDrawingImage(image, angle); UpdateDrawingControls();
+        DrawingOrientationText.Text = "Saving page orientation…";
+        try
+        {
+            await Task.Run(() => _data.SaveDrawingView(unit.Id, key, angle));
+            if (!_isClosed && SelectedUnit?.Id == unit.Id && _drawingViewKey == key) { _drawingViews[key] = angle; DrawingOrientationText.Text = "Saved for this unit and page"; }
+        }
+        catch (Exception error)
+        {
+            if (!_isClosed && SelectedUnit?.Id == unit.Id && _drawingViewKey == key) { _drawingAngle = before; DrawingImage.Source = RotateDrawingImage(image, before); DrawingOrientationText.Text = "Orientation was not saved: " + error.Message; }
+        }
+        finally { _savingDrawingView = false; if (!_isClosed) UpdateDrawingControls(); }
+    }
+
     private async void PreviousDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage == 0) return; _drawingPage--; await RenderDrawingPageAsync(); }
     private async void NextDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage + 1 >= _drawingPageCount) return; _drawingPage++; await RenderDrawingPageAsync(); }
     private void OpenDrawing_Click(object sender, RoutedEventArgs e) { if (_drawingPath.Length > 0) FileLauncherService.Open(_drawingPath); }

@@ -21,6 +21,7 @@
     <Compile Include="../../SafetyGateSupport/Services/DataService.Areas.cs" Link="Services/DataService.Areas.cs" />
     <Compile Include="../../SafetyGateSupport/Services/StockroomService.cs" Link="Services/StockroomService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.PartPhotos.cs" Link="Services/DataService.PartPhotos.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/DataService.DrawingViews.cs" Link="Services/DataService.DrawingViews.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.cs" Link="Services/DataService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/SearchService.cs" Link="Services/SearchService.cs" />
     <EmbeddedResource Include="../../SafetyGateSupport/SeedData.zip" LogicalName="SafetyGateSupport.Validation.SeedData.zip" />

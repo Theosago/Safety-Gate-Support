@@ -15,6 +15,7 @@ public partial class UnitFilesWindow : Window
     private readonly List<ResourceDefinition> _resources;
     private List<AssignedFile> _files = [];
     private string _filter;
+    private readonly bool _drawingOnly;
     private bool _closed;
     private string _unavailable = "";
     private sealed record AssignedFile(string Name, string Path, string Category, string Kind);
@@ -22,10 +23,11 @@ public partial class UnitFilesWindow : Window
     public UnitFilesWindow(DataService data, SafetyGate gate, SafetySystem unit, IEnumerable<ResourceDefinition> resources, string filter = "all")
     {
         InitializeComponent();
-        _data = data; _gate = gate; _unit = unit; _filter = filter;
+        _data = data; _gate = gate; _unit = unit; _filter = filter; _drawingOnly = filter == "drawing";
         _resources = data.ResourcesFor(gate, unit, resources).ToList();
         UnitText.Text = $"{gate.Display} / {unit.UnitDisplay} • {gate.Category} • {gate.Location}";
-        ColumnButton.Visibility = _resources.Any(SignalColumnService.IsLightResource) ? Visibility.Visible : Visibility.Collapsed;
+        if (_drawingOnly) { Title = FilesTitleText.Text = "Electrical Schematics"; FilterPanel.Visibility = Visibility.Collapsed; }
+        ColumnButton.Visibility = !_drawingOnly && _resources.Any(SignalColumnService.IsLightResource) ? Visibility.Visible : Visibility.Collapsed;
         Loaded += async (_, _) => await LoadFilesAsync();
         Closed += (_, _) => _closed = true;
     }
@@ -39,7 +41,7 @@ public partial class UnitFilesWindow : Window
                 var files = new List<AssignedFile>();
                 var unavailable = new List<string>();
                 var currentResources = _data.ResourcesFor(_gate, _unit, _data.LoadResources().Concat(_resources).GroupBy(r => r.Id).Select(g => g.First()));
-                foreach (var resource in currentResources.Where(r => r.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) || r.Kind.Equals("Photos", StringComparison.OrdinalIgnoreCase)))
+                foreach (var resource in currentResources.Where(r => !_drawingOnly || AssignedDrawings.IsDrawing(r)).Where(r => r.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) || r.Kind.Equals("Photos", StringComparison.OrdinalIgnoreCase)))
                 {
                     try
                     {
@@ -53,7 +55,7 @@ public partial class UnitFilesWindow : Window
                     }
                     catch (Exception e) when (e is IOException or UnauthorizedAccessException) { unavailable.Add(resource.Label); }
                 }
-                foreach (var manual in _data.ManualsFor(_gate, _unit))
+                foreach (var manual in _drawingOnly ? new List<SafetyGateSupport.Models.ManualRecord>() : _data.ManualsFor(_gate, _unit))
                     files.Add(new(Path.GetFileName(manual.FilePath), _data.Resolve(manual.FilePath), manual.Title, "manual"));
                 return (Files: files.DistinctBy(f => (f.Path.ToUpperInvariant(), f.Kind)).OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList(), Unavailable: unavailable);
             });
@@ -78,7 +80,7 @@ public partial class UnitFilesWindow : Window
             button.FontWeight = selected ? FontWeights.Bold : FontWeights.Normal;
             button.Background = selected ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(226, 242, 247)) : System.Windows.Media.Brushes.White;
         }
-        StatusText.Text = matches.Count == 0 ? "No matching current files assigned. Try All files, or use Import / assign files to review this unit’s assignments." : $"{matches.Count} current file(s) • {_filter}";
+        StatusText.Text = matches.Count == 0 ? (_drawingOnly ? "No electrical schematics are assigned to this unit. Use Add / update drawings on the unit page." : "No matching current files assigned. Try All files, or use Import / assign files to review this unit’s assignments.") : $"{matches.Count} current file(s) • {_filter}";
         StatusText.Text += _unavailable;
     }
     private void Filter_Click(object sender, RoutedEventArgs e) { _filter = (string)((Button)sender).Tag; RefreshFiles(); }

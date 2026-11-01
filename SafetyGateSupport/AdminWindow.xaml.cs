@@ -133,6 +133,7 @@ public partial class AdminWindow : Window
     private void PopulateUnit()
     {
         CleanupPendingPhotoTemp();
+        UnitHasSignalColumnCheck.IsChecked = _selectedUnit?.ShowLightConfiguration ?? true; UnitHasScannerCheck.IsChecked = _selectedUnit?.ShowScannerConfiguration ?? true;
         UnitNumberBox.Text = _selectedUnit?.UnitNumber ?? "";
         UnitPhotoText.Text = _selectedUnit?.PrimaryPhoto ?? "";
         GateUnitEditorScroll.ScrollToTop();
@@ -251,6 +252,7 @@ public partial class AdminWindow : Window
         }
         if (_selectedUnit is null) return;
         _selectedUnit.UnitNumber = string.IsNullOrWhiteSpace(number) ? null : number;
+        _selectedUnit.ShowLightConfiguration = UnitHasSignalColumnCheck.IsChecked == true; _selectedUnit.ShowScannerConfiguration = UnitHasScannerCheck.IsChecked == true;
         if (!string.IsNullOrWhiteSpace(_pendingPhotoSource))
         {
             _data.SetIdentificationPhoto(_selectedUnit, _pendingPhotoSource);

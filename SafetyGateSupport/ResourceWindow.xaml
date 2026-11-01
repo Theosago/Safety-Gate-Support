@@ -43,7 +43,7 @@
      <Button x:Name="ReplaceFileButton" Content="Replace selected file…" Click="ReplaceFile_Click" Visibility="Collapsed"/>
      <Button x:Name="FileUnitsButton" Content="Applies to units…" Click="FileUnits_Click" Visibility="Collapsed"/>
      <Button Content="View Archive" Click="OpenArchive_Click"/>
-     <Button x:Name="UamDiagnosticsButton" Content="Check UAM scanner…" Click="UamDiagnostics_Click" Visibility="Collapsed"/>
+     <Button x:Name="UamDiagnosticsButton" Content="Read scanner USB status…" Click="UamDiagnostics_Click" Visibility="Collapsed"/>
      <Button x:Name="SignalColumnButton" Content="Check / configure column…" Click="SignalColumn_Click" Visibility="Collapsed"/>
      <Button x:Name="LaunchButton" Click="Launch_Click" Visibility="Collapsed"/>
     </WrapPanel>

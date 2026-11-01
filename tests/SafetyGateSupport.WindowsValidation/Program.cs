@@ -106,6 +106,8 @@ internal static class Program
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
+            ("Electrical PDFs automatically display landscape and saved flips survive unit changes", AutomaticDrawingOrientation),
+            ("Unit equipment choices hide optional configuration actions without removing files", UnitEquipmentActions),
             ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
             ("Organized shared print pairs display their PDF automatically and detect independent DWG changes", PairedDrawingPreview),
             ("Bundled PDF engine renders landscape and portrait pages without editing the source", NativePdfRendering),
@@ -443,6 +445,47 @@ internal static class Program
         await ExpectCancellation(DrawingPreviewService.RenderPdfAsync(bytes, 0, cancel.Token));
     }
 
+    private static async Task AutomaticDrawingOrientation()
+    {
+        var fixture = NewFixture();
+        var resource = new ResourceDefinition { Id = "orientation", GateId = fixture.Gate.Id, Label = "Electrical Drawings", RelativeFolder = "orientation", AppliesToUnitIds = [fixture.BlueUnit.Id] };
+        fixture.Data.SaveResources([resource]); fixture.Data.EnsureResourceFolders(resource, fixture.Gate);
+        string path = Path.Combine(fixture.Data.ResourceCurrentFolder(resource, fixture.Gate), "drawing.pdf"); byte[] original = TestDrawingPdf(); File.WriteAllBytes(path, original);
+        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
+        var image = Control<Image>(main, "DrawingImage");
+        await WaitUntil(() => HasColor(image.Source, Colors.Red), "Landscape page was not displayed.");
+        Require(((BitmapSource)image.Source).PixelWidth > ((BitmapSource)image.Source).PixelHeight, "Landscape page was rotated to portrait.");
+        Click(Control<Button>(main, "NextDrawingPageButton"));
+        await WaitUntil(() => HasColor(image.Source, Colors.Blue), "Portrait source page did not display.");
+        Require(((BitmapSource)image.Source).PixelWidth > ((BitmapSource)image.Source).PixelHeight, "Portrait PDF page was not automatically made horizontal.");
+        Click(Control<Button>(main, "FlipDrawingButton"));
+        await WaitUntil(() => Control<TextBlock>(main, "DrawingOrientationText").Text.Contains("Saved for"), "Page flip was not saved.");
+        string key = fixture.Data.DrawingViewKey(path, 1);
+        Require(fixture.Data.LoadDrawingViews(fixture.BlueUnit.Id)[key] == 270 && fixture.Data.LoadDrawingViews(fixture.RedUnit.Id).Count == 0, "Page correction was not isolated to the selected unit.");
+        await SelectGalleryUnit(main, fixture.RedUnit); await SelectGalleryUnit(main, fixture.BlueUnit);
+        await WaitUntil(() => HasColor(image.Source, Colors.Red), "Reopened unit did not load its first page."); Click(Control<Button>(main, "NextDrawingPageButton"));
+        await WaitUntil(() => HasColor(image.Source, Colors.Blue) && Control<TextBlock>(main, "DrawingOrientationText").Text == "Saved page orientation", "Page correction was lost on reopening the unit.");
+        Require(File.ReadAllBytes(path).SequenceEqual(original), "View orientation rewrote the source PDF.");
+    }
+    private static async Task UnitEquipmentActions()
+    {
+        var fixture = NewFixture(); var units = fixture.Data.LoadSystems();
+        var own = units.Single(u => u.Id == fixture.BlueUnit.Id); own.ShowLightConfiguration = false; own.ShowScannerConfiguration = false; fixture.Data.SaveSystems(units);
+        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
+        Require(Control<Button>(main, "ScannerButton").Visibility == Visibility.Collapsed && Control<Button>(main, "LightColumnButton").Visibility == Visibility.Collapsed, "Absent equipment actions were left visible.");
+        Require(Control<Button>(main, "PartManualsButton").Content.Equals("Part Manuals") && Control<Button>(main, "UnitPartsButton").Content.Equals("Parts"), "Canonical unit actions are missing.");
+        Require(Control<Panel>(main, "SystemResourcePanel").Visibility == Visibility.Collapsed, "Duplicate legacy resource buttons remain on the unit page.");
+        var admin = Track(new AdminWindow(fixture.Data)); ShowOffscreen(admin); await WaitUntil(() => admin.IsEnabled, "Setup did not load.");
+        Control<ComboBox>(admin, "GateAreaFilterBox").SelectedItem = fixture.Gate.Category;
+        var gates = Control<ListBox>(admin, "GateList"); gates.SelectedItem = gates.Items.Cast<SafetyGate>().Single(g => g.Id == fixture.Gate.Id);
+        var list = Control<ListBox>(admin, "UnitListAdmin"); list.SelectedItem = list.Items.Cast<SafetySystem>().Single(u => u.Id == own.Id);
+        Require(Control<CheckBox>(admin, "UnitHasScannerCheck").IsChecked == false && Control<CheckBox>(admin, "UnitHasSignalColumnCheck").IsChecked == false, "Setup equipment choices disagree with the unit page.");
+        Control<CheckBox>(admin, "UnitHasScannerCheck").IsChecked = true; Control<CheckBox>(admin, "UnitHasSignalColumnCheck").IsChecked = true;
+        typeof(AdminWindow).GetMethod("SaveUnit_Click", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(admin, [admin, new RoutedEventArgs()]);
+        var enabled = fixture.Data.LoadSystems().Single(u => u.Id == own.Id); Require(enabled.ShowLightConfiguration && enabled.ShowScannerConfiguration, "Equipment choices did not persist.");
+        Require(fixture.Data.LoadResources().Count > 0, "Toggling equipment removed assigned resources.");
+    }
+
     private static async Task InlineDrawingAndNotes()
     {
         var fixture = NewFixture();
@@ -572,6 +615,7 @@ internal static class Program
         Require(first.AppliesTo(fixture.BlueUnit.Id) && first.AppliesTo(fixture.RedUnit.Id), "Asset PLC files were restricted to one unit.");
         var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main window did not load.");
         await SelectGalleryUnit(main, fixture.BlueUnit); main.UpdateLayout();
+        Control<Expander>(main, "UnitDetailsExpander").IsExpanded = true; main.UpdateLayout();
         foreach (string action in new[] { "ScannerButton", "PlcButton" })
         {
             Require(Control<Button>(main, action).IsVisible, "Device action is hidden.");
@@ -581,10 +625,10 @@ internal static class Program
             {
                 try
                 {
-                    if (action == "ScannerButton" && Application.Current.Windows.OfType<UamDiagnosticsWindow>().SingleOrDefault() is { } scanner)
+                    if (action == "ScannerButton" && Application.Current.Windows.OfType<ResourceWindow>().SingleOrDefault() is { } scanner)
                     {
-                        Track(scanner); Require(Control<TextBlock>(scanner, "ContextText").Text.Contains(fixture.BlueUnit.UnitDisplay), "Scanner lost the selected unit.");
-                        Require(!Control<Button>(scanner, "CancelButton").IsEnabled, "Opening scanner tools started a USB read.");
+                        Track(scanner); Require(Control<TextBlock>(scanner, "SystemText").Text.Contains(fixture.BlueUnit.UnitDisplay), "Scanner configuration lost the selected unit.");
+                        Require(Control<Button>(scanner, "UamDiagnosticsButton").IsVisible, "Scanner configuration removed the USB diagnostics action.");
                         visited = true; timer.Stop(); scanner.Close();
                     }
                     else if (action == "PlcButton" && Application.Current.Windows.OfType<PlcWindow>().SingleOrDefault() is { } plc)
@@ -1003,7 +1047,7 @@ internal static class Program
         var photo = Control<Image>(window, "GateImage");
         await WaitUntil(() => HasColor(photo.Source, Colors.Blue), "Main window did not keep the final selected unit's blue photo.");
         Require(Control<TextBlock>(window, "UnitTitleText").Text.Contains(fixture.BlueUnit.UnitDisplay, StringComparison.Ordinal), "Unit title does not match the final selection.");
-        Require(Control<Panel>(window, "SystemResourcePanel").Children.Count > 0, "Selected unit resource buttons were not populated.");
+        Require(Control<Button>(window, "FilesButton").Content.Equals("Electrical Schematics"), "Selected unit drawing action was not populated.");
         units.SelectedIndex = 0;
         units.SelectedItem = null;
         await DispatcherSettled();
