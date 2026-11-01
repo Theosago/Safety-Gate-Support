@@ -49,10 +49,10 @@ public partial class MainWindow : Window
     public MainWindow() : this(HomePreviewService.IsRequested(Environment.GetCommandLineArgs(), Environment.ProcessPath)
         ? HomePreviewService.Create() : new DataService(initializeSharedDefaults: false)) { }
 
-    public MainWindow(DataService data)
+    public MainWindow(DataService data, Func<string, CancellationToken, Task<StockroomService.Snapshot>>? stockroomReader = null)
     {
         InitializeComponent();
-        _data = data;
+        _data = data; _stockroomReader = stockroomReader ?? ((url, token) => StockroomService.FetchAsync(url, token));
         InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
@@ -67,7 +67,7 @@ public partial class MainWindow : Window
             _isClosed = true;
             _dataGeneration++;
             CancelSearchIndexRefresh();
-            CancelPhotoLoad();
+            CancelPhotoLoad(); CancelPartPhotos(); _stockroomRefresh?.Cancel();
             _drawingListing?.Cancel(); _drawingRendering?.Cancel(); _drawingPairCheck?.Cancel(); _drawingWatch.Stop();
             _galleryCancellation?.Cancel(); _unitSearchTimer.Stop();
             _notesSaveTimer.Stop();
@@ -135,6 +135,7 @@ public partial class MainWindow : Window
             BuildHelpPanels();
             RefreshManuals();
             RefreshParts();
+            if (!_data.IsHomePreview && _parts.Count > 0 && _stockroomRequestedUrl != _content.StoreroomUrl) { _stockroomRequestedUrl = _content.StoreroomUrl; _ = RefreshStockroomAsync(); }
             BuildFastSearchIndex();
             _ = RefreshSearchIndexAsync();
             if (!string.IsNullOrWhiteSpace(_currentArea) && _categories.Contains(_currentArea)) AreaBox.SelectedItem = _currentArea;
@@ -285,7 +286,7 @@ public partial class MainWindow : Window
         foreach (var h in _help)
             entries.Add(new SearchIndexEntry { Title = h.Title, BaseSubtitle = h.Section, Kind = "Help", Body = h.Body, SearchText = $"{h.Title} {h.Body} {h.Keywords} {h.Section}" });
         foreach (var p in _parts)
-            entries.Add(new SearchIndexEntry { Title = p.Display, BaseSubtitle = string.IsNullOrWhiteSpace(p.Manufacturer) ? "Part" : "Part • " + p.Manufacturer, Kind = "Part", Target = p.Id, SearchText = $"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} part parts" });
+            entries.Add(new SearchIndexEntry { Title = p.Display, BaseSubtitle = string.IsNullOrWhiteSpace(p.Manufacturer) ? "Part" : "Part • " + p.Manufacturer, Kind = "Part", Target = p.Id, SearchText = $"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} {p.LocationValue} {p.SiteValue} part parts" });
         foreach (var m in _manuals)
             entries.Add(new SearchIndexEntry { Title = m.Display, BaseSubtitle = "Manual", Kind = "Manual", Target = m.Id, SearchText = $"{m.Title} {m.Manufacturer} {m.Model} {m.Keywords} manual documentation" });
         foreach (var r in _resources.Where(r => r.IsVisible))
@@ -335,7 +336,7 @@ public partial class MainWindow : Window
                     built.Add(SystemIndexEntry(g, s, notes));
                 }
                 foreach (var h in help) built.Add(new SearchIndexEntry { Title = h.Title, BaseSubtitle = h.Section, Kind = "Help", Body = h.Body, SearchText = $"{h.Title} {h.Body} {h.Keywords} {h.Section}" });
-                foreach (var p in parts) built.Add(new SearchIndexEntry { Title = p.Display, BaseSubtitle = string.IsNullOrWhiteSpace(p.Manufacturer) ? "Part" : "Part • " + p.Manufacturer, Kind = "Part", Target = p.Id, SearchText = $"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} part parts" });
+                foreach (var p in parts) built.Add(new SearchIndexEntry { Title = p.Display, BaseSubtitle = string.IsNullOrWhiteSpace(p.Manufacturer) ? "Part" : "Part • " + p.Manufacturer, Kind = "Part", Target = p.Id, SearchText = $"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} {p.LocationValue} {p.SiteValue} part parts" });
                 foreach (var m in manuals) built.Add(new SearchIndexEntry { Title = m.Display, BaseSubtitle = "Manual", Kind = "Manual", Target = m.Id, SearchText = $"{m.Title} {m.Manufacturer} {m.Model} {m.Keywords} manual documentation" });
                 foreach (var r in resources.Where(x => x.IsVisible))
                 {
@@ -644,23 +645,33 @@ public partial class MainWindow : Window
 
     private void RefreshParts()
     {
-        if (PartList is null) return; var q = PartSearchBox?.Text.Trim() ?? ""; IEnumerable<PartRecord> source = _parts;
+        if (PartList is null) return;
+        string? selected = SelectedPart?.Id; var q = PartSearchBox?.Text.Trim() ?? ""; IEnumerable<PartRecord> source = _parts;
         if (!string.IsNullOrWhiteSpace(_partFilterGateId) && !string.IsNullOrWhiteSpace(_partFilterUnitId)) source = source.Where(p => p.AppliesTo(_partFilterGateId, _partFilterUnitId));
-        PartList.ItemsSource = source.Where(p => string.IsNullOrWhiteSpace(q) || Contains($"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets}", q)).OrderBy(p => p.PartNumber).ThenBy(p => p.Description).ToList();
-        PartsIntroText.Text = string.IsNullOrWhiteSpace(_partFilterGateId) ? _content.PartsIntro : "Showing parts linked to the selected gate/unit. Use the Parts navigation button to return to the full list.";
+        var items = source.Where(p => string.IsNullOrWhiteSpace(q) || Contains($"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} {p.LocationValue} {p.SiteValue}", q)).OrderBy(p => p.Description).ThenBy(p => p.LocationValue).ThenBy(p => p.PartNumber).ToList();
+        PartList.ItemsSource = items; PartList.SelectedItem = items.FirstOrDefault(p => p.Id == selected) ?? items.FirstOrDefault();
+        PartsIntroText.Text = string.IsNullOrWhiteSpace(_partFilterGateId) ? _content.PartsIntro : "Parts linked to this unit. Choose Parts in the sidebar to see all parts.";
     }
     private void PartSearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshParts();
     private void PartList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var p = SelectedPart; if (p is null) { PartTitleText.Text = "Select a part."; PartManufacturerText.Text = PartRelatedText.Text = PartNotesText.Text = ""; return; }
-        PartTitleText.Text = p.Display; PartManufacturerText.Text = string.IsNullOrWhiteSpace(p.Manufacturer) ? "" : "Manufacturer: " + p.Manufacturer;
+        var p = SelectedPart;
+        UploadPartPhotoButton.IsEnabled = p is not null && !_partPhotoSaving;
+        if (p is null)
+        {
+            PartTitleText.Text = "Select a part."; PartLocationText.Text = PartStockText.Text = PartManufacturerText.Text = PartRelatedText.Text = PartNotesText.Text = PartReportedQuantityText.Text = "";
+            _partPhotoLoad?.Cancel(); PartPhotoImage.Source = null; PartPhotoMessage.Text = "Select a part to see its photo."; PartPhotoMessage.Visibility = Visibility.Visible; EnlargePartPhotoButton.IsEnabled = false; UpdatePartQuantity(); return;
+        }
+        PartTitleText.Text = p.Description; PartLocationText.Text = p.LocationDisplay; PartStockText.Text = "Stock number: " + p.PartNumber;
+        PartManufacturerText.Text = string.IsNullOrWhiteSpace(p.Manufacturer) ? "" : "Manufacturer: " + p.Manufacturer;
         var related = new List<string>(); related.AddRange(_gates.Where(g => p.AppliesToGateIds.Contains(g.Id)).Select(g => g.Display)); related.AddRange(_systems.Where(u => p.AppliesToUnitIds.Contains(u.Id)).Select(u => $"{GateFor(u)?.Display} / {u.UnitDisplay}"));
         PartRelatedText.Text = related.Count == 0 ? (string.IsNullOrWhiteSpace(p.RelatedAssets) ? "" : "Related: " + p.RelatedAssets) : "Applies to: " + string.Join(", ", related);
-        PartNotesText.Text = p.Notes; StoreroomResultText.Text = "No lookup performed.";
+        PartNotesText.Text = p.NotesDisplay; PartReportedQuantityText.Text = "Reported quantity (snapshot): " + p.QuantityDisplay + (p.SiteValue.Length > 0 ? " • Site: " + p.SiteValue : "");
+        PartDetailScroll.ScrollToTop(); LoadPartPhoto(p); UpdatePartQuantity();
     }
     private void OpenPartDocument_Click(object sender, RoutedEventArgs e) { var p = SelectedPart; if (p is null || string.IsNullOrWhiteSpace(p.DocumentPath)) { MessageBox.Show("No document is attached to this part."); return; } var path = _data.Resolve(p.DocumentPath); if (File.Exists(path)) FileLauncherService.Open(path); else MessageBox.Show("The attached part document could not be found."); }
     private void OpenStoreroom_Click(object sender, RoutedEventArgs e) { if (string.IsNullOrWhiteSpace(_content.StoreroomUrl)) { MessageBox.Show("Storeroom URL is not configured."); return; } FileLauncherService.Open(_content.StoreroomUrl); }
-    private async void CheckStoreroom_Click(object sender, RoutedEventArgs e) { var p = SelectedPart; if (p is null) { MessageBox.Show("Select a part first."); return; } var q = string.IsNullOrWhiteSpace(p.PartNumber) ? p.Description : p.PartNumber; StoreroomResultText.Text = "Checking storeroom database..."; try { StoreroomResultText.Text = await _data.LookupStoreroomAsync(q); } catch (Exception ex) { StoreroomResultText.Text = "Could not read the storeroom page: " + ex.Message; } }
+    private async void CheckStoreroom_Click(object sender, RoutedEventArgs e) => await RefreshStockroomAsync();
 
     private sealed record SharedDataSnapshot(List<SafetyGate> Gates, List<SafetySystem> Systems,
         List<ResourceDefinition> Resources, List<string> Categories, List<HelpItem> Help,

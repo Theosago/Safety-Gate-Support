@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <Compile Include="../../SafetyGateSupport/Models/*.cs" Link="Models/%(Filename)%(Extension)" />
     <Compile Include="../../SafetyGateSupport/Services/HomePreviewService.cs" Link="Services/HomePreviewService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/GuidedTroubleshooting.cs" Link="Services/GuidedTroubleshooting.cs" />
@@ -18,6 +19,8 @@
     <Compile Include="../../SafetyGateSupport/Services/AssetStorageMigration.cs" Link="Services/AssetStorageMigration.cs" />
     <Compile Include="../../SafetyGateSupport/Services/AssignedDrawings.cs" Link="Services/AssignedDrawings.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.Areas.cs" Link="Services/DataService.Areas.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/StockroomService.cs" Link="Services/StockroomService.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/DataService.PartPhotos.cs" Link="Services/DataService.PartPhotos.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.cs" Link="Services/DataService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/SearchService.cs" Link="Services/SearchService.cs" />
     <EmbeddedResource Include="../../SafetyGateSupport/SeedData.zip" LogicalName="SafetyGateSupport.Validation.SeedData.zip" />

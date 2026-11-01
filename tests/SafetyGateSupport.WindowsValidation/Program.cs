@@ -104,6 +104,7 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
+            ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
             ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
             ("Organized shared print pairs display their PDF automatically and detect independent DWG changes", PairedDrawingPreview),
@@ -520,6 +521,43 @@ internal static class Program
         Require(HasColor(image.Source, Colors.Red), "Companion warning hid the available PDF.");
         await SelectGalleryUnit(main, fixture.RedUnit);
         await WaitUntil(() => status.Text.Contains("DWG changed, but the PDF has not") && HasColor(image.Source, Colors.Red), "Other shared unit did not show the same print and warning.");
+    }
+
+    private static async Task PartsPhotosAndStock()
+    {
+        var fixture = NewFixture();
+        var first = new PartRecord { Id = "photo-part-one", PartNumber = "0115639", Description = "A yellow module with a long identification description that must wrap inside both the list and detail pane", PhotoPath = fixture.RedUnit.PrimaryPhoto, Notes = "Bin location: TOP K-12\nReported quantity: 5.00 (snapshot)\nSite: HRM" };
+        var second = new PartRecord { Id = "photo-part-two", PartNumber = "0115640", Description = "Z green module", PhotoPath = fixture.BlueUnit.PrimaryPhoto };
+        fixture.Data.SaveParts([first, second]);
+        int requests = 0; var pending = new TaskCompletionSource<StockroomService.Snapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<StockroomService.Snapshot> Fetch(string _, CancellationToken token) { requests++; return requests == 1 ? pending.Task.WaitAsync(token) : Task.FromException<StockroomService.Snapshot>(new IOException("Test stockroom offline")); }
+        var main = Track(new MainWindow(fixture.Data, Fetch)); ShowOffscreen(main);
+        await WaitUntil(() => main.IsEnabled && requests == 1, "Startup waited for the stockroom response.");
+        Click(Control<Button>(main, "PartsNav")); main.Width = 920; main.Height = 700; main.UpdateLayout();
+        var image = Control<Image>(main, "PartPhotoImage"); var list = Control<ListBox>(main, "PartList");
+        await WaitUntil(() => HasColor(image.Source, Colors.Red), "Initial part photo did not display.");
+        Require(Control<TextBlock>(main, "PartLocationText").Text == "TOP K-12" && Control<TextBlock>(main, "PartReportedQuantityText").Text.Contains("snapshot): 5") && !Control<TextBlock>(main, "PartReportedQuantityText").Text.Contains("5.00"), "Legacy bin/quantity details were not shown as whole-number stock counts.");
+        var detail = Control<ScrollViewer>(main, "PartDetailScroll");
+        var title = Control<TextBlock>(main, "PartTitleText"); var location = Control<TextBlock>(main, "PartLocationText"); var stock = Control<TextBlock>(main, "PartStockText");
+        Require(title.TextWrapping == TextWrapping.Wrap && title.ActualHeight > title.FontSize * 1.5 && title.ActualWidth <= detail.ViewportWidth, "Long part descriptions are clipped at a narrow window size.");
+        Require(title.TranslatePoint(new Point(), detail).Y < location.TranslatePoint(new Point(), detail).Y && location.TranslatePoint(new Point(), detail).Y < stock.TranslatePoint(new Point(), detail).Y, "Stock number appears before description/location.");
+        Require(main.ResizeMode == ResizeMode.CanResize && Descendants<GridSplitter>(main).Any(g => g.IsVisible), "Part panes cannot be resized.");
+        pending.SetResult(StockroomService.Parse("<table><tr><th>Stock number</th><th>Quantity on hand</th><th>Site</th></tr><tr><td>0115639</td><td>7.00</td><td>HRM</td></tr></table>"));
+        await WaitUntil(() => Control<TextBlock>(main, "PartCurrentQuantityText").Text == "Current quantity: 7", "Startup stock result did not update the selected part.");
+        Require(requests == 1, "Startup made one request per part.");
+        list.SelectedItem = list.Items.Cast<PartRecord>().Single(p => p.Id == second.Id); list.SelectedItem = list.Items.Cast<PartRecord>().Single(p => p.Id == first.Id);
+        await WaitUntil(() => HasColor(image.Source, Colors.Red), "Rapid part selection retained a previous photo.");
+        string upload = Path.Combine(NewDirectory(), "reference photo.png"); WriteImage(upload, 500, 900, Colors.Green); byte[] source = File.ReadAllBytes(upload);
+        var save = (Task)typeof(MainWindow).GetMethod("SavePartPhotoAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(main, [list.SelectedItem, upload])!;
+        await save;
+        await WaitUntil(() => HasColor(image.Source, Colors.Green), "Uploaded photo did not replace the selected preview.");
+        var saved = fixture.Data.LoadParts().Single(p => p.Id == first.Id);
+        Require(saved.PhotoPath.StartsWith("Library/Parts/Photos/") && source.SequenceEqual(File.ReadAllBytes(fixture.Data.Resolve(saved.PhotoPath))) && source.SequenceEqual(File.ReadAllBytes(upload)), "Shared photo storage changed the original or failed to persist.");
+        Require(((BitmapSource)image.Source).PixelHeight > ((BitmapSource)image.Source).PixelWidth && image.Stretch == Stretch.Uniform, "A portrait part photo was cropped or distorted.");
+        Click(Control<Button>(main, "RefreshStockroomButton"));
+        await WaitUntil(() => requests == 2 && Control<Button>(main, "RefreshStockroomButton").IsEnabled, "Offline refresh did not finish.");
+        Require(Control<TextBlock>(main, "PartCurrentQuantityText").Text == "Current quantity unavailable" && Control<TextBlock>(main, "PartReportedQuantityText").Text.Contains("snapshot): 5"), "Offline stock check showed a stale quantity as current or discarded the snapshot.");
+        Require(fixture.Data.LoadParts().Single(p => p.Id == first.Id).QuantityDisplay == "5", "Live inventory overwrote the stored stock snapshot.");
     }
 
     private static async Task DirectDeviceActions()

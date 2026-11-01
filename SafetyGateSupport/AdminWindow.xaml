@@ -174,11 +174,14 @@
     <Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
       <WrapPanel><Button Content="+ Part" Click="NewPart_Click"/><Button Content="Delete" Click="DeletePart_Click"/></WrapPanel>
-      <ListBox x:Name="AdminPartList" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="Display" SelectionChanged="AdminPartList_SelectionChanged"/>
+      <ListBox x:Name="AdminPartList" Grid.Row="1" Margin="0,8,0,0" SelectionChanged="AdminPartList_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.ItemContainerStyle><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox>
      </Grid>
      <ScrollViewer Grid.Column="2"><StackPanel>
-      <TextBlock Text="Part Number"/><TextBox x:Name="PartNumberBox" Height="34"/>
-      <TextBlock Text="Description" Margin="0,7,0,3"/><TextBox x:Name="PartDescriptionBox" Height="34"/>
+      <TextBlock Text="Description"/><TextBox x:Name="PartDescriptionBox" MinHeight="60" AcceptsReturn="True" TextWrapping="Wrap"/>
+      <TextBlock Text="Bin location" Margin="0,7,0,3"/><TextBox x:Name="PartBinBox" Height="34"/>
+      <TextBlock Text="Stock number" Margin="0,7,0,3"/><TextBox x:Name="PartNumberBox" Height="34"/>
+      <TextBlock Text="Reported quantity (snapshot)" Margin="0,7,0,3"/><TextBox x:Name="PartQuantityBox" Height="34"/>
+      <TextBlock Text="Site" Margin="0,7,0,3"/><TextBox x:Name="PartSiteBox" Height="34"/>
       <TextBlock Text="Manufacturer" Margin="0,7,0,3"/><TextBox x:Name="PartManufacturerBox" Height="34"/>
       <TextBlock Text="Keywords" Margin="0,7,0,3"/><TextBox x:Name="PartKeywordsBox" Height="34"/>
       <TextBlock Text="Legacy / freeform related assets" Margin="0,7,0,3"/><TextBox x:Name="PartAssetsBox" Height="34"/>

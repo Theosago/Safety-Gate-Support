@@ -9,11 +9,12 @@
     <RootNamespace>SafetyGateSupport</RootNamespace>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
-    <Version>8.0.1</Version>
-    <AssemblyVersion>8.0.1.0</AssemblyVersion>
-    <FileVersion>8.0.1.0</FileVersion>
+    <Version>8.1.0</Version>
+    <AssemblyVersion>8.1.0.0</AssemblyVersion>
+    <FileVersion>8.1.0.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <EmbeddedResource Include="SeedData.zip" />
     <Content Include="../docs/third-party/**/*" Link="ThirdPartyNotices/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <ProjectReference Include="../SafetyGateSupport.Hokuyo/SafetyGateSupport.Hokuyo.csproj" />
