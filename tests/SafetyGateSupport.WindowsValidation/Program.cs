@@ -249,7 +249,7 @@ internal static class Program
         var fixture = NewFixture();
         var categoryCount = fixture.Data.LoadCategories().Count;
         var watch = Stopwatch.StartNew();
-        var window = Track(new MainWindow(fixture.Data));
+        var window = Track(NewMainWindow(fixture.Data));
         Equal(0, Control<Panel>(window, "HomeCategoryPanel").Children.Count, "Constructor must not synchronously load shared inventory");
         var rendered = false;
         window.ContentRendered += (_, _) => rendered = true;
@@ -348,7 +348,7 @@ internal static class Program
     private static async Task V7HomeTasks()
     {
         var fixture = NewFixture();
-        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main);
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main);
         await WaitUntil(() => main.IsEnabled, "Unit-first home did not finish loading.");
         Equal(Visibility.Visible, Control<ScrollViewer>(main, "HomeView").Visibility, "Home must open directly to unit selection");
         Require(Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "The opening screen has no units.");
@@ -465,7 +465,7 @@ internal static class Program
         var resource = new ResourceDefinition { Id = "orientation", GateId = fixture.Gate.Id, Label = "Electrical Drawings", RelativeFolder = "orientation", AppliesToUnitIds = [fixture.BlueUnit.Id] };
         fixture.Data.SaveResources([resource]); fixture.Data.EnsureResourceFolders(resource, fixture.Gate);
         string path = Path.Combine(fixture.Data.ResourceCurrentFolder(resource, fixture.Gate), "drawing.pdf"); byte[] original = TestDrawingPdf(); File.WriteAllBytes(path, original);
-        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
         var image = Control<Image>(main, "DrawingImage");
         await WaitUntil(() => HasColor(image.Source, Colors.Red), "Landscape page was not displayed.");
         Require(((BitmapSource)image.Source).PixelWidth > ((BitmapSource)image.Source).PixelHeight, "Landscape page was rotated to portrait.");
@@ -485,7 +485,7 @@ internal static class Program
     {
         var fixture = NewFixture(); var units = fixture.Data.LoadSystems();
         var own = units.Single(u => u.Id == fixture.BlueUnit.Id); own.ShowLightConfiguration = false; own.ShowScannerConfiguration = false; fixture.Data.SaveSystems(units);
-        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
         Require(Control<Button>(main, "ScannerButton").Visibility == Visibility.Collapsed && Control<Button>(main, "LightColumnButton").Visibility == Visibility.Collapsed, "Absent equipment actions were left visible.");
         Require(Control<Button>(main, "PartManualsButton").Content.Equals("Part Manuals") && Control<Button>(main, "UnitPartsButton").Content.Equals("Parts"), "Canonical unit actions are missing.");
         Require(Control<Panel>(main, "SystemResourcePanel").Visibility == Visibility.Collapsed, "Duplicate legacy resource buttons remain on the unit page.");
@@ -520,7 +520,7 @@ internal static class Program
         Require(listing.Files[1].Path.EndsWith("bbb-image.png") && listing.Files[2].Path.EndsWith("aaa-cad.dwg"), "A CAD file hid an available inline drawing.");
         Require(listing.Files[0].Path.EndsWith("inline-own.pdf"), "Drawing lookup chose the wrong assignment.");
         fixture.Data.SaveSystemNotes(fixture.BlueUnit, "Visible drawing test note");
-        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load.");
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load.");
         await SelectGalleryUnit(main, fixture.BlueUnit);
         var image = Control<Image>(main, "DrawingImage");
         await WaitUntil(() => HasColor(image.Source, Colors.Red), "Drawing did not display automatically after selecting the unit.");
@@ -564,7 +564,7 @@ internal static class Program
             Require(refused && File.ReadAllBytes(upload.PdfPath).SequenceEqual(TestDrawingPdf()) && File.ReadAllText(fixture.Data.ResourcesFile) == beforeRecords, "A locked DWG left a partial drawing revision published.");
         }
         Require(fixture.Data.GetResourceFiles(resource.ForUnit(fixture.RedUnit.Id), gate).Contains(upload.PdfPath), "Paired update lost the other shared unit.");
-        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load after storage organization.");
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load after storage organization.");
         await SelectGalleryUnit(main, fixture.BlueUnit);
         var image = Control<Image>(main, "DrawingImage"); var status = Control<TextBlock>(main, "DrawingPairStatusText");
         await WaitUntil(() => HasColor(image.Source, Colors.Red) && status.Text.Contains("uploaded together"), "Uploaded PDF did not display with its companion status.");
@@ -627,7 +627,7 @@ internal static class Program
         var first = PlcWindow.FilesFor(saved); var second = PlcWindow.FilesFor(new SafetyGate { Id = saved.Id, AssetNumber = "renamed" });
         Equal(first.RelativeFolder, second.RelativeFolder, "Renaming an asset moved its PLC files");
         Require(first.AppliesTo(fixture.BlueUnit.Id) && first.AppliesTo(fixture.RedUnit.Id), "Asset PLC files were restricted to one unit.");
-        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main window did not load.");
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main window did not load.");
         await SelectGalleryUnit(main, fixture.BlueUnit); main.UpdateLayout();
         Control<Expander>(main, "UnitDetailsExpander").IsExpanded = true; main.UpdateLayout();
         foreach (string action in new[] { "ScannerButton", "PlcButton" })
@@ -662,7 +662,7 @@ internal static class Program
     private static async Task GalleryFilteringAndPhotos()
     {
         var fixture = NewFixture();
-        var main = Track(new MainWindow(fixture.Data)); ShowOffscreen(main);
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main);
         await WaitUntil(() => main.IsEnabled && Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "Gallery did not populate.");
         var gallery = Control<ItemsControl>(main, "UnitGallery");
         Require(gallery.Items.Count <= 12, "Gallery decoded unbounded inventory at once.");
@@ -1050,7 +1050,7 @@ internal static class Program
     private static async Task MainWindowPhotoSelection()
     {
         var fixture = NewFixture();
-        var window = Track(new MainWindow(fixture.Data));
+        var window = Track(NewMainWindow(fixture.Data));
         ShowOffscreen(window);
         await WaitUntil(() => Control<Panel>(window, "HomeCategoryPanel").Children.Count > 0 && window.IsEnabled, "Main window inventory did not load.");
         await SelectGalleryUnit(window, fixture.BlueUnit);
@@ -1091,7 +1091,7 @@ internal static class Program
         catch (ArgumentException) { invalidPathObserved = true; }
         Require(invalidPathObserved, "The malformed managed-resource path did not trigger the intended enumeration failure.");
 
-        var window = Track(new MainWindow(fixture.Data));
+        var window = Track(NewMainWindow(fixture.Data));
         var readyField = typeof(MainWindow).GetField("_searchIndexReady", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("MainWindow search readiness field was not found.");
         ShowOffscreen(window);
@@ -1215,6 +1215,10 @@ internal static class Program
         Require(!Control<Button>(window, "BackButton").IsEnabled, "Restart should clear navigation history.");
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
     }
+
+    // Never contact the private plant network from CI; the parts integration check
+    // separately injects delayed, successful and failing inventory responses.
+    private static MainWindow NewMainWindow(DataService data) => new(data, (_, token) => Task.FromResult(new StockroomService.Snapshot([], DateTimeOffset.UtcNow)));
 
     private static Fixture NewFixture()
     {

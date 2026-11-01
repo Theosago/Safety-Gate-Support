@@ -69,6 +69,7 @@ internal static class Program
             checks.AddRange(AssetStorageChecks.Cases);
             checks.AddRange(AreaChecks.Cases);
             checks.AddRange(PartsPageChecks.Cases);
+            checks.Add(("Supplied parts import upgrades existing catalogs without duplicates or lost site edits", PartsCatalogChecks.Check));
             // Home preview checks are opt-in; normal builds do not create a preview profile.
             if (args.Contains("--include-home-preview")) checks.AddRange(HomePreviewChecks.Cases);
             checks.Add(("Current-file snapshots retain shared-unit links and refresh files", CurrentFileSnapshots));

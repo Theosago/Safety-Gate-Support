@@ -1,0 +1,146 @@
+[
+  {
+    "id": "site-safe2cross-0115639",
+    "partNumber": "0115639",
+    "description": "TL70 yellow light module, 12–30 VDC — SG-TL70-Y",
+    "manufacturer": "Banner",
+    "keywords": "Safe2Cross safety gate SG-TL70-Y TOP K-12",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: SG-TL70-Y\nBin location: TOP K-12\nReported quantity: 5.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0115638",
+    "partNumber": "0115638",
+    "description": "TL70 red light module, 12–30 VDC — SG-TL70-R",
+    "manufacturer": "Banner",
+    "keywords": "Safe2Cross safety gate SG-TL70-R TOP K-12",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: SG-TL70-R\nBin location: TOP K-12\nReported quantity: 4.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0115641",
+    "partNumber": "0115641",
+    "description": "TL70 black audible alarm module, 12–30 VDC — SG-TL70-A",
+    "manufacturer": "Banner",
+    "keywords": "Safe2Cross safety gate SG-TL70-A TOP K-12",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: SG-TL70-A\nBin location: TOP K-12\nReported quantity: 4.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0115640",
+    "partNumber": "0115640",
+    "description": "TL70 green light module, 12–30 VDC — SG-TL70-G",
+    "manufacturer": "Banner",
+    "keywords": "Safe2Cross safety gate SG-TL70-G TOP K-12",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: SG-TL70-G\nBin location: TOP K-12\nReported quantity: 3.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0115642",
+    "partNumber": "0115642",
+    "description": "TL70 black light-stack base module, 12–30 VDC — B-TL70-8",
+    "manufacturer": "Banner",
+    "keywords": "Safe2Cross safety gate B-TL70-8 TOP K-12",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: B-TL70-8\nBin location: TOP K-12\nReported quantity: 3.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117369",
+    "partNumber": "0117369",
+    "description": "Proximity switch, 24 V, 12 mm — AMI-AP-4A",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate AMI-AP-4A TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: AMI-AP-4A\nBin location: TOP T-05\nReported quantity: 2.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117488",
+    "partNumber": "0117488",
+    "description": "Hydraulic gate closer — CRL7072",
+    "manufacturer": "CRL",
+    "keywords": "Safe2Cross safety gate CRL7072 TOP T-04",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: CRL7072\nBin location: TOP T-04\nReported quantity: 2.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117489",
+    "partNumber": "0117489",
+    "description": "Linear arm actuator — 361610-03",
+    "manufacturer": "Linak",
+    "keywords": "Safe2Cross safety gate 361610-03 TOP T-04",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: 361610-03\nBin location: TOP T-04\nReported quantity: 2.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117490",
+    "partNumber": "0117490",
+    "description": "Linear arm actuator — 361609-02",
+    "manufacturer": "Linak",
+    "keywords": "Safe2Cross safety gate 361609-02 TOP T-04",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: 361609-02\nBin location: TOP T-04\nReported quantity: 2.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0116820",
+    "partNumber": "0116820",
+    "description": "Electronically configurable signal column, M12 8-pin — 8WD46135JH37",
+    "manufacturer": "Siemens",
+    "keywords": "Safe2Cross safety gate 8WD46135JH37 TOP U-05 8WD4613-5JH37",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: 8WD46135JH37\nBin location: TOP U-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM\nSupplied reference: Safe2Cross gates, 903 Scrapfeed."
+  },
+  {
+    "id": "site-safe2cross-0117711",
+    "partNumber": "0117711",
+    "description": "Logic push switch — S2C-LOGIC SWITCH",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate S2C-LOGIC SWITCH TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: S2C-LOGIC SWITCH\nBin location: TOP T-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117712",
+    "partNumber": "0117712",
+    "description": "USB programming interface cable with converter — USB2LIN06",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate USB2LIN06 TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: USB2LIN06\nBin location: TOP T-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117713",
+    "partNumber": "0117713",
+    "description": "Electromagnetic interlock — E-942FC-1300",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate E-942FC-1300 TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: E-942FC-1300\nBin location: TOP T-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117714",
+    "partNumber": "0117714",
+    "description": "Anvil mount assembly — ANVIL MOUNT ASSEMBLY",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate ANVIL MOUNT ASSEMBLY TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: ANVIL MOUNT ASSEMBLY\nBin location: TOP T-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117715",
+    "partNumber": "0117715",
+    "description": "5-degree pivot plate — 22-MAG-1003",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate 22-MAG-1003 TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: 22-MAG-1003\nBin location: TOP T-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117716",
+    "partNumber": "0117716",
+    "description": "Interlock mount — 20-MAG-0009",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate 20-MAG-0009 TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: 20-MAG-0009\nBin location: TOP T-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: Not supplied"
+  }
+]

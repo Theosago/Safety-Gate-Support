@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <EmbeddedResource Include="SeedData.zip" />
+    <EmbeddedResource Include="Catalog/Safe2CrossParts.json" />
     <Content Include="../docs/third-party/**/*" Link="ThirdPartyNotices/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <ProjectReference Include="../SafetyGateSupport.Hokuyo/SafetyGateSupport.Hokuyo.csproj" />
     <ProjectReference Include="../SafetyGateSupport.Siemens.Desktop/SafetyGateSupport.Siemens.Desktop.csproj" />

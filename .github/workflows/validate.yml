@@ -84,6 +84,8 @@ jobs:
           $smokeRoot = Join-Path $env:RUNNER_TEMP ('SafetyGateSupport-Smoke-' + [guid]::NewGuid().ToString('N'))
           $sharedRoot = Join-Path $smokeRoot 'Shared'
           Expand-Archive -LiteralPath SafetyGateSupport/SeedData.zip -DestinationPath $sharedRoot
+          # Never contact the private plant service from this isolated packaged-app test.
+          @{ StoreroomUrl = 'http://127.0.0.1:1/isolated-stockroom' } | ConvertTo-Json | Set-Content (Join-Path $sharedRoot 'Data/shared-content.json') -Encoding utf8
           $settingsPath = Join-Path $env:LOCALAPPDATA 'SafetyGateSupport/settings.json'
           New-Item -ItemType Directory -Path (Split-Path $settingsPath) -Force | Out-Null
           $previousSettings = if (Test-Path $settingsPath) { [IO.File]::ReadAllBytes($settingsPath) } else { $null }
