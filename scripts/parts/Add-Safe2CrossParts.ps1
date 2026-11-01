@@ -25,7 +25,7 @@ try {
     $before = [IO.File]::ReadAllBytes($partsFile)
     $text = [Text.Encoding]::UTF8.GetString($before).TrimStart([char]0xFEFF)
     if (-not $text.TrimStart().StartsWith('[')) { throw 'parts.json is not a JSON list. It has not been overwritten.' }
-    $existing = @($text | ConvertFrom-Json)
+    $existing = ConvertFrom-Json -InputObject $text
     $catalog = @'
 [
   {
@@ -188,8 +188,10 @@ try {
     $backup = Join-Path $backups ('parts_before_storeroom_' + (Get-Date -Format 'yyyyMMdd_HHmmssfff') + '_' + [Guid]::NewGuid().ToString('N').Substring(0,6) + '.json')
     [IO.File]::WriteAllBytes($backup, $before)
     $temp = $partsFile + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-    $merged = @($existing) + @($added)
-    $json = ConvertTo-Json -InputObject $merged -Depth 100
+    $merged = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($part in $existing) { [void]$merged.Add($part) }
+    foreach ($part in $added) { [void]$merged.Add($part) }
+    $json = ConvertTo-Json -InputObject $merged.ToArray() -Depth 100
     [IO.File]::WriteAllText($temp, $json, (New-Object Text.UTF8Encoding($false)))
     # Check an older app has not changed the catalog since we read it.
     $sha = [Security.Cryptography.SHA256]::Create()

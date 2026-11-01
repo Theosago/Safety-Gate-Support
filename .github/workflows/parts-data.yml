@@ -39,7 +39,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Initial update from the saved shared-folder setting failed' }
           } finally { $env:LOCALAPPDATA = $savedLocalData }
           $data = @(Get-Content -Raw $parts | ConvertFrom-Json)
-          if ($data.Count -ne 16 -or @($data | Where-Object partNumber -eq '0115639').Count -ne 1) { throw 'Expected 16 stock numbers, retaining leading zeros' }
+          if ($data.Count -ne 16 -or @($data | Where-Object partNumber -eq '0115639').Count -ne 1) { throw ("Expected 16 stock numbers, retaining leading zeros; found " + $data.Count) }
           $custom = '[{"id":"edited","partNumber":"115639","description":"Site edited","customField":"Retain me"},{"id":"other","partNumber":"OTHER","notes":"Keep existing notes"}]'
           [IO.File]::WriteAllText($parts, $custom)
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root 2>&1 | Tee-Object -FilePath (Join-Path $root 'updater-output.txt')
