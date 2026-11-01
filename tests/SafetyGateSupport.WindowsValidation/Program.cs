@@ -1039,6 +1039,7 @@ internal static class Program
     {
         var fixture = NewFixture();
         var window = Track(new AdminWindow(fixture.Data)); ShowOffscreen(window);
+        await WaitUntil(() => window.IsEnabled, "Setup did not finish loading.");
         var tabs = Descendants<TabControl>(window).First();
         tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(tab => Equals(tab.Header, "Areas"));
         var areas = Control<ListBox>(window, "AreaList"); var name = Control<TextBox>(window, "AreaNameBox");
@@ -1051,13 +1052,17 @@ internal static class Program
         Require(fixture.Data.LoadSystems().Single(u => u.Id == fixture.BlueUnit.Id).Category == renamed, "Unit retained its old area.");
         string categoriesBefore = File.ReadAllText(fixture.Data.CategoriesFile), gatesBefore = File.ReadAllText(fixture.Data.GatesFile), unitsBefore = File.ReadAllText(fixture.Data.SystemsFile);
         areas.SelectedItem = renamed; name.Text = renamed + " blocked";
-        using (var held = new FileStream(fixture.Data.GatesFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+        using (var held = new FileStream(fixture.Data.GatesFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         {
             Click(Control<Button>(window, "RenameAreaButton"));
             await WaitUntil(() => window.IsEnabled, "Setup did not recover from a locked shared record.");
             await DispatcherSettled();
+            Require(Control<TextBlock>(window, "AdminStatusText").Text.StartsWith("Area change failed:"), "Locked record did not produce an actionable error in Setup.");
             Require(File.ReadAllText(fixture.Data.CategoriesFile) == categoriesBefore && File.ReadAllText(fixture.Data.GatesFile) == gatesBefore && File.ReadAllText(fixture.Data.SystemsFile) == unitsBefore, "Failed rename left a partially renamed area.");
         }
+        name.Text = renamed + " retry"; Click(Control<Button>(window, "RenameAreaButton"));
+        await WaitUntil(() => window.IsEnabled && fixture.Data.LoadCategories().Contains(renamed + " retry"), "Retry after releasing the shared record did not work.");
+        Require(!fixture.Data.LoadCategories().Contains(renamed), "Retry left the previous area active.");
     }
 
     private static async Task AdminPhotoSelection()
@@ -1065,6 +1070,7 @@ internal static class Program
         var fixture = NewFixture();
         var window = Track(new AdminWindow(fixture.Data));
         ShowOffscreen(window);
+        await WaitUntil(() => window.IsEnabled, "Setup did not finish loading.");
         Control<ComboBox>(window, "GateAreaFilterBox").SelectedItem = fixture.Gate.Category;
         var gates = Control<ListBox>(window, "GateList");
         gates.SelectedItem = gates.Items.Cast<SafetyGate>().Single(gate => gate.Id == fixture.Gate.Id);

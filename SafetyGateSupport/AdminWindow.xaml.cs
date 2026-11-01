@@ -36,6 +36,8 @@ public partial class AdminWindow : Window
     private bool _pendingPhotoIsTemporary;
     private CancellationTokenSource? _photoPreviewCancellation;
     private bool _isClosed;
+    private bool _areaSaveBusy;
+    private bool _loadingSetup;
     private string _pendingPartDocumentSource = "";
     private string _pendingManualSource = "";
 
@@ -48,23 +50,50 @@ public partial class AdminWindow : Window
         ResourceLaunchBox.ItemsSource = new[] { "None", "Siemens", "UAM" };
         ResourceKindBox.SelectedIndex = 0; ResourceArchiveBox.SelectedIndex = 0; ResourceLaunchBox.SelectedIndex = 0;
         SharedRootBox.Text = _data.SharedRoot; SiemensBox.Text = _data.Settings.SiemensExePath; UamBox.Text = _data.Settings.UamExePath;
-        ReloadAll();
+        IsEnabled = false; SetupTabs.IsEnabled = false; AdminStatusText.Text = "Loading shared setup data…";
+        Loaded += async (_, _) => await LoadInitialSetupAsync();
     }
 
     private void ReloadAll()
     {
+        ApplySetupSnapshot(ReadSetupSnapshot());
+    }
+    private sealed record SetupSnapshot(List<SafetyGate> Gates, List<SafetySystem> Units, List<ResourceDefinition> Resources, List<string> Areas,
+        List<HelpItem> Help, List<PartRecord> Parts, List<ManualRecord> Manuals, List<TroubleshootingFlow> Flows, SharedContent Content, List<AuditEntry> Audit);
+    private SetupSnapshot ReadSetupSnapshot()
+    {
         var ready = _data.IsReady;
         if (ready) _data.EnsureSharedDefaults();
-        _gates = ready ? _data.LoadGates() : new();
-        _units = ready ? _data.LoadSystems(_gates) : new();
-        _resources = ready ? _data.LoadResources() : new();
-        _areas = ready ? _data.LoadCategories() : new();
-        _help = ready ? _data.LoadHelpItems() : new();
-        _parts = ready ? _data.LoadParts() : new();
-        _manuals = ready ? _data.LoadManualRecords() : new();
-        _flows = ready ? _data.LoadTroubleshootingFlows() : new();
-        var content = ready ? _data.LoadSharedContent() : new SharedContent();
+        var gates = ready ? _data.LoadGates() : new();
+        return new(gates, ready ? _data.LoadSystems(gates) : new(), ready ? _data.LoadResources() : new(), ready ? _data.LoadCategories() : new(),
+            ready ? _data.LoadHelpItems() : new(), ready ? _data.LoadParts() : new(), ready ? _data.LoadManualRecords() : new(),
+            ready ? _data.LoadTroubleshootingFlows() : new(), ready ? _data.LoadSharedContent() : new(), ready ? _data.LoadRecentAudit(300) : new());
+    }
+    private async Task LoadInitialSetupAsync()
+    {
+        if (_loadingSetup || _isClosed) return;
+        _loadingSetup = true;
+        try { var snapshot = await Task.Run(ReadSetupSnapshot); if (!_isClosed) { ApplySetupSnapshot(snapshot); SetupTabs.IsEnabled = true; AdminStatusText.Text = "Setup ready."; } }
+        catch (Exception error) { if (!_isClosed) { SetupTabs.IsEnabled = false; AdminStatusText.Text = "Unable to load Setup. Close and reopen Setup after checking shared-drive access. " + error.Message; } }
+        finally { _loadingSetup = false; if (!_isClosed) IsEnabled = true; }
+    }
+    private void ApplySetupSnapshot(SetupSnapshot snapshot)
+    {
+        _gates = snapshot.Gates; _units = snapshot.Units; _resources = snapshot.Resources; _areas = snapshot.Areas;
+        _help = snapshot.Help; _parts = snapshot.Parts; _manuals = snapshot.Manuals; _flows = snapshot.Flows;
+        var content = snapshot.Content;
+        BindInventoryLists();
+        HelpList.ItemsSource = _help.OrderBy(h => h.Section).ThenBy(h => h.SortOrder).ThenBy(h => h.Title).ToList();
+        AdminPartList.ItemsSource = _parts.OrderBy(p => p.PartNumber).ThenBy(p => p.Description).ToList();
+        ManualListAdmin.ItemsSource = _manuals.OrderBy(m => m.Title).ToList();
+        FlowListAdmin.ItemsSource = _flows.OrderBy(f => f.Title).ToList();
+        HomeSubtitleBox.Text = content.HomeSubtitle; ManualsIntroBox.Text = content.ManualsIntro; PartsIntroBox.Text = content.PartsIntro; StoreroomUrlBox.Text = content.StoreroomUrl;
+        if (_areas.Count > 0 && GateAreaFilterBox.SelectedItem is null) GateAreaFilterBox.SelectedIndex = 0;
+        RefreshGateList(); RefreshResourceList(); AuditList.ItemsSource = snapshot.Audit;
+    }
 
+    private void BindInventoryLists()
+    {
         GateAreaFilterBox.ItemsSource = _areas; GateAreaBox.ItemsSource = _areas; AreaList.ItemsSource = _areas;
         ResourceGateBox.ItemsSource = _gates.OrderBy(g => g.Category).ThenBy(g => SortNum(g.AssetNumber)).ToList();
         ManualGateAssignments.ItemsSource = _gates.OrderBy(g => g.Category).ThenBy(g => SortNum(g.AssetNumber)).ToList();
@@ -72,13 +101,6 @@ public partial class AdminWindow : Window
         PartGateAssignments.ItemsSource = _gates.OrderBy(g => g.Category).ThenBy(g => SortNum(g.AssetNumber)).ToList();
         PartUnitAssignments.ItemsSource = _units.OrderBy(u => u.Category).ThenBy(u => SortNum(u.AssetNumber)).ThenBy(u => SortNum(u.UnitNumber)).ToList();
         FlowGateBox.ItemsSource = new[] { new GateChoice { Id = "", Display = "All gates" } }.Concat(_gates.OrderBy(g => g.Category).ThenBy(g => SortNum(g.AssetNumber)).Select(g => new GateChoice { Id = g.Id, Display = g.Display })).ToList();
-        HelpList.ItemsSource = _help.OrderBy(h => h.Section).ThenBy(h => h.SortOrder).ThenBy(h => h.Title).ToList();
-        AdminPartList.ItemsSource = _parts.OrderBy(p => p.PartNumber).ThenBy(p => p.Description).ToList();
-        ManualListAdmin.ItemsSource = _manuals.OrderBy(m => m.Title).ToList();
-        FlowListAdmin.ItemsSource = _flows.OrderBy(f => f.Title).ToList();
-        HomeSubtitleBox.Text = content.HomeSubtitle; ManualsIntroBox.Text = content.ManualsIntro; PartsIntroBox.Text = content.PartsIntro; StoreroomUrlBox.Text = content.StoreroomUrl;
-        if (_areas.Count > 0 && GateAreaFilterBox.SelectedItem is null) GateAreaFilterBox.SelectedIndex = 0;
-        RefreshGateList(); RefreshResourceList(); RefreshAuditView();
     }
 
     private static int SortNum(string? s) => int.TryParse(s, out var n) ? n : int.MaxValue;
@@ -512,9 +534,50 @@ public partial class AdminWindow : Window
     // Shared content / areas / software
     private void SaveSharedContent_Click(object sender, RoutedEventArgs e) { if (!_data.IsReady) { MessageBox.Show("Initialize shared data first."); return; } var content = new SharedContent { HomeSubtitle = HomeSubtitleBox.Text.Trim(), ManualsIntro = ManualsIntroBox.Text.Trim(), PartsIntro = PartsIntroBox.Text.Trim(), StoreroomUrl = StoreroomUrlBox.Text.Trim() }; _data.SaveSharedContent(content); _data.LogAudit("Shared content saved", details: "Home/help text or storeroom URL updated"); AdminStatusText.Text = "Shared content settings saved."; }
     private void AreaList_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (AreaList.SelectedItem is string a) AreaNameBox.Text = a; }
-    private void AddArea_Click(object sender, RoutedEventArgs e) { var n = AreaNameBox.Text.Trim(); if (string.IsNullOrWhiteSpace(n) || _areas.Any(a => a.Equals(n, StringComparison.OrdinalIgnoreCase))) return; _areas.Add(n); _data.SaveCategories(_areas); ReloadAll(); }
-    private void RenameArea_Click(object sender, RoutedEventArgs e) { if (AreaList.SelectedItem is not string old) return; var n = AreaNameBox.Text.Trim(); if (string.IsNullOrWhiteSpace(n) || old == n) return; if (_areas.Any(a => !a.Equals(old, StringComparison.OrdinalIgnoreCase) && a.Equals(n, StringComparison.OrdinalIgnoreCase))) { MessageBox.Show("That area already exists."); return; } var i = _areas.IndexOf(old); _areas[i] = n; foreach (var g in _gates.Where(g => g.Category.Equals(old, StringComparison.OrdinalIgnoreCase))) g.Category = n; _data.SaveCategories(_areas); _data.SaveGates(_gates); _data.LogAudit("Area renamed", details: $"{old} -> {n}"); ReloadAll(); }
-    private void DeleteArea_Click(object sender, RoutedEventArgs e) { if (AreaList.SelectedItem is not string a) return; if (_gates.Any(g => g.Category.Equals(a, StringComparison.OrdinalIgnoreCase))) { MessageBox.Show("Move the gates out of this area before deleting it."); return; } if (MessageBox.Show($"Delete area '{a}'?", "Delete", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return; _areas.Remove(a); _data.SaveCategories(_areas); ReloadAll(); }
+    private async void AddArea_Click(object sender, RoutedEventArgs e) => await ChangeAreaAsync(null, AreaNameBox.Text.Trim());
+    private async void RenameArea_Click(object sender, RoutedEventArgs e)
+    {
+        if (AreaList.SelectedItem is not string old || old == AreaNameBox.Text.Trim()) return;
+        await ChangeAreaAsync(old, AreaNameBox.Text.Trim());
+    }
+    private async void DeleteArea_Click(object sender, RoutedEventArgs e)
+    {
+        if (AreaList.SelectedItem is not string area) return;
+        if (_gates.Any(g => g.Category.Equals(area, StringComparison.OrdinalIgnoreCase))) { AdminStatusText.Text = "Move the gates out of this area before deleting it."; return; }
+        if (MessageBox.Show(this, $"Delete area '{area}'?", "Delete", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes) await ChangeAreaAsync(area, null);
+    }
+    private async Task ChangeAreaAsync(string? oldName, string? newName)
+    {
+        if (_areaSaveBusy) return;
+        if (newName is not null && newName.Length == 0) { AdminStatusText.Text = "Enter an area name."; return; }
+        string? filter = GateAreaFilterBox.SelectedItem as string, gateId = _selectedGate?.Id, unitId = _selectedUnit?.Id;
+        _areaSaveBusy = true; IsEnabled = false; AdminStatusText.Text = "Saving area change…";
+        try
+        {
+            var saved = await Task.Run(() => _data.ChangeArea(oldName, newName));
+            if (_isClosed) return;
+            _areas = saved.Areas; _gates = saved.Gates; _units = saved.Units;
+            BindInventoryLists();
+            GateAreaFilterBox.SelectedItem = string.Equals(filter, oldName, StringComparison.OrdinalIgnoreCase) ? newName : filter;
+            if (GateAreaFilterBox.SelectedItem is null && _areas.Count > 0) GateAreaFilterBox.SelectedIndex = 0;
+            RefreshGateList(); RefreshResourceList();
+            if (gateId is not null && _gates.Any(g => g.Id == gateId))
+            {
+                SelectGateById(gateId);
+                if (unitId is not null) UnitListAdmin.SelectedItem = _units.FirstOrDefault(u => u.Id == unitId);
+            }
+            AreaList.SelectedItem = newName; AreaNameBox.Text = newName ?? "";
+            AdminStatusText.Text = oldName is null ? "Area added." : newName is null ? "Area deleted." : "Area renamed. Gate and unit assignments retained.";
+        }
+        catch (Exception error) { if (!_isClosed) AdminStatusText.Text = "Area change failed: " + error.Message; }
+        finally { _areaSaveBusy = false; if (!_isClosed) IsEnabled = true; }
+    }
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (_areaSaveBusy) { e.Cancel = true; AdminStatusText.Text = "Wait for the area save to finish before closing Setup."; }
+        base.OnClosing(e);
+    }
+
     private void ChooseSharedRoot_Click(object sender, RoutedEventArgs e) { var d = new OpenFolderDialog { Title = "Select the shared Safety Gate Support folder", Multiselect = false }; if (Directory.Exists(SharedRootBox.Text)) d.InitialDirectory = SharedRootBox.Text; if (d.ShowDialog(this) == true) SharedRootBox.Text = d.FolderName; }
     private void Initialize_Click(object sender, RoutedEventArgs e) { try { _data.SetSharedRoot(SharedRootBox.Text.Trim()); _data.InitializeSharedData(); ReloadAll(); AdminStatusText.Text = "Shared starter data initialized."; } catch (Exception ex) { MessageBox.Show(ex.Message, "Initialization failed", MessageBoxButton.OK, MessageBoxImage.Error); } }
     private void BrowseSiemens_Click(object sender, RoutedEventArgs e) => BrowseExe(SiemensBox, "Select Siemens 8WD46 Configurator");
@@ -523,8 +586,11 @@ public partial class AdminWindow : Window
     private void SaveLocalSettings_Click(object sender, RoutedEventArgs e) { try { _data.SetSharedRoot(SharedRootBox.Text.Trim()); _data.SetSoftwarePaths(SiemensBox.Text, UamBox.Text); AdminStatusText.Text = "Local software paths saved for this computer."; ReloadAll(); } catch (Exception ex) { MessageBox.Show(ex.Message, "Unable to save settings", MessageBoxButton.OK, MessageBoxImage.Warning); } }
 
     // Audit
-    private void RefreshAudit_Click(object sender, RoutedEventArgs e) => RefreshAuditView();
-    private void RefreshAuditView() { if (AuditList is not null) AuditList.ItemsSource = _data.IsReady ? _data.LoadRecentAudit(300) : new List<AuditEntry>(); }
+    private async void RefreshAudit_Click(object sender, RoutedEventArgs e)
+    {
+        try { var entries = await Task.Run(() => _data.LoadRecentAudit(300)); if (!_isClosed) AuditList.ItemsSource = entries; }
+        catch (Exception error) { if (!_isClosed) AdminStatusText.Text = "Cannot refresh audit history: " + error.Message; }
+    }
 
     public sealed class GateChoice { public string Id { get; set; } = ""; public string Display { get; set; } = ""; }
 }

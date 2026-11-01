@@ -8,7 +8,7 @@
    <TextBlock Text="Setup Mode" FontSize="26" FontWeight="Bold"/>
    <TextBlock Text="Gate structure, buttons, troubleshooting, manuals, parts, and home content are stored on the shared drive. Changing them does not require rebuilding the EXE." Foreground="#555" TextWrapping="Wrap"/>
   </StackPanel>
-  <TabControl Grid.Row="1" Margin="0,14,0,10">
+  <TabControl x:Name="SetupTabs" Grid.Row="1" Margin="0,14,0,10">
 
    <TabItem Header="Gates &amp; Units">
     <Grid Margin="12">

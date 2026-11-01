@@ -300,8 +300,8 @@ public partial class DataService
             File.Copy(path, Path.Combine(backups, Path.GetFileNameWithoutExtension(path) + "_" + stamp + Path.GetExtension(path)), true);
         }
         var temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(value, _write));
-        File.Move(temp, path, true);
+        try { File.WriteAllText(temp, JsonSerializer.Serialize(value, _write)); File.Move(temp, path, true); }
+        finally { if (File.Exists(temp)) File.Delete(temp); }
     }
 
     public string Resolve(string relativePath)
@@ -613,7 +613,7 @@ public partial class DataService
         if (!File.Exists(AuditFile)) return new();
         try
         {
-            var lines = File.ReadLines(AuditFile).Reverse().Take(max).ToList();
+            var lines = ReadLastAuditLines(max);
             return lines.Select(line =>
             {
                 try { return JsonSerializer.Deserialize<AuditEntry>(line, _read); }
@@ -621,6 +621,30 @@ public partial class DataService
             }).Where(x => x is not null).Cast<AuditEntry>().ToList();
         }
         catch { return new(); }
+    }
+
+    // Audit is append-only. Read backwards in blocks instead of buffering the whole
+    // shared-drive history to display the most recent 300 entries.
+    private IEnumerable<string> ReadLastAuditLines(int max)
+    {
+        if (max <= 0) return Array.Empty<string>();
+        using var input = new FileStream(AuditFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var chunks = new List<byte[]>(); long position = input.Length; int separators = 0;
+        while (position > 0 && separators <= max)
+        {
+            int count = (int)Math.Min(64 * 1024, position); position -= count; input.Position = position;
+            var chunk = new byte[count]; input.ReadExactly(chunk);
+            int start = 0;
+            for (int i = count - 1; i >= 0; i--)
+                if (chunk[i] == (byte)'\n' && ++separators > max) { start = i + 1; break; }
+            chunks.Add(start == 0 ? chunk : chunk[start..]);
+        }
+        chunks.Reverse();
+        var bytes = new byte[chunks.Sum(c => c.Length)]; int offset = 0;
+        foreach (var chunk in chunks) { chunk.CopyTo(bytes, offset); offset += chunk.Length; }
+        var lines = Encoding.UTF8.GetString(bytes).Split('\n');
+        int last = lines.Length - 1; if (bytes.Length > 0 && bytes[^1] == (byte)'\n') last--;
+        return Enumerable.Range(0, Math.Min(max, last + 1)).Select(i => lines[last - i].TrimEnd('\r').TrimStart('\uFEFF')).ToArray();
     }
 
     public async Task<string> LookupStoreroomAsync(string query, CancellationToken cancellationToken = default)
