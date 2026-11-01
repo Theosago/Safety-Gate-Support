@@ -97,7 +97,7 @@
       <WrapPanel Margin="0,0,0,12"><Button x:Name="TroubleshootButton" Content="Troubleshoot" Click="TroubleshootSimple_Click" Style="{StaticResource PrimaryButton}" MinHeight="38" HorizontalContentAlignment="Left"/>
 <Button x:Name="FilesButton" Content="Electrical Schematics" Tag="drawing" Click="FindFiles_Click" MinHeight="38" HorizontalContentAlignment="Left"/>
 <Button x:Name="LightColumnButton" Content="Signal Column configuration" Click="LightColumn_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Read, compare or upload this unit’s approved Siemens light configuration"/>
-<Button x:Name="ScannerButton" Content="Safety Scanner configuration" Click="Scanner_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Read UAM scanner status or look up a display code"/>
+<Button x:Name="ScannerButton" Content="Safety Scanner configuration" Click="Scanner_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Assigned scanner configuration files and available USB diagnostics"/>
 <Button x:Name="PartManualsButton" Content="Part Manuals" Click="UnitManuals_Click" MinHeight="38"/><Button x:Name="UnitPartsButton" Content="Parts" Click="UnitParts_Click" MinHeight="38"/></WrapPanel>
       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.9*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
        <GroupBox Header="Electrical Schematics" Margin="0"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>

@@ -620,7 +620,7 @@ public partial class MainWindow : Window
     private void Scanner_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedGate is not { } gate || SelectedUnit is not { } unit || !unit.ShowScannerConfiguration) return;
-        var resource = _resources.FirstOrDefault(r => r.GateId == gate.Id && r.AppliesTo(unit.Id) && r.LaunchAction.Equals("UAM", StringComparison.OrdinalIgnoreCase));
+        var resource = _resources.FirstOrDefault(r => r.GateId == gate.Id && r.AppliesTo(unit.Id) && r.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) && AssetFileLayout.Category(r) == "Scanner Configurations");
         if (resource is null) { new UamDiagnosticsWindow(_data, gate, unit) { Owner = this }.ShowDialog(); return; }
         new ResourceWindow(_data, gate, unit, resource) { Owner = this }.ShowDialog();
     }
