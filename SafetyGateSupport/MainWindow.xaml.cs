@@ -52,7 +52,7 @@ public partial class MainWindow : Window
     public MainWindow(DataService data, Func<string, CancellationToken, Task<StockroomService.Snapshot>>? stockroomReader = null)
     {
         InitializeComponent();
-        _data = data; _stockroomReader = stockroomReader ?? ((url, token) => StockroomService.FetchAsync(url, token));
+        _data = data; _stockroomReader = stockroomReader ?? ((url, token) => Task.Run(() => StockroomService.FetchAsync(url, token), token));
         InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };

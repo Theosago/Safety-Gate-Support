@@ -39,13 +39,13 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Initial update from the saved shared-folder setting failed' }
           } finally { $env:LOCALAPPDATA = $savedLocalData }
           $data = @(Get-Content -Raw $parts | ConvertFrom-Json)
-          if ($data.Count -ne 16 -or @($data | Where-Object partNumber -eq '0115639').Count -ne 1) { throw ("Expected 16 stock numbers, retaining leading zeros; found " + $data.Count) }
+          if ($data.Count -ne 19 -or @($data | Where-Object partNumber -eq '0115639').Count -ne 1) { throw ("Expected 19 stock numbers, retaining leading zeros; found " + $data.Count) }
           $custom = '[{"id":"edited","partNumber":"115639","description":"Site edited","customField":"Retain me"},{"id":"other","partNumber":"OTHER","notes":"Keep existing notes"}]'
           [IO.File]::WriteAllText($parts, $custom)
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root 2>&1 | Tee-Object -FilePath (Join-Path $root 'updater-output.txt')
           if ($LASTEXITCODE -ne 0) { throw 'Existing-catalog update failed' }
           $data = @(Get-Content -Raw $parts | ConvertFrom-Json)
-          if ($data.Count -ne 17 -or ($data | Where-Object id -eq 'edited').customField -ne 'Retain me') { throw 'Existing records were duplicated or overwritten' }
+          if ($data.Count -ne 20 -or ($data | Where-Object id -eq 'edited').customField -ne 'Retain me') { throw 'Existing records were duplicated or overwritten' }
           $before = [IO.File]::ReadAllText($parts)
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root 2>&1 | Tee-Object -FilePath (Join-Path $root 'updater-output.txt')
           if ($LASTEXITCODE -ne 0 -or [IO.File]::ReadAllText($parts) -ne $before) { throw 'Repeat update was not a no-op' }

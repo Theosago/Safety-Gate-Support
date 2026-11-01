@@ -11,6 +11,7 @@ internal static class PartsPageChecks
         ("Legacy part notes expose location and whole-number snapshot without re-entry", LegacyParts),
         ("Part photos copy into the shared library, preserve edits and archive replacements", PhotoStorage),
         ("Stockroom tables require exact stock identity, clear quantity headers and a unique site/bin match", StockroomTables),
+        ("Stockroom reader submits the Safe2Cross search form with its hidden fields", SearchForms),
         ("Stockroom HTTP fetch stays bounded, rejects failures and honors cancellation", StockroomFetch)
     ];
     private static void LegacyParts()
@@ -57,6 +58,28 @@ internal static class PartsPageChecks
         public int Requests;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         { token.ThrowIfCancellationRequested(); Requests++; Require(request.Method == HttpMethod.Get, "Stock lookup sent a write request."); return Task.FromResult(new HttpResponseMessage(code) { Content = new StringContent(body, Encoding.UTF8, "text/html") }); }
+    }
+    private sealed class SearchReply(bool post) : HttpMessageHandler
+    {
+        public int Requests;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            Requests++;
+            if (Requests == 1) return new(HttpStatusCode.OK) { Content = new StringContent("<form action='/inventory/search?site=HRM' method='" + (post ? "post" : "get") + "'><input type='hidden' name='token' value='abc&amp;123'><input name='keyword' type='search'><input type='submit' name='find' value='Search'></form>") };
+            Require(request.RequestUri!.Host == "inventory.invalid" && request.RequestUri.AbsolutePath == "/inventory/search", "Search used the wrong form action.");
+            string parameters = post ? await request.Content!.ReadAsStringAsync(token) : request.RequestUri.Query;
+            Require(request.Method == (post ? HttpMethod.Post : HttpMethod.Get) && parameters.Contains("keyword=Safe2Cross") && parameters.Contains("token=abc%26123"), "Search query or hidden form fields were lost.");
+            return new(HttpStatusCode.OK) { Content = new StringContent("<table>" + Headers + Row("0117719", "0.00") + "</table>") };
+        }
+    }
+    private static void SearchForms()
+    {
+        foreach (bool post in new[] { false, true })
+        {
+            var handler = new SearchReply(post);
+            var result = StockroomService.FetchAsync("https://inventory.invalid/storeroom.html", CancellationToken.None, handler).GetAwaiter().GetResult();
+            Require(handler.Requests == 2 && result.Rows.Single().Stock == "0117719" && result.Rows.Single().Quantity == 0, "Search results did not preserve a zero-stock part.");
+        }
     }
     private static void StockroomFetch()
     {

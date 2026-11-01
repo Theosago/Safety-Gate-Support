@@ -25,7 +25,7 @@ public partial class MainWindow
             var snapshot = await _stockroomReader(_content.StoreroomUrl, source.Token);
             if (_isClosed || source.IsCancellationRequested) return;
             _stockroomSnapshot = snapshot;
-            _stockroomMessage = snapshot.Rows.Count == 0 ? "No supported stock/quantity table was found. Open the stockroom page to confirm its layout." : $"Stockroom checked {snapshot.CheckedUtc.LocalDateTime:g}.";
+            _stockroomMessage = snapshot.Rows.Count == 0 ? "The Safe2Cross search returned no readable stock rows. Open the stockroom to check its search results." : $"Stockroom checked {snapshot.CheckedUtc.LocalDateTime:g}.";
         }
         catch (OperationCanceledException) { if (!_isClosed) { _stockroomSnapshot = null; _stockroomMessage = "Stockroom check timed out or was canceled. Reported snapshot retained."; } }
         catch (Exception error) { if (!_isClosed) { _stockroomSnapshot = null; _stockroomMessage = "Stockroom unavailable: " + error.Message + " Reported snapshot retained."; } }

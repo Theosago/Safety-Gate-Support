@@ -125,19 +125,19 @@ public partial class MainWindow
                 var result = await DrawingPreviewService.RenderPdfAsync(bytes, page, token);
                 if (_isClosed || token.IsCancellationRequested) return;
                 DisplayDrawingImage(result.Image, path, page, bytes); _drawingPageCount = result.PageCount;
-                DrawingPageText.Text = $"Page {page + 1} of {result.PageCount}";
+                DrawingPageText.Text = result.PageCount > 1 ? $"Page {page + 1} of {result.PageCount}" : "";
             }
             else if (new[] { ".dwg", ".dxf" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
             {
                 DrawingMessage.Text = "This CAD drawing needs its installed viewer. Use the download link, or assign a PDF for an inline preview.";
-                DrawingPageText.Text = "CAD drawing"; return;
+                DrawingPageText.Text = ""; return;
             }
             else
             {
                 var result = await IdentificationPhotoLoader.LoadAsync(path, 2000, token);
                 if (_isClosed || token.IsCancellationRequested) return;
                 if (result.Source is not null) DisplayDrawingImage(result.Source, path, page, null);
-                _drawingPageCount = 1; DrawingPageText.Text = "Image drawing";
+                _drawingPageCount = 1; DrawingPageText.Text = "";
                 if (result.Source is null) { DrawingMessage.Text = "This drawing image is unavailable or could not be displayed. Use the download link to inspect the file."; return; }
             }
             DrawingMessage.Visibility = Visibility.Collapsed;
@@ -160,6 +160,7 @@ public partial class MainWindow
     private void UpdateDrawingControls()
     {
         bool idle = _drawingRendering is null;
+        DrawingPageControls.Visibility = _drawingPageCount > 1 ? Visibility.Visible : Visibility.Collapsed;
         PreviousDrawingPageButton.IsEnabled = idle && _drawingPage > 0;
         NextDrawingPageButton.IsEnabled = idle && _drawingPage + 1 < _drawingPageCount;
         DownloadPdfLink.IsEnabled = Path.GetExtension(_drawingPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
@@ -188,7 +189,7 @@ public partial class MainWindow
     private void DrawingPreview_Click(object sender, MouseButtonEventArgs e)
     {
         if (DrawingImage.Source is null) return;
-        new DrawingZoomWindow(DrawingFileText.Text + " • " + DrawingPageText.Text, DrawingImage) { Owner = this }.ShowDialog(); e.Handled = true;
+        new DrawingZoomWindow(DrawingFileText.Text + (_drawingPageCount > 1 ? " • " + DrawingPageText.Text : ""), DrawingImage) { Owner = this }.ShowDialog(); e.Handled = true;
     }
     private async void DownloadDrawing_Click(object sender, RoutedEventArgs e)
     {

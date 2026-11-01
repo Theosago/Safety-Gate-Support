@@ -1,4 +1,4 @@
-ADD THE 16 SUPPLIED SAFE2CROSS PARTS — NO APP UPGRADE
+ADD THE 19 SUPPLIED SAFE2CROSS PARTS — NO APP UPGRADE
 
 1. Extract this download into a folder on the Windows PC where you use Safety Gate Support.
 2. Close Safety Gate Support (and other copies using the same shared data).
@@ -7,7 +7,7 @@ ADD THE 16 SUPPLIED SAFE2CROSS PARTS — NO APP UPGRADE
 
 The updater adds missing stock numbers, leaves existing records and extra fields intact,
 and saves an exact backup under the shared folder's Data\Backups directory.
-Quantities are the supplied stock snapshot, not live inventory. Stock 0117716 had no site supplied.
+Quantities are the supplied stock snapshot, not live inventory. Stock 0117719 had no site supplied.
 
 The data is included in this download; nothing is fetched or installed at runtime.
 The script only changes Data\parts.json, creates its backup, and uses the app's shared write lock.

@@ -105,6 +105,7 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
+            ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
             ("Electrical PDFs detect reading direction automatically and open click-to-zoom without manual controls", AutomaticDrawingOrientation),
@@ -473,6 +474,7 @@ internal static class Program
         var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
         var image = Control<Image>(main, "DrawingImage");
         await WaitUntil(() => image.Source is TransformedBitmap { Transform: RotateTransform { Angle: 180 } }, "Upside-down PDF text was not corrected automatically.");
+        Require(Control<Panel>(main, "DrawingPageControls").Visibility == Visibility.Collapsed && Control<TextBlock>(main, "DrawingPageText").Text == "", "Single-page prints still show page navigation.");
         Require(main.FindName("FlipDrawingButton") is null && main.FindName("EnlargeDrawingButton") is null && main.FindName("OpenDwgButton") is null, "Manual/enlarge/DWG buttons remain on the drawing page.");
         Require(((System.Windows.Documents.Hyperlink)main.FindName("DownloadPdfLink")).IsEnabled, "PDF download link is missing.");
         Exception? failure = null; bool zoomed = false; var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
@@ -559,6 +561,7 @@ internal static class Program
         Click(Control<Button>(main, "NextDrawingPageButton"));
         await WaitUntil(() => HasColor(image.Source, Colors.Blue), "Next drawing page failed.");
         Equal("Page 2 of 2", Control<TextBlock>(main, "DrawingPageText").Text, "Drawing page indicator");
+        Require(Control<Panel>(main, "DrawingPageControls").Visibility == Visibility.Visible, "Multi-page print navigation was hidden.");
         RapidSelect(Control<ListBox>(main, "UnitList"), fixture.RedUnit.Id, fixture.BlueUnit.Id);
         await WaitUntil(() => Control<TextBlock>(main, "DrawingFileText").Text.Contains("inline-own.pdf") && HasColor(image.Source, Colors.Red), "Rapid selection retained an obsolete drawing or page.");
         await SelectGalleryUnit(main, fixture.RedUnit);
@@ -608,6 +611,49 @@ internal static class Program
         Require(HasColor(image.Source, Colors.Red), "Companion warning hid the available PDF.");
         await SelectGalleryUnit(main, fixture.RedUnit);
         await WaitUntil(() => status.Text.Contains("DWG changed, but the PDF has not") && HasColor(image.Source, Colors.Red), "Other shared unit did not show the same print and warning.");
+    }
+
+    private static async Task InteractiveStockroomSearch()
+    {
+        var portFinder = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0); portFinder.Start(); int port = ((System.Net.IPEndPoint)portFinder.LocalEndpoint).Port; portFinder.Stop();
+        using var listener = new System.Net.HttpListener(); string url = $"http://127.0.0.1:{port}/"; listener.Prefixes.Add(url); listener.Start();
+        using var stop = new CancellationTokenSource(); int searches = 0;
+        var server = Task.Run(async () =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                System.Net.HttpListenerContext context;
+                try { context = await listener.GetContextAsync().WaitAsync(stop.Token); } catch (Exception error) when (error is OperationCanceledException or System.Net.HttpListenerException or ObjectDisposedException) { break; }
+                string body;
+                if (context.Request.Url!.AbsolutePath == "/inventory")
+                {
+                    Require(context.Request.QueryString["query"] == "Safe2Cross", "Browser did not submit the Safe2Cross search."); Interlocked.Increment(ref searches);
+                    body = System.Text.Json.JsonSerializer.Serialize(new[] { "0115639", "0115638", "0115641", "0115640", "0115642", "0117369", "0117488", "0117489", "0117490", "0116820", "0117711", "0117712", "0117713", "0117714", "0117715", "0117716", "0117717", "0117718", "0117719" }); context.Response.ContentType = "application/json";
+                }
+                else if (context.Request.Url.AbsolutePath == "/")
+                {
+                    body = """
+                    <html><body><label>Search stockroom <input type="search" id="search"></label><div id="results"></div>
+                    <script>document.getElementById('search').addEventListener('input',async e=>{
+                    if(e.target.value!=='Safe2Cross')return;
+                    const stocks=await(await fetch('/inventory?query='+encodeURIComponent(e.target.value))).json();
+                    const table=document.createElement('table');table.innerHTML='<thead><tr><th>Item</th><th>Description</th><th>Available</th><th>Location</th><th>Site</th></tr></thead><tbody></tbody>';
+                    for(const stock of stocks){const row=table.tBodies[0].insertRow();for(const value of [stock,'Safe2Cross Gate',stock==='0117719'?'0.00':'1.00','TOP T-05','HRM'])row.insertCell().textContent=value;}
+                    document.getElementById('results').replaceChildren(table);
+                    });</script></body></html>
+                    """; context.Response.ContentType = "text/html";
+                }
+                else { body = ""; context.Response.StatusCode = 204; }
+                byte[] bytes = Encoding.UTF8.GetBytes(body); context.Response.ContentLength64 = bytes.Length; await context.Response.OutputStream.WriteAsync(bytes); context.Response.Close();
+            }
+        });
+        try
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(18));
+            var result = await StockroomService.FetchAsync(url, deadline.Token);
+            Require(searches > 0 && result.Rows.Select(r => r.Stock).Distinct().Count() == 19 && result.Rows.Single(r => r.Stock == "0117719").Quantity == 0, "Interactive stockroom search did not return all 19 items, including the zero-stock scanner.");
+        }
+        finally { stop.Cancel(); listener.Stop(); await server; }
     }
 
     private static async Task PartsPhotosAndStock()

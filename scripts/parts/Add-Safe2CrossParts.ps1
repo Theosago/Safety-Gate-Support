@@ -170,7 +170,34 @@ try {
     "manufacturer": "",
     "keywords": "Safe2Cross safety gate 20-MAG-0009 TOP T-05",
     "relatedAssets": "Safe2Cross gates",
-    "notes": "Manufacturer/reference P/N: 20-MAG-0009\nBin location: TOP T-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: Not supplied"
+    "notes": "Manufacturer/reference P/N: 20-MAG-0009\nBin location: TOP T-05\nReported quantity: 1.00 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117717",
+    "partNumber": "0117717",
+    "description": "Terminal housing box — SG-TB-4PT-GS",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate SG-TB-4PT-GS TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: SG-TB-4PT-GS\nBin location: TOP T-05\nReported quantity: 1 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117718",
+    "partNumber": "0117718",
+    "description": "Proximity switch, 24 V, 12 mm — AM1-AP-1A",
+    "manufacturer": "",
+    "keywords": "Safe2Cross safety gate AM1-AP-1A TOP T-05",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: AM1-AP-1A\nBin location: TOP T-05\nReported quantity: 1 (supplied stock snapshot; check storeroom for current availability).\nSite: HRM"
+  },
+  {
+    "id": "site-safe2cross-0117719",
+    "partNumber": "0117719",
+    "description": "Safety laser scanner, 24 V — UAM-05LP-T301",
+    "manufacturer": "Hokuyo",
+    "keywords": "Safe2Cross safety gate UAM-05LP-T301 TOP T-05 omni laser",
+    "relatedAssets": "Safe2Cross gates",
+    "notes": "Manufacturer/reference P/N: UAM-05LP-T301\nBin location: TOP T-05\nReported quantity: 0 (supplied stock snapshot; check storeroom for current availability).\nSite: Not supplied"
   }
 ]
 '@ | ConvertFrom-Json
@@ -181,8 +208,19 @@ try {
         [void]$ids.Add([string]$part.id)
         [void]$stocks.Add(([string]$part.partNumber).Trim().TrimStart('0'))
     }
+    $updated = 0
+    foreach ($part in $existing) {
+        $stockKey = ([string]$part.partNumber).Trim().TrimStart('0')
+        $notes = [string]$part.notes
+        $site = [string]$part.site
+        if ($stockKey -eq '117716' -and ($site -eq '' -or $site -eq 'Not supplied') -and ($notes -notmatch '(?im)^Site:[ \t]*(?!Not supplied)(?!$)\S+')) {
+            $part | Add-Member -NotePropertyName site -NotePropertyValue HRM -Force
+            $part.notes = $notes.Replace('Site: Not supplied','Site: HRM')
+            $updated++
+        }
+    }
     $added = @($catalog | Where-Object { -not $ids.Contains([string]$_.id) -and $stocks.Add(([string]$_.partNumber).Trim().TrimStart('0')) })
-    if ($added.Count -eq 0) { Write-Host 'All supplied stock numbers are already present. No changes needed.' -ForegroundColor Green; exit 0 }
+    if ($added.Count -eq 0 -and $updated -eq 0) { Write-Host 'All supplied stock numbers are already present. No changes needed.' -ForegroundColor Green; exit 0 }
     $backups = Join-Path $SharedRoot 'Data\Backups'
     [void][IO.Directory]::CreateDirectory($backups)
     $backup = Join-Path $backups ('parts_before_storeroom_' + (Get-Date -Format 'yyyyMMdd_HHmmssfff') + '_' + [Guid]::NewGuid().ToString('N').Substring(0,6) + '.json')
