@@ -93,6 +93,7 @@ internal static class Program
         (string Name, Func<Task> Check)[] checks =
         [
             ("Landscape and portrait photos decode within the preview pixel limit", BoundedPhotoDecoding),
+            ("Camera photo orientation metadata is applied automatically without changing the original", CameraPhotoOrientation),
             ("Small photos retain their dimensions and can be read from a worker thread", SmallFrozenPhoto),
             ("Decoded photos release the original file and reload replacement pixels", PhotoReplacement),
             ("Missing and corrupt photos return distinct nonfatal results", PhotoFailures),
@@ -443,6 +444,19 @@ internal static class Program
         Require(bytes.SequenceEqual(original), "Rendering altered the PDF bytes.");
         using var cancel = new CancellationTokenSource(); cancel.Cancel();
         await ExpectCancellation(DrawingPreviewService.RenderPdfAsync(bytes, 0, cancel.Token));
+    }
+
+    private static async Task CameraPhotoOrientation()
+    {
+        string path = Path.Combine(NewDirectory(), "camera.jpg");
+        var image = BitmapSource.Create(60, 120, 96, 96, PixelFormats.Bgr24, null, new byte[60 * 120 * 3], 60 * 3);
+        var metadata = new BitmapMetadata("jpg"); metadata.SetQuery("/app1/ifd/{ushort=274}", (ushort)6);
+        var encoder = new JpegBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image, null, metadata, null));
+        using (var output = File.Create(path)) encoder.Save(output);
+        byte[] original = File.ReadAllBytes(path);
+        var result = await IdentificationPhotoLoader.LoadAsync(path, 192, CancellationToken.None);
+        Require(result.Source is { PixelWidth: 120, PixelHeight: 60, IsFrozen: true }, "Camera EXIF rotation was not applied automatically.");
+        Require(File.ReadAllBytes(path).SequenceEqual(original), "Camera orientation changed the uploaded original.");
     }
 
     private static async Task AutomaticDrawingOrientation()

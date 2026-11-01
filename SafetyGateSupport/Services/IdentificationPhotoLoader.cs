@@ -2,6 +2,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
+using System.Windows.Media;
 
 namespace SafetyGateSupport.Services;
 
@@ -24,6 +25,11 @@ public static class IdentificationPhotoLoader
         return Task.Run(() => Load(path, maxPixelDimension, cancellationToken), cancellationToken);
     }
 
+    private static Transform ExifMirrorRotation(int angle)
+    {
+        var transforms = new TransformGroup(); transforms.Children.Add(new ScaleTransform(-1, 1)); transforms.Children.Add(new RotateTransform(angle)); return transforms;
+    }
+
     private static IdentificationPhotoResult Load(string path, int maxPixelDimension, CancellationToken cancellationToken)
     {
         try
@@ -37,6 +43,10 @@ public static class IdentificationPhotoLoader
             // Inspect dimensions without decoding the full-size pixel buffer. Limit the long edge,
             // preserving aspect ratio and avoiding upscaling photos that are already small.
             var header = BitmapFrame.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+            int orientation = 1;
+            if (header.Metadata is BitmapMetadata metadata)
+                foreach (string query in new[] { "/app1/ifd/{ushort=274}", "/ifd/{ushort=274}" })
+                    try { if (metadata.GetQuery(query) is { } value) { orientation = Convert.ToInt32(value); break; } } catch { /* Metadata is optional; decode the image even if this query is unavailable. */ }
             var width = header.PixelWidth;
             var height = header.PixelHeight;
             cancellationToken.ThrowIfCancellationRequested();
@@ -54,7 +64,14 @@ public static class IdentificationPhotoLoader
             bitmap.EndInit();
             bitmap.Freeze();
             cancellationToken.ThrowIfCancellationRequested();
-            return new(bitmap, IdentificationPhotoStatus.Loaded);
+            Transform? transform = orientation switch
+            {
+                2 => new ScaleTransform(-1, 1), 3 => new RotateTransform(180), 4 => new ScaleTransform(1, -1),
+                5 => ExifMirrorRotation(270), 6 => new RotateTransform(90), 7 => ExifMirrorRotation(90), 8 => new RotateTransform(270), _ => null
+            };
+            if (transform is null) return new(bitmap, IdentificationPhotoStatus.Loaded);
+            var oriented = new TransformedBitmap(bitmap, transform); oriented.Freeze();
+            return new(oriented, IdentificationPhotoStatus.Loaded);
         }
         catch (OperationCanceledException) { throw; }
         catch (FileNotFoundException) { return new(null, IdentificationPhotoStatus.Missing); }
