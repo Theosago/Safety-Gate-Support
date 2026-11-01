@@ -199,7 +199,7 @@ try {
     } finally { $sha.Dispose() }
     if ($originalHash -ne $currentHash) { throw 'The parts file changed during this update. Close other app copies and retry. The newer file has not been replaced.' }
     # Atomically publish on the same volume; never delete the original as a fallback.
-    [IO.File]::Replace($temp, $partsFile, $null, $true)
+    [IO.File]::Replace($temp, $partsFile, $backup, $true)
     $temp = $null
     Write-Host ("Added {0} missing parts; existing records were retained." -f $added.Count) -ForegroundColor Green
     Write-Host "Backup: $backup"
