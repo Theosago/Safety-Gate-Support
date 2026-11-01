@@ -14,6 +14,7 @@ public partial class MainWindow
 {
     private CancellationTokenSource? _drawingPairCheck;
     private string? _drawingDwg;
+    private bool _drawingDwgAvailable;
     private CancellationTokenSource? _drawingOrientationCancellation;
     private string _drawingFingerprint = "";
     private bool _checkingDrawingFiles;
@@ -50,8 +51,8 @@ public partial class MainWindow
             if (_isClosed || token.IsCancellationRequested || _drawingPath != file.Path) return;
             _drawingDwg = status.DwgPath;
             DrawingPairStatusText.Text = status.Message; DrawingPairStatusText.Foreground = new SolidColorBrush(status.NeedsAttention ? Color.FromRgb(150, 88, 19) : Color.FromRgb(65, 100, 115));
-            var fingerprint = await Task.Run(() => DrawingFingerprint(file.Path, status.DwgPath), token);
-            if (!token.IsCancellationRequested && !_isClosed && _drawingPath == file.Path) { _drawingFingerprint = fingerprint; UpdateDrawingControls(); }
+            var probe = await Task.Run(() => (Fingerprint: DrawingFingerprint(file.Path, status.DwgPath), Available: status.DwgPath is not null && File.Exists(status.DwgPath)), token);
+            if (!token.IsCancellationRequested && !_isClosed && _drawingPath == file.Path) { _drawingFingerprint = probe.Fingerprint; _drawingDwgAvailable = probe.Available; UpdateDrawingControls(); }
         }
         catch (OperationCanceledException) { }
         catch (Exception error) { if (!_isClosed && !token.IsCancellationRequested) DrawingPairStatusText.Text = "Cannot check companion revisions: " + error.Message; }
@@ -68,7 +69,7 @@ public partial class MainWindow
     private void ClearDrawings()
     {
         _drawingListing?.Cancel(); _drawingListing = null;
-        _drawingPairCheck?.Cancel(); _drawingPairCheck = null; _drawingDwg = null; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
+        _drawingPairCheck?.Cancel(); _drawingPairCheck = null; _drawingDwg = null; _drawingDwgAvailable = false; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
         _drawingRendering?.Cancel(); _drawingRendering = null;
         _settingDrawingFiles = true; DrawingFileBox.ItemsSource = null; _settingDrawingFiles = false;
         _drawingOrientationCancellation?.Cancel(); DrawingOrientationText.Text = "";
@@ -103,7 +104,7 @@ public partial class MainWindow
     private async void DrawingFile_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_settingDrawingFiles || DrawingFileBox.SelectedItem is not AssignedDrawings.FileItem file) return;
-        _drawingPairCheck?.Cancel(); _drawingDwg = null; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
+        _drawingPairCheck?.Cancel(); _drawingDwg = null; _drawingDwgAvailable = false; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
         _drawingPath = file.Path; _drawingBytes = null; _drawingPage = 0; _drawingPageCount = 0;
         DrawingFileText.Text = file.Name; DrawingFileText.ToolTip = file.Path;
         await RenderDrawingPageAsync();
@@ -162,7 +163,7 @@ public partial class MainWindow
         PreviousDrawingPageButton.IsEnabled = idle && _drawingPage > 0;
         NextDrawingPageButton.IsEnabled = idle && _drawingPage + 1 < _drawingPageCount;
         DownloadPdfLink.IsEnabled = Path.GetExtension(_drawingPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
-        DownloadDwgLink.IsEnabled = _drawingDwg is not null;
+        DownloadDwgLink.IsEnabled = _drawingDwgAvailable;
     }
     private void DisplayDrawingImage(BitmapSource image, string path, int page, byte[]? pdf)
     {
