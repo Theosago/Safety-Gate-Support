@@ -84,7 +84,7 @@ public static class DrawingOrientationService
         byte[] png = Png(image);
         string directory = Path.Combine(AppContext.BaseDirectory, "Ocr");
         var start = new ProcessStartInfo(Path.Combine(directory, "tesseract.exe")) { WorkingDirectory = directory, UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (string argument in new[] { "stdin", "stdout", "--tessdata-dir", "tessdata", "-l", "eng", "--oem", "1", "--psm", "11", "tsv" }) start.ArgumentList.Add(argument);
+        foreach (string argument in new[] { "stdin", "stdout", "--tessdata-dir", "tessdata", "-l", "eng", "--oem", "1", "--psm", "11", "-c", "tessedit_create_tsv=1", "-c", "tessedit_create_txt=0" }) start.ArgumentList.Add(argument);
         start.Environment["OMP_THREAD_LIMIT"] = "1";
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(TimeSpan.FromSeconds(10));
         using var process = new Process { StartInfo = start };
