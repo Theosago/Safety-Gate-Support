@@ -17,6 +17,14 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $root = Join-Path $env:RUNNER_TEMP ('parts updater test ' + [Guid]::NewGuid().ToString('N'))
+          trap {
+            $message = $_.Exception.Message
+            $log = Join-Path $root 'updater-output.txt'
+            if (Test-Path $log) { $message += "`n" + (Get-Content -Raw $log) }
+            $message = $message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Parts updater validation::$message"
+            exit 1
+          }
           New-Item -ItemType Directory -Path (Join-Path $root 'Data') -Force | Out-Null
           $parts = Join-Path $root 'Data\parts.json'
           $script = Join-Path $pwd 'scripts\parts\Add-Safe2CrossParts.ps1'
@@ -27,28 +35,28 @@ jobs:
             $settingsFolder = Join-Path $env:LOCALAPPDATA 'SafetyGateSupport'
             New-Item -ItemType Directory -Path $settingsFolder -Force | Out-Null
             @{ sharedRoot = $root } | ConvertTo-Json | Set-Content (Join-Path $settingsFolder 'settings.json') -Encoding utf8
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script 2>&1 | Tee-Object -FilePath (Join-Path $root 'updater-output.txt')
             if ($LASTEXITCODE -ne 0) { throw 'Initial update from the saved shared-folder setting failed' }
           } finally { $env:LOCALAPPDATA = $savedLocalData }
           $data = @(Get-Content -Raw $parts | ConvertFrom-Json)
           if ($data.Count -ne 16 -or @($data | Where-Object partNumber -eq '0115639').Count -ne 1) { throw 'Expected 16 stock numbers, retaining leading zeros' }
           $custom = '[{"id":"edited","partNumber":"115639","description":"Site edited","customField":"Retain me"},{"id":"other","partNumber":"OTHER","notes":"Keep existing notes"}]'
           [IO.File]::WriteAllText($parts, $custom)
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root 2>&1 | Tee-Object -FilePath (Join-Path $root 'updater-output.txt')
           if ($LASTEXITCODE -ne 0) { throw 'Existing-catalog update failed' }
           $data = @(Get-Content -Raw $parts | ConvertFrom-Json)
           if ($data.Count -ne 17 -or ($data | Where-Object id -eq 'edited').customField -ne 'Retain me') { throw 'Existing records were duplicated or overwritten' }
           $before = [IO.File]::ReadAllText($parts)
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root 2>&1 | Tee-Object -FilePath (Join-Path $root 'updater-output.txt')
           if ($LASTEXITCODE -ne 0 -or [IO.File]::ReadAllText($parts) -ne $before) { throw 'Repeat update was not a no-op' }
           [IO.File]::WriteAllText($parts, '[]')
           $held = [IO.File]::Open($parts, 'Open', 'Read', 'ReadWrite')
           try {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root 2>&1 | Tee-Object -FilePath (Join-Path $root 'updater-output.txt')
             if ($LASTEXITCODE -eq 0 -or [IO.File]::ReadAllText($parts) -ne '[]') { throw 'Locked destination was not preserved' }
           } finally { $held.Dispose() }
           [IO.File]::WriteAllText($parts, '{broken')
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -SharedRoot $root 2>&1 | Tee-Object -FilePath (Join-Path $root 'updater-output.txt')
           if ($LASTEXITCODE -eq 0 -or [IO.File]::ReadAllText($parts) -ne '{broken') { throw 'Malformed data was not preserved' }
           $backups = @(Get-ChildItem (Join-Path $root 'Data\Backups') -Filter '*.json')
           if (-not ($backups | Where-Object { [IO.File]::ReadAllText($_.FullName) -eq $custom })) { throw 'Exact pre-update backup was not retained' }
