@@ -24,6 +24,13 @@ public static class StockroomBrowserReader
             var start = new ProcessStartInfo(browser) { UseShellExecute = false, CreateNoWindow = true };
             foreach (string argument in new[] { "--headless=new", "--disable-gpu", "--window-size=1600,1000", "--disable-component-update", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-background-networking", "--disable-sync", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + profile, "--auth-server-allowlist=" + uri.Host, "about:blank" }) start.ArgumentList.Add(argument);
             process = Process.Start(start) ?? throw new IOException("The background stockroom reader could not start.");
+            // Cancellation runs this synchronously, including when the app is closing.
+            // Do not leave an isolated browser running after the main window exits.
+            using var killOnCancel = deadline.Token.Register(() =>
+            {
+                try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+                catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException) { }
+            });
             string portFile = Path.Combine(profile, "DevToolsActivePort");
             int port = 0;
             while (port == 0)
@@ -85,7 +92,7 @@ public static class StockroomBrowserReader
         {
             if (process is not null)
             {
-                try { if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(CancellationToken.None); } } catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+                try { if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(CancellationToken.None); } } catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException) { }
                 process.Dispose();
             }
             try { if (Directory.Exists(profile)) Directory.Delete(profile, true); } catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
