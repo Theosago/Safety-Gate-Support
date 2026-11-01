@@ -37,7 +37,7 @@ public sealed class DrawingZoomWindow : Window
     {
         if (_image.Source is not BitmapSource bitmap) return;
         _scroll.UpdateLayout();
-        _zoom = Math.Max(0.01, Math.Min(Math.Max(1, _scroll.ViewportWidth - 24) / bitmap.PixelWidth, Math.Max(1, _scroll.ViewportHeight - 24) / bitmap.PixelHeight));
+        _zoom = Math.Max(0.01, Math.Min(Math.Max(1, _scroll.ActualWidth - 24) / bitmap.PixelWidth, Math.Max(1, _scroll.ActualHeight - 24) / bitmap.PixelHeight));
         ResizeImage(bitmap); _scroll.ScrollToHorizontalOffset(0); _scroll.ScrollToVerticalOffset(0);
     }
     public void ZoomAt(double factor, Point cursor)
