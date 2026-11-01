@@ -202,7 +202,7 @@ public partial class MainWindow : Window
     private void ShowHome() { HideAllViews(); HomeView.Visibility = Visibility.Visible; SetActiveNavigation(HomeNav); }
     private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
     private void ShowManuals() { HideAllViews(); ManualsView.Visibility = Visibility.Visible; SetActiveNavigation(ManualsNav); }
-    private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; SetActiveNavigation(PartsNav); }
+    private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; SetActiveNavigation(PartsNav); if (SelectedPart is { } part) LoadPartPhoto(part); }
 
     private void SetActiveNavigation(Button active)
     {
@@ -667,7 +667,7 @@ public partial class MainWindow : Window
         var related = new List<string>(); related.AddRange(_gates.Where(g => p.AppliesToGateIds.Contains(g.Id)).Select(g => g.Display)); related.AddRange(_systems.Where(u => p.AppliesToUnitIds.Contains(u.Id)).Select(u => $"{GateFor(u)?.Display} / {u.UnitDisplay}"));
         PartRelatedText.Text = related.Count == 0 ? (string.IsNullOrWhiteSpace(p.RelatedAssets) ? "" : "Related: " + p.RelatedAssets) : "Applies to: " + string.Join(", ", related);
         PartNotesText.Text = p.NotesDisplay; PartReportedQuantityText.Text = "Reported quantity (snapshot): " + p.QuantityDisplay + (p.SiteValue.Length > 0 ? " • Site: " + p.SiteValue : "");
-        PartDetailScroll.ScrollToTop(); LoadPartPhoto(p); UpdatePartQuantity();
+        PartDetailScroll.ScrollToTop(); if (PartsView.IsVisible) LoadPartPhoto(p); UpdatePartQuantity();
     }
     private void OpenPartDocument_Click(object sender, RoutedEventArgs e) { var p = SelectedPart; if (p is null || string.IsNullOrWhiteSpace(p.DocumentPath)) { MessageBox.Show("No document is attached to this part."); return; } var path = _data.Resolve(p.DocumentPath); if (File.Exists(path)) FileLauncherService.Open(path); else MessageBox.Show("The attached part document could not be found."); }
     private void OpenStoreroom_Click(object sender, RoutedEventArgs e) { if (string.IsNullOrWhiteSpace(_content.StoreroomUrl)) { MessageBox.Show("Storeroom URL is not configured."); return; } FileLauncherService.Open(_content.StoreroomUrl); }
