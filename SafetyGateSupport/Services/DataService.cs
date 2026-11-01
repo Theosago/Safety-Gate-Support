@@ -106,6 +106,7 @@ public partial class DataService
         MigrateResourcesIfNeeded();
         MigrateManualIndexIfNeeded();
         MigrateTroubleshootingIfNeeded();
+        EnsurePartsCatalog();
     }
 
     private void MigrateGateHierarchyIfNeeded()
@@ -235,7 +236,11 @@ public partial class DataService
     public List<ResourceDefinition> LoadResources() => LoadList<ResourceDefinition>(ResourcesFile);
     public List<string> LoadCategories() => LoadList<string>(CategoriesFile);
     public List<HelpItem> LoadHelpItems() => LoadList<HelpItem>(HelpFile);
-    public List<PartRecord> LoadParts() => LoadList<PartRecord>(PartsFile);
+    public List<PartRecord> LoadParts()
+    {
+        var parts = LoadList<PartRecord>(PartsFile);
+        return File.Exists(PartsCatalogMarker) ? parts : MergePartsCatalog(parts);
+    }
     public List<ManualRecord> LoadManualRecords() => LoadList<ManualRecord>(ManualsIndexFile);
     public List<TroubleshootingFlow> LoadTroubleshootingFlows() => GuidedTroubleshooting.Merge(LoadList<TroubleshootingFlow>(TroubleshootingFile));
 
