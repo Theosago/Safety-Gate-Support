@@ -682,8 +682,7 @@ internal static class Program
         old.SetResult(StockroomService.Parse("<table><tr><th>Stock number</th><th>Quantity</th></tr><tr><td>0115639</td><td>99</td></tr></table>"));
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         Require(Control<TextBlock>(main, "PartCurrentQuantityText").Text == "Current quantity: 12" && Control<TextBlock>(main, "PartStockroomStatusText").Text.Contains("Salisbury") && Control<TextBlock>(main, "PartStockroomStatusText").Text.Contains("NEW BIN"), "Stale Huntingdon result replaced Salisbury quantity or source details.");
-        var settingsFile = Directory.GetFiles(Path.GetDirectoryName(fixture.Data.DrawingOrientationCache)!, "settings.json").Single();
-        var saved = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(settingsFile))!;
+        var saved = new DataService(false, Path.GetDirectoryName(fixture.Data.DrawingOrientationCache)!).Settings;
         Require(saved.StockroomPlantId == "04" && new AppSettings().StockroomPlantId == "", "Choice was not saved locally or new installations assume a plant.");
     }
 
