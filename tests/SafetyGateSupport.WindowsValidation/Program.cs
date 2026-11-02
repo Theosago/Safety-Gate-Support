@@ -106,6 +106,7 @@ internal static class Program
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
+            ("Plant selection is local, starts unselected and cancels stale stockroom results", StockroomPlantSelection),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
             ("Electrical PDFs detect reading direction automatically and open click-to-zoom without manual controls", AutomaticDrawingOrientation),
@@ -656,11 +657,42 @@ internal static class Program
         finally { stop.Cancel(); listener.Stop(); await server; }
     }
 
+    private static async Task StockroomPlantSelection()
+    {
+        var fixture = NewFixture();
+        var old = new TaskCompletionSource<StockroomService.Snapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var latest = new TaskCompletionSource<StockroomService.Snapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var urls = new List<string>(); CancellationToken original = default;
+        Task<StockroomService.Snapshot> Fetch(string url, CancellationToken token)
+        {
+            urls.Add(url); if (urls.Count == 1) { original = token; return old.Task; } return latest.Task;
+        }
+        var main = Track(new MainWindow(fixture.Data, Fetch)); ShowOffscreen(main);
+        await WaitUntil(() => main.IsEnabled && Control<ListBox>(main, "PartList").Items.Count > 0, "Part catalog not loaded.");
+        Require(urls.Count == 0, "An unselected computer silently checked a plant.");
+        var box = Control<ComboBox>(main, "StockroomPlantBox");
+        box.SelectedItem = StockroomPlant.Find("02");
+        await WaitUntil(() => urls.Count == 1, "Huntingdon selection did not start reading.");
+        box.SelectedItem = StockroomPlant.Find("04");
+        await WaitUntil(() => urls.Count == 2, "Switching plant did not start a fresh request.");
+        Require(original.IsCancellationRequested && urls[0].EndsWith("/inventory/02") && urls[1].EndsWith("/inventory/04"), "Plant routes or cancellation are incorrect.");
+        latest.SetResult(StockroomService.Parse("<table><tr><th>Stock number</th><th>Quantity</th><th>Site</th><th>Bin</th></tr><tr><td>0115639</td><td>12</td><td>SAL</td><td>NEW BIN</td></tr></table>"));
+        var list = Control<ListBox>(main, "PartList"); list.SelectedItem = list.Items.Cast<PartRecord>().Single(p => p.PartNumber == "0115639");
+        await WaitUntil(() => Control<TextBlock>(main, "PartCurrentQuantityText").Text == "Current quantity: 12", "A legacy HRM snapshot hid Salisbury stock.");
+        old.SetResult(StockroomService.Parse("<table><tr><th>Stock number</th><th>Quantity</th></tr><tr><td>0115639</td><td>99</td></tr></table>"));
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Require(Control<TextBlock>(main, "PartCurrentQuantityText").Text == "Current quantity: 12" && Control<TextBlock>(main, "PartStockroomStatusText").Text.Contains("Salisbury") && Control<TextBlock>(main, "PartStockroomStatusText").Text.Contains("NEW BIN"), "Stale Huntingdon result replaced Salisbury quantity or source details.");
+        var settingsFile = Directory.GetFiles(Path.GetDirectoryName(fixture.Data.DrawingOrientationCache)!, "settings.json").Single();
+        var saved = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(settingsFile))!;
+        Require(saved.StockroomPlantId == "04" && new AppSettings().StockroomPlantId == "", "Choice was not saved locally or new installations assume a plant.");
+    }
+
     private static async Task PartsPhotosAndStock()
     {
         var fixture = NewFixture();
         var first = new PartRecord { Id = "photo-part-one", PartNumber = "0115639", Description = "A yellow module with a long identification description that must wrap inside both the list and detail pane", PhotoPath = fixture.RedUnit.PrimaryPhoto, Notes = "Bin location: TOP K-12\nReported quantity: 5.00 (snapshot)\nSite: HRM" };
         var second = new PartRecord { Id = "photo-part-two", PartNumber = "0115640", Description = "Z green module", PhotoPath = fixture.BlueUnit.PrimaryPhoto };
+        fixture.Data.Settings.StockroomPlantId = "02"; fixture.Data.SaveLocalSettings();
         fixture.Data.SaveParts([first, second]);
         int requests = 0; var pending = new TaskCompletionSource<StockroomService.Snapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
         Task<StockroomService.Snapshot> Fetch(string _, CancellationToken token) { requests++; return requests == 1 ? pending.Task.WaitAsync(token) : Task.FromException<StockroomService.Snapshot>(new IOException("Test stockroom offline")); }

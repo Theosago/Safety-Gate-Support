@@ -8,12 +8,22 @@ internal static class PartsPageChecks
 {
     public static IEnumerable<(string Name, Action Check)> Cases =>
     [
+        ("Selected plant inventories ignore legacy snapshot sites and reject duplicate stocks", PlantInventories),
         ("Legacy part notes expose location and whole-number snapshot without re-entry", LegacyParts),
         ("Part photos copy into the shared library, preserve edits and archive replacements", PhotoStorage),
         ("Stockroom tables require exact stock identity, clear quantity headers and a unique site/bin match", StockroomTables),
         ("Stockroom reader submits the Safe2Cross search form with its hidden fields", SearchForms),
         ("Stockroom HTTP fetch stays bounded, rejects failures and honors cancellation", StockroomFetch)
     ];
+    private static void PlantInventories()
+    {
+        Require(StockroomPlant.Find("02")?.Name == "Huntingdon" && StockroomPlant.Find("04")?.Url.EndsWith("/inventory/04") == true && StockroomPlant.Find("05")?.Name == "Newport" && StockroomPlant.Find("unknown") is null, "Plant mappings differ from the portal.");
+        var snapshot = new StockroomService.Snapshot([new("0115639", 12, "SAL", "SAL BIN", "Quantity")], DateTimeOffset.UtcNow);
+        var part = new PartRecord { PartNumber = "0115639", Site = "HRM", BinLocation = "TOP K-12" };
+        Require(StockroomService.Find(snapshot, part, plantScoped: true)?.Quantity == 12 && StockroomService.Find(snapshot, part) is null, "Legacy snapshot site leaked into selected-plant matching.");
+        var duplicates = snapshot with { Rows = [..snapshot.Rows, new("0115639", 6, "HRM", "TOP K-12", "Quantity")] };
+        Require(StockroomService.Find(duplicates, part, plantScoped: true) is null, "Ambiguous stocks were guessed from an old plant snapshot.");
+    }
     private static void LegacyParts()
     {
         var part = new PartRecord { Description = "Yellow module", PartNumber = "0115639", Notes = "Bin location: TOP K-12\nReported quantity: 5.00 (stock snapshot)\nSite: HRM\nReference: SG-TL70-Y" };

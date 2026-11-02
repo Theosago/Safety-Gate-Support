@@ -53,6 +53,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _data = data; _stockroomReader = stockroomReader ?? ((url, token) => Task.Run(() => StockroomService.FetchAsync(url, token), token));
+        InitializeStockroomPlants();
         InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
@@ -135,7 +136,7 @@ public partial class MainWindow : Window
             BuildHelpPanels();
             RefreshManuals();
             RefreshParts();
-            if (!_data.IsHomePreview && _parts.Count > 0 && _stockroomRequestedUrl != _content.StoreroomUrl) { _stockroomRequestedUrl = _content.StoreroomUrl; _ = RefreshStockroomAsync(); }
+            if (!_data.IsHomePreview && _parts.Count > 0 && SelectedStockroomPlant is { } plant && _stockroomRequestedUrl != plant.Url) { _stockroomRequestedUrl = plant.Url; _ = RefreshStockroomAsync(); }
             BuildFastSearchIndex();
             _ = RefreshSearchIndexAsync();
             if (!string.IsNullOrWhiteSpace(_currentArea) && _categories.Contains(_currentArea)) AreaBox.SelectedItem = _currentArea;
@@ -677,7 +678,7 @@ public partial class MainWindow : Window
         PartDetailScroll.ScrollToTop(); if (PartsView.IsVisible) LoadPartPhoto(p); UpdatePartQuantity();
     }
     private void OpenPartDocument_Click(object sender, RoutedEventArgs e) { var p = SelectedPart; if (p is null || string.IsNullOrWhiteSpace(p.DocumentPath)) { MessageBox.Show("No document is attached to this part."); return; } var path = _data.Resolve(p.DocumentPath); if (File.Exists(path)) FileLauncherService.Open(path); else MessageBox.Show("The attached part document could not be found."); }
-    private void OpenStoreroom_Click(object sender, RoutedEventArgs e) { if (string.IsNullOrWhiteSpace(_content.StoreroomUrl)) { MessageBox.Show("Storeroom URL is not configured."); return; } FileLauncherService.Open(_content.StoreroomUrl); }
+    private void OpenStoreroom_Click(object sender, RoutedEventArgs e) { if (SelectedStockroomPlant is { } plant) FileLauncherService.Open(plant.Url); else StockroomPlantBox.Focus(); }
     private async void CheckStoreroom_Click(object sender, RoutedEventArgs e) => await RefreshStockroomAsync();
 
     private sealed record SharedDataSnapshot(List<SafetyGate> Gates, List<SafetySystem> Systems,

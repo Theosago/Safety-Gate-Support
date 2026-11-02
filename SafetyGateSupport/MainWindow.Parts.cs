@@ -15,28 +15,56 @@ public partial class MainWindow
     private string _stockroomRequestedUrl = "", _stockroomMessage = "Current quantity has not been checked.";
     private bool _partPhotoSaving;
     private readonly Dictionary<Image, CancellationTokenSource> _partThumbnailLoads = new();
+    private StockroomPlant? SelectedStockroomPlant => StockroomPlantBox.SelectedItem as StockroomPlant;
+    private void InitializeStockroomPlants()
+    {
+        StockroomPlantBox.ItemsSource = StockroomPlant.All;
+        StockroomPlantBox.SelectedItem = StockroomPlant.Find(_data.Settings.StockroomPlantId);
+        UpdatePartQuantity();
+    }
+    private async void StockroomPlant_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_data is null) return;
+        _stockroomRefresh?.Cancel(); _stockroomRefresh = null;
+        _stockroomSnapshot = null; _stockroomRequestedUrl = "";
+        var plant = SelectedStockroomPlant;
+        _data.Settings.StockroomPlantId = plant?.Id ?? "";
+        try { _data.SaveLocalSettings(); }
+        catch (Exception error) { MessageBox.Show(this, "The plant choice could not be saved on this computer: " + error.Message); }
+        _stockroomMessage = plant is null ? "Choose a stockroom plant to check current quantities." : "Selected stockroom: " + plant.Name;
+        UpdatePartQuantity();
+        if (_sharedDataReady && plant is not null) { _stockroomRequestedUrl = plant.Url; await RefreshStockroomAsync(); }
+    }
     private async Task RefreshStockroomAsync()
     {
         if (_stockroomRefresh is not null || _isClosed || _data.IsHomePreview) return;
+        var plant = SelectedStockroomPlant;
+        if (plant is null) { _stockroomMessage = "Choose a stockroom plant to check current quantities."; UpdatePartQuantity(); StockroomPlantBox.Focus(); return; }
         var source = new CancellationTokenSource(); _stockroomRefresh = source;
-        _stockroomSnapshot = null; _stockroomMessage = "Checking stockroom in the background…"; RefreshStockroomButton.IsEnabled = false; UpdatePartQuantity();
+        _stockroomSnapshot = null; _stockroomMessage = $"Checking {plant.Name} stockroom in the background…"; RefreshStockroomButton.IsEnabled = false; UpdatePartQuantity();
         try
         {
-            var snapshot = await _stockroomReader(_content.StoreroomUrl, source.Token);
-            if (_isClosed || source.IsCancellationRequested) return;
+            var snapshot = await _stockroomReader(plant.Url, source.Token);
+            if (_isClosed || source.IsCancellationRequested || !ReferenceEquals(_stockroomRefresh, source)) return;
             _stockroomSnapshot = snapshot;
-            _stockroomMessage = snapshot.Rows.Count == 0 ? "The Safe2Cross search returned no readable stock rows. Open the stockroom to check its search results." : $"Stockroom checked {snapshot.CheckedUtc.LocalDateTime:g}.";
+            _stockroomMessage = snapshot.Rows.Count == 0 ? $"{plant.Name}: the Safe2Cross search returned no readable stock rows. Open the stockroom to check its search results." : $"{plant.Name} stockroom checked {snapshot.CheckedUtc.LocalDateTime:g}.";
         }
-        catch (OperationCanceledException) { if (!_isClosed) { _stockroomSnapshot = null; _stockroomMessage = "Stockroom check timed out or was canceled. Reported snapshot retained."; } }
-        catch (Exception error) { if (!_isClosed) { _stockroomSnapshot = null; _stockroomMessage = "Stockroom unavailable: " + error.Message + " Reported snapshot retained."; } }
-        finally { if (ReferenceEquals(_stockroomRefresh, source)) _stockroomRefresh = null; source.Dispose(); if (!_isClosed) { RefreshStockroomButton.IsEnabled = true; UpdatePartQuantity(); } }
+        catch (OperationCanceledException) { if (!_isClosed && ReferenceEquals(_stockroomRefresh, source)) { _stockroomSnapshot = null; _stockroomMessage = $"{plant.Name} check timed out or was canceled. Reported snapshot retained."; } }
+        catch (Exception error) { if (!_isClosed && ReferenceEquals(_stockroomRefresh, source)) { _stockroomSnapshot = null; _stockroomMessage = $"{plant.Name} stockroom unavailable: " + error.Message + " Reported snapshot retained."; } }
+        finally
+        {
+            if (ReferenceEquals(_stockroomRefresh, source)) { _stockroomRefresh = null; if (!_isClosed) { RefreshStockroomButton.IsEnabled = true; UpdatePartQuantity(); } }
+            source.Dispose();
+        }
     }
     private void UpdatePartQuantity()
     {
-        var p = SelectedPart; var row = p is null || _stockroomSnapshot is null ? null : StockroomService.Find(_stockroomSnapshot, p);
+        var plant = SelectedStockroomPlant;
+        var p = SelectedPart; var row = p is null || _stockroomSnapshot is null ? null : StockroomService.Find(_stockroomSnapshot, p, plantScoped: true);
         PartCurrentQuantityText.Text = row is null ? "Current quantity unavailable" : "Current quantity: " + PartRecord.FormatQuantity(row.Quantity);
-        PartStockroomStatusText.Text = row is not null ? $"{row.QuantityLabel} • checked {_stockroomSnapshot!.CheckedUtc.LocalDateTime:g}" : _stockroomSnapshot?.Rows.Count > 0 && p is not null ? "No unique stockroom quantity matched this stock number and site/location." : _stockroomMessage;
-        StoreroomResultText.Text = _stockroomMessage;
+        PartStockroomStatusText.Text = row is not null ? $"{plant?.Name} • {row.QuantityLabel} • bin: {(row.Location.Length > 0 ? row.Location : "not provided")} • checked {_stockroomSnapshot!.CheckedUtc.LocalDateTime:g}" : _stockroomSnapshot?.Rows.Count > 0 && p is not null ? $"{plant?.Name}: no unique stockroom quantity matched this stock number." : plant is null ? "Choose a plant above. Reported quantities and locations are the original supplied snapshot, not current inventory for this plant." : _stockroomMessage;
+        StockroomPlantHint.Text = plant is null ? "Choose a plant for current stock levels" : plant.Url + " • saved on this PC";
+        StoreroomResultText.Text = plant is null ? "Choose a stockroom plant. No plant has been checked." : _stockroomMessage;
     }
     private async void LoadPartPhoto(PartRecord part)
     {

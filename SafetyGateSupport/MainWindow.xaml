@@ -22,7 +22,7 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18">
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.1.2" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.1.3" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -145,6 +145,7 @@
     <TextBlock Text="Parts" FontSize="28" FontWeight="Bold"/>
     <StackPanel Grid.Row="1" Margin="0,8,0,12">
      <TextBlock x:Name="PartsIntroText" Foreground="#555" TextWrapping="Wrap"/>
+     <WrapPanel Margin="0,10,0,0"><TextBlock Text="Stockroom plant" VerticalAlignment="Center" Margin="0,0,10,0"/><ComboBox x:Name="StockroomPlantBox" Width="190" DisplayMemberPath="Name" SelectionChanged="StockroomPlant_SelectionChanged"/><TextBlock x:Name="StockroomPlantHint" Text="Choose a plant for current stock levels" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#566D7C"/></WrapPanel>
      <TextBox x:Name="PartSearchBox" Height="36" FontSize="16" Margin="0,10,0,0" VerticalContentAlignment="Center" TextChanged="PartSearchBox_TextChanged" ToolTip="Search part number, description, manufacturer, keyword, or related asset"/>
     </StackPanel>
     <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="4*" MinWidth="260"/><ColumnDefinition Width="12"/><ColumnDefinition Width="6*" MinWidth="360"/></Grid.ColumnDefinitions>
@@ -152,12 +153,13 @@
       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="9"/></Style></ListBox.ItemContainerStyle>
       <ListBox.ItemTemplate><DataTemplate><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="76"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
        <Border Background="#EDF1F5" CornerRadius="6" Width="66" Height="76" VerticalAlignment="Top"><Grid><TextBlock Text="Photo" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#8293A1"/><Image Stretch="Uniform" Margin="3" Loaded="PartThumbnail_Loaded" Unloaded="PartThumbnail_Unloaded" DataContextChanged="PartThumbnail_DataContextChanged"/></Grid></Border>
-       <StackPanel Grid.Column="1"><TextBlock Text="{Binding Description}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding LocationDisplay}" Foreground="#1B637A" Margin="0,5,0,3" TextWrapping="Wrap"/><TextBlock Text="{Binding PartNumber, StringFormat='Stock {0}'}" Foreground="#687A88" TextWrapping="Wrap"/></StackPanel>
+       <StackPanel Grid.Column="1"><TextBlock Text="{Binding Description}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding LocationDisplay, StringFormat='Reported bin: {0}'}" Foreground="#1B637A" Margin="0,5,0,3" TextWrapping="Wrap"/><TextBlock Text="{Binding PartNumber, StringFormat='Stock {0}'}" Foreground="#687A88" TextWrapping="Wrap"/></StackPanel>
       </Grid></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
      <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#CED8E1" ToolTip="Drag to adjust the parts list and detail widths"/>
      <ScrollViewer x:Name="PartDetailScroll" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="8,0,10,12">
       <TextBlock x:Name="PartTitleText" FontSize="23" FontWeight="SemiBold" Text="Select a part." TextWrapping="Wrap"/>
+      <TextBlock Text="Reported bin (original snapshot)" Foreground="#687A88" Margin="0,7,0,0"/>
       <TextBlock x:Name="PartLocationText" FontSize="20" Foreground="#1B637A" Margin="0,7,0,4" TextWrapping="Wrap"/>
       <TextBlock x:Name="PartStockText" Foreground="#617585" TextWrapping="Wrap"/>
       <Border Height="300" Background="#F7F9FC" BorderBrush="#D5DFE8" BorderThickness="1" CornerRadius="8" Margin="0,14,0,6"><Grid>

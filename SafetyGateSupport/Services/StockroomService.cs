@@ -48,9 +48,12 @@ public static class StockroomService
         }
         return new(rows, DateTimeOffset.UtcNow);
     }
-    public static Row? Find(Snapshot snapshot, PartRecord part)
+    public static Row? Find(Snapshot snapshot, PartRecord part, bool plantScoped = false)
     {
         var matches = snapshot.Rows.Where(r => StockKey(r.Stock) == StockKey(part.PartNumber)).ToList();
+        // A plant inventory endpoint is already scoped. Legacy snapshot site/bin values
+        // must never select a different plant or hide a new plant's location.
+        if (plantScoped) return matches.Count == 1 ? matches[0] : null;
         string site = part.SiteValue;
         if (site.Length > 0 && !site.Equals("Not supplied", StringComparison.OrdinalIgnoreCase) && matches.Any(r => r.Site.Length > 0)) matches = matches.Where(r => r.Site.Equals(site, StringComparison.OrdinalIgnoreCase)).ToList();
         if (matches.Count > 1 && part.LocationValue.Length > 0 && matches.Any(r => r.Location.Length > 0)) matches = matches.Where(r => r.Location.Equals(part.LocationValue, StringComparison.OrdinalIgnoreCase)).ToList();
