@@ -6,17 +6,17 @@
  <Grid Margin="22">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <StackPanel>
-   <TextBlock x:Name="SectionText" Foreground="#1769AA" FontWeight="SemiBold" FontSize="13"/>
+   <TextBlock x:Name="SectionText" Foreground="{DynamicResource ThemeForeground1769AA}" FontWeight="SemiBold" FontSize="13"/>
    <TextBlock x:Name="TitleText" FontSize="26" FontWeight="Bold" Margin="0,4,0,12" TextWrapping="Wrap"/>
   </StackPanel>
-  <Border Grid.Row="1" BorderBrush="#D6DCE2" BorderThickness="1" CornerRadius="4" Background="#FAFBFC" Padding="18">
+  <Border Grid.Row="1" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}" BorderThickness="1" CornerRadius="4" Background="{DynamicResource ThemeBackgroundFAFBFC}" Padding="18">
    <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <TextBlock x:Name="BodyText" FontSize="15" LineHeight="24" TextWrapping="Wrap" Foreground="#333"/>
+    <TextBlock x:Name="BodyText" FontSize="15" LineHeight="24" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground333333}"/>
    </ScrollViewer>
   </Border>
   <Grid Grid.Row="2" Margin="0,14,0,0">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <TextBlock Text="This content is managed from Setup Mode and shared through Q:\SafetyGateSupport." Foreground="#777" VerticalAlignment="Center"/>
+   <TextBlock Text="This content is managed from Setup Mode and shared through Q:\SafetyGateSupport." Foreground="{DynamicResource ThemeForeground777777}" VerticalAlignment="Center"/>
    <Button Grid.Column="1" Content="Close" Click="Close_Click" Padding="24,8"/>
   </Grid>
  </Grid>

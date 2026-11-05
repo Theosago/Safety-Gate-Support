@@ -7,7 +7,7 @@
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <StackPanel>
    <TextBlock x:Name="TaskTitleText" Text="Which unit are you working on?" FontSize="26" FontWeight="Bold"/>
-   <TextBlock x:Name="TaskDescriptionText" Text="Search across all areas by asset number. Choose the unit and confirm its photo before continuing." Foreground="#555" Margin="0,4,0,14" TextWrapping="Wrap"/>
+   <TextBlock x:Name="TaskDescriptionText" Text="Search across all areas by asset number. Choose the unit and confirm its photo before continuing." Foreground="{DynamicResource ThemeForeground555555}" Margin="0,4,0,14" TextWrapping="Wrap"/>
   </StackPanel>
 
   <Grid Grid.Row="1" Margin="0,0,0,12">
@@ -39,21 +39,21 @@
       <RowDefinition Height="Auto"/>
      </Grid.RowDefinitions>
      <TextBlock x:Name="PreviewTitleText" Text="Select a unit" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
-     <Border Grid.Row="1" BorderBrush="#C8C8C8" BorderThickness="1" CornerRadius="3" Background="#F7F7F7" MinHeight="220">
+     <Border Grid.Row="1" BorderBrush="{DynamicResource ThemeBorderBrushC8C8C8}" BorderThickness="1" CornerRadius="3" Background="{DynamicResource ThemeBackgroundF7F7F7}" MinHeight="220">
       <Grid>
        <Image x:Name="PreviewImage" Stretch="Uniform" Margin="6"/>
-       <TextBlock x:Name="PreviewPlaceholderText" Text="Choose a safety gate and unit to see its identification photo." Foreground="#777" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"/>
+       <TextBlock x:Name="PreviewPlaceholderText" Text="Choose a safety gate and unit to see its identification photo." Foreground="{DynamicResource ThemeForeground777777}" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"/>
       </Grid>
      </Border>
-     <TextBlock x:Name="PreviewDetailText" Grid.Row="2" Foreground="#444" Margin="0,10,0,0" TextWrapping="Wrap"/>
-     <TextBlock x:Name="PreviewStatusText" Grid.Row="3" Foreground="#777" Margin="0,5,0,0" FontSize="12" TextWrapping="Wrap"/>
+     <TextBlock x:Name="PreviewDetailText" Grid.Row="2" Foreground="{DynamicResource ThemeForeground444444}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+     <TextBlock x:Name="PreviewStatusText" Grid.Row="3" Foreground="{DynamicResource ThemeForeground777777}" Margin="0,5,0,0" FontSize="12" TextWrapping="Wrap"/>
     </Grid>
    </GroupBox>
   </Grid>
 
   <Grid Grid.Row="3" Margin="0,14,0,0">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <TextBlock x:Name="SelectedText" Text="Select a safety gate and unit." Foreground="#555" FontSize="14" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0"/>
+   <TextBlock x:Name="SelectedText" Text="Select a safety gate and unit." Foreground="{DynamicResource ThemeForeground555555}" FontSize="14" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0"/>
    <Button Grid.Column="1" Content="Cancel" Click="Cancel_Click" Padding="22,8" Margin="0,0,8,0"/>
    <Button x:Name="StartButton" Grid.Column="2" Content="Continue" Click="Start_Click" Padding="22,8" IsEnabled="False" Style="{StaticResource PrimaryButton}"/>
   </Grid>

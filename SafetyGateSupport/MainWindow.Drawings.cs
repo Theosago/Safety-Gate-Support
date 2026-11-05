@@ -215,7 +215,7 @@ public partial class MainWindow
         var choices = _data.ResourcesFor(gate, unit, resources).Where(AssignedDrawings.IsDrawing).ToList();
         var resource = choices.FirstOrDefault(r => Path.GetDirectoryName(_drawingPath)?.Equals(_data.ResourceCurrentFolder(r, gate), StringComparison.OrdinalIgnoreCase) == true) ?? choices.FirstOrDefault();
         if (resource is null) { MessageBox.Show(this, "Add this asset’s drawing collection in Setup or link a drawing from Support library first."); return; }
-        new ResourceWindow(_data, gate, unit, resource, _drawingPath) { Owner = this }.ShowDialog();
+        ShowInlineResource("Electrical Drawings");
         if (!_isClosed && SelectedUnit?.Id == unit.Id) LoadDrawings(gate, unit);
     }
 

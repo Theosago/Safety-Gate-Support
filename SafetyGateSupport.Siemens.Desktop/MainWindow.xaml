@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Signal column • v0.4.0 • Safety Gate Support 7"
         Width="1040" Height="900" MinWidth="720" MinHeight="650"
-        WindowStartupLocation="CenterScreen" Background="#F5F7FA"
+        WindowStartupLocation="CenterScreen" Background="{DynamicResource ThemeBackgroundF5F7FA}"
         FontFamily="Segoe UI" FontSize="14"
         Loaded="Window_Loaded">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -20,18 +20,18 @@
 
         <StackPanel Grid.Row="0" Margin="0,0,0,18">
             <TextBlock x:Name="ContextText" TextWrapping="Wrap" FontWeight="Bold" Margin="0,0,0,8" Visibility="Collapsed"/>
-            <TextBlock Text="Check the light. Fix the configuration." FontSize="25" FontWeight="SemiBold" Foreground="#14263D" />
+            <TextBlock Text="Check the light. Fix the configuration." FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource ThemeForeground14263D}" />
             <TextBlock Text="Connect → choose this unit’s file → read and compare → check the actual lights."
-                       Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#394C60" />
+                       Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground394C60}" />
         </StackPanel>
 
-        <Border Grid.Row="1" Padding="14" Background="White" BorderBrush="#D6DEE8" BorderThickness="1" CornerRadius="6">
+        <Border Grid.Row="1" Padding="14" Background="{DynamicResource ThemeBackgroundFFFFFF}" BorderBrush="{DynamicResource ThemeBorderBrushD6DEE8}" BorderThickness="1" CornerRadius="6">
             <StackPanel>
                 <TextBlock Text="8WD4613-5JH37 • isolate the equipment for servicing before USB connection."
                            FontWeight="SemiBold" TextWrapping="Wrap" />
                 <TextBlock Margin="0,7,0,0" TextWrapping="Wrap"
                            Text="Close Siemens Configurator first. Connect the column directly using a USB-C data cable. Windows must recognize its serial port." />
-                <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="#88520A"
+                <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground88520A}"
                            Text="Opening USB can restart the column. Upload replaces its settings and requests a restart. A backup is saved before uploading, and stored settings are checked after restart. Physical operation must be checked separately." />
             </StackPanel>
         </Border>
@@ -50,7 +50,7 @@
                     VerticalAlignment="Bottom" Click="RefreshButton_Click" />
         </Grid>
 
-        <TextBlock x:Name="DetectionText" Grid.Row="3" Margin="0,7,0,0" Foreground="#394C60"
+        <TextBlock x:Name="DetectionText" Grid.Row="3" Margin="0,7,0,0" Foreground="{DynamicResource ThemeForeground394C60}"
                    TextWrapping="Wrap" Text="Checking connected devices…" />
 
         <StackPanel Grid.Row="4" Margin="0,16,0,14">
@@ -71,13 +71,13 @@
             </WrapPanel>
         <TextBox x:Name="ResultText" Height="140" Margin="0,12,0,6" IsReadOnly="True" TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                 Padding="12" BorderBrush="#D6DEE8" Background="White"
+                 Padding="12" BorderBrush="{DynamicResource ThemeBorderBrushD6DEE8}" Background="{DynamicResource ThemeBackgroundFFFFFF}"
                  Text="Select the spare column. Read saves a backup report; Upload uses the selected .signal file. No device opens until you start a read or confirm an upload." />
              </StackPanel></TabItem>
              <TabItem Header="Expected lights &amp; sound">
                 <StackPanel Margin="14">
                     <TextBlock Text="Which inputs are ON? Match the safely observed input signals from the drawing." TextWrapping="Wrap" Margin="0,10,0,6"/>
-                    <TextBlock Text="These switches change the preview only. They never operate the real column." Foreground="#536E81" TextWrapping="Wrap"/>
+                    <TextBlock Text="These switches change the preview only. They never operate the real column." Foreground="{DynamicResource ThemeForeground536E81}" TextWrapping="Wrap"/>
                     <WrapPanel Margin="0,8">
                      <ToggleButton x:Name="Input1Toggle" Tag="1" Content="Input 1" Checked="Input_Changed" Unchecked="Input_Changed" Margin="0,0,8,6" Padding="14,10" ToolTip="Preview input 1 ON / OFF"/>
                      <ToggleButton x:Name="Input2Toggle" Tag="2" Content="Input 2" Checked="Input_Changed" Unchecked="Input_Changed" Margin="0,0,8,6" Padding="14,10" ToolTip="Preview input 2 ON / OFF"/>
@@ -88,8 +88,8 @@
                      <Button x:Name="ClearInputsButton" Content="All OFF" Click="ClearInputs_Click" Margin="0,0,0,6"/>
                     </WrapPanel>
                     <TextBlock x:Name="InputStateText" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                    <Border Background="White" BorderBrush="#DFE6ED" BorderThickness="1" CornerRadius="10" Padding="16">
-                     <StackPanel><TextBlock Text="Expected appearance" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Stored segment order; confirm physical orientation against the drawing." Foreground="#536E81" TextWrapping="Wrap" Margin="0,4,0,10"/><WrapPanel x:Name="SegmentPreviewPanel"/><TextBlock x:Name="SoundPreviewText" TextWrapping="Wrap" Margin="0,12,0,0"/></StackPanel>
+                    <Border Background="{DynamicResource ThemeBackgroundFFFFFF}" BorderBrush="{DynamicResource ThemeBorderBrushDFE6ED}" BorderThickness="1" CornerRadius="10" Padding="16">
+                     <StackPanel><TextBlock Text="Expected appearance" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Stored segment order; confirm physical orientation against the drawing." Foreground="{DynamicResource ThemeForeground536E81}" TextWrapping="Wrap" Margin="0,4,0,10"/><WrapPanel x:Name="SegmentPreviewPanel"/><TextBlock x:Name="SoundPreviewText" TextWrapping="Wrap" Margin="0,12,0,0"/></StackPanel>
                     </Border>
                     <Expander Header="Stored values and effect details" Margin="0,8"><TextBox x:Name="PreviewText" IsReadOnly="True" TextWrapping="Wrap" Height="150" VerticalScrollBarVisibility="Auto"/></Expander>
                     <ComboBox x:Name="ObservationCombo" SelectionChanged="Observation_SelectionChanged" Margin="0,5">
@@ -105,7 +105,7 @@
 
 
 
-        <TextBlock x:Name="StatusText" Grid.Row="6" Margin="0,12,0,0" Foreground="#394C60"
+        <TextBlock x:Name="StatusText" Grid.Row="6" Margin="0,12,0,0" Foreground="{DynamicResource ThemeForeground394C60}"
                    TextWrapping="Wrap" Text="Ready. Device detection does not open USB." />
     </Grid>
     </ScrollViewer>

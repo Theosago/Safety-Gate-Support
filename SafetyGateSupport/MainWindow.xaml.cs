@@ -53,7 +53,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _data = data; _stockroomReader = stockroomReader ?? ((url, token) => Task.Run(() => StockroomService.FetchAsync(url, token), token));
-        InitializeStockroomPlants(); InitializeReplacementParts();
+        InitializeStockroomPlants(); InitializeReplacementParts(); InitializeTheme();
         InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
@@ -62,7 +62,7 @@ public partial class MainWindow : Window
         _searchIndexRefreshTimer.Tick += (_, _) => _ = RefreshSearchIndexAsync();
         _notesRefreshTimer.Start();
         _searchIndexRefreshTimer.Start();
-        Closing += (_, _) => SaveSharedNotesNow();
+        Closing += (_, args) => { if (InlineBusy) { args.Cancel = true; MessageBox.Show(this, "Finish or cancel the current USB/file operation before closing."); } else { CloseInlineTool(); SaveSharedNotesNow(); } };
         Closed += (_, _) =>
         {
             _isClosed = true;
@@ -174,7 +174,7 @@ public partial class MainWindow : Window
         HomeCategoryPanel.Children.Clear();
         foreach (var category in _categories)
         {
-            var button = new Button { Tag = category, MinWidth = 90, MinHeight = 36, Content = category, Margin = new Thickness(4), HorizontalContentAlignment = HorizontalAlignment.Left };
+            var button = new Button { Tag = category, MinWidth = 90, MinHeight = 36, Content = category, Margin = new Thickness(4), HorizontalContentAlignment = HorizontalAlignment.Center };
             button.Click += (_, _) => SelectGalleryArea(category);
             HomeCategoryPanel.Children.Add(button);
         }
@@ -196,8 +196,8 @@ public partial class MainWindow : Window
 
     private void HomeNav_Click(object sender, RoutedEventArgs e) => ShowHome();
     private void SystemsNav_Click(object sender, RoutedEventArgs e) { if (SelectedUnit is null) ShowHome(); else ShowSystems(); }
-    private void ManualsNav_Click(object sender, RoutedEventArgs e) { _manualFilterGateId = _manualFilterUnitId = ""; ShowManuals(); RefreshManuals(); }
-    private void PartsNav_Click(object sender, RoutedEventArgs e) { _partFilterGateId = _partFilterUnitId = ""; ShowParts(); RefreshParts(); }
+    private void ManualsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; _manualFilterGateId = _manualFilterUnitId = ""; ShowManuals(); RefreshManuals(); }
+    private void PartsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; _partFilterGateId = _partFilterUnitId = ""; ShowParts(); RefreshParts(); }
 
     private void HideAllViews() { SetPartsRail(false); HomeView.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
     private void ShowHome() { HideAllViews(); HomeView.Visibility = Visibility.Visible; SetPartsRail(true); SetActiveNavigation(HomeNav); }
@@ -412,6 +412,7 @@ public partial class MainWindow : Window
 
     private void NavigateToSystem(SafetySystem unit, string? highlightNoteText = null)
     {
+        if (InlineBusy) { MessageBox.Show(this, "Finish or cancel the current operation before changing units."); return; }
         var gate = GateFor(unit); if (gate is null) return;
         ShowSystems(); _currentArea = gate.Category; SystemSearchBox.Text = ""; AreaBox.SelectedItem = gate.Category; RefreshGates(false);
         var gateItem = (AssetList.ItemsSource as IEnumerable<SafetyGate>)?.FirstOrDefault(g => g.Id == gate.Id); if (gateItem is null) return;
@@ -464,6 +465,7 @@ public partial class MainWindow : Window
 
     private void ShowUnitDetails(SafetySystem unit)
     {
+        CloseInlineTool();
         SaveSharedNotesNow();
         var gate = GateFor(unit); if (gate is null) { ClearUnit(); return; }
         NoUnitPanel.Visibility = Visibility.Collapsed; UnitDetailPanel.Visibility = Visibility.Visible;
@@ -595,7 +597,7 @@ public partial class MainWindow : Window
 
     private void HomeTroubleshoot_Click(object sender, RoutedEventArgs e) => BeginTask("unknown");
     private void Symptom_Click(object sender, RoutedEventArgs e) => BeginTask((string)((Button)sender).Tag);
-    private void FindFiles_Click(object sender, RoutedEventArgs e) => BeginTask((string)((Button)sender).Tag, files: true);
+    private void FindFiles_Click(object sender, RoutedEventArgs e) => ShowInlineResource("Electrical Drawings");
 
     private void BeginTask(string task, bool files = false)
     {
@@ -614,17 +616,8 @@ public partial class MainWindow : Window
         }
     }
     private void TroubleshootSimple_Click(object sender, RoutedEventArgs e) => BeginTask("unknown");
-    private async void LightColumn_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedGate is { } gate && SelectedUnit is { } unit) await SignalColumnService.OpenAsync(this, _data, gate, unit, _resources);
-    }
-    private void Scanner_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedGate is not { } gate || SelectedUnit is not { } unit || !unit.ShowScannerConfiguration) return;
-        var resource = _resources.FirstOrDefault(r => r.GateId == gate.Id && r.AppliesTo(unit.Id) && r.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) && AssetFileLayout.Category(r) == "Scanner Configurations");
-        if (resource is null) { new UamDiagnosticsWindow(_data, gate, unit) { Owner = this }.ShowDialog(); return; }
-        new ResourceWindow(_data, gate, unit, resource) { Owner = this }.ShowDialog();
-    }
+    private void LightColumn_Click(object sender, RoutedEventArgs e) => ShowInlineResource("Light Configurations");
+    private void Scanner_Click(object sender, RoutedEventArgs e) => ShowInlineResource("Scanner Configurations");
     private void Plc_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedGate is { } gate && SelectedUnit is { } unit) new PlcWindow(_data, gate, unit) { Owner = this }.ShowDialog();
@@ -639,7 +632,7 @@ public partial class MainWindow : Window
     {
         if (ManualList is null) return; var q = ManualSearchBox?.Text.Trim() ?? "";
         IEnumerable<ManualRecord> source = _manuals;
-        if (!string.IsNullOrWhiteSpace(_manualFilterGateId) && !string.IsNullOrWhiteSpace(_manualFilterUnitId)) source = source.Where(m => m.AppliesTo(_manualFilterGateId, _manualFilterUnitId));
+        if (!string.IsNullOrWhiteSpace(_manualFilterGateId) && !string.IsNullOrWhiteSpace(_manualFilterUnitId)) source = source.Where(m => SelectedUnit?.ManualIds is { } ids ? ids.Contains(m.Id, StringComparer.OrdinalIgnoreCase) : m.AppliesTo(_manualFilterGateId, _manualFilterUnitId));
         var items = source.Where(m => string.IsNullOrWhiteSpace(q) || Contains($"{m.Title} {m.Manufacturer} {m.Model} {m.Keywords}", q))
             .Select(m => new ManualFileItem { Id = m.Id, Name = m.Display, Path = _data.Resolve(m.FilePath) }).OrderBy(m => m.Name).ToList();
         ManualList.ItemsSource = items;

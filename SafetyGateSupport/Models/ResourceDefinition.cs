@@ -12,7 +12,8 @@ public class ResourceDefinition
     public string Target { get; set; } = "";
     public List<string> AppliesToUnitIds { get; set; } = new();
     public bool IsVisible { get; set; } = true;
-    public bool AllowUserUpload { get; set; }
+    private bool _allowUserUpload;
+    public bool AllowUserUpload { get => _allowUserUpload || Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) && (LaunchAction is "Siemens" or "UAM" || Label.Contains("Drawing", StringComparison.OrdinalIgnoreCase) || StorageCategory is "Electrical Drawings" or "Light Configurations" or "Scanner Configurations"); set => _allowUserUpload = value; }
     // SameExtension, SameName, All, None
     public string ArchiveMode { get; set; } = "SameExtension";
     // None, Siemens, UAM

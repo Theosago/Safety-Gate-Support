@@ -13,11 +13,11 @@
 
   <StackPanel>
    <TextBlock x:Name="ResourceTitleText" FontSize="25" FontWeight="Bold"/>
-   <TextBlock x:Name="SystemText" Foreground="#555" Margin="0,3,0,0"/>
+   <TextBlock x:Name="SystemText" Foreground="{DynamicResource ThemeForeground555555}" Margin="0,3,0,0"/>
   </StackPanel>
 
-  <Border Grid.Row="1" Background="#F4F7FA" BorderBrush="#D6DCE2" BorderThickness="1" Padding="12" Margin="0,14,0,10">
-   <TextBlock x:Name="DescriptionText" TextWrapping="Wrap" Foreground="#444"/>
+  <Border Grid.Row="1" Background="{DynamicResource ThemeBackgroundF4F7FA}" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}" BorderThickness="1" Padding="12" Margin="0,14,0,10">
+   <TextBlock x:Name="DescriptionText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground444444}"/>
   </Border>
 
   <GroupBox Grid.Row="2" Header="Files">
@@ -29,13 +29,13 @@
        <Grid Margin="3">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="150"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
         <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
-        <TextBlock Grid.Column="1" Text="{Binding Modified}" Foreground="#666"/>
-        <TextBlock Grid.Column="2" Text="{Binding Size}" Foreground="#666" HorizontalAlignment="Right"/>
+        <TextBlock Grid.Column="1" Text="{Binding Modified}" Foreground="{DynamicResource ThemeForeground666666}"/>
+        <TextBlock Grid.Column="2" Text="{Binding Size}" Foreground="{DynamicResource ThemeForeground666666}" HorizontalAlignment="Right"/>
        </Grid>
       </DataTemplate>
      </ListBox.ItemTemplate>
     </ListBox>
-    <TextBlock x:Name="EmptyText" Grid.Row="0" Text="No files have been added yet." Foreground="#777" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+    <TextBlock x:Name="EmptyText" Grid.Row="0" Text="No files have been added yet." Foreground="{DynamicResource ThemeForeground777777}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
     <WrapPanel Grid.Row="1" Margin="0,8,0,0">
      <Button Content="Open Selected" Click="OpenSelected_Click"/>
      <Button Content="Open Current Folder" Click="OpenCurrentFolder_Click"/>
@@ -51,7 +51,7 @@
   </GroupBox>
 
   <DockPanel Grid.Row="3" Margin="0,12,0,0">
-   <TextBlock x:Name="StatusText" Foreground="#666" VerticalAlignment="Center" TextWrapping="Wrap"/>
+   <TextBlock x:Name="StatusText" Foreground="{DynamicResource ThemeForeground666666}" VerticalAlignment="Center" TextWrapping="Wrap"/>
    <Button Content="Close" Click="Close_Click" DockPanel.Dock="Right" Padding="24,8"/>
   </DockPanel>
  </Grid>

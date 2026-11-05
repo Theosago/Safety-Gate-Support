@@ -10,6 +10,9 @@ namespace SafetyGateSupport;
 
 public partial class ResourceWindow : Window
 {
+    public bool IsEmbeddedBusy => _fileUpdateBusy;
+    public Action? EmbeddedColumnRequested { get; set; }
+    public Action? EmbeddedScannerRequested { get; set; }
     private bool _fileUpdateBusy;
     private readonly DataService _data;
     private readonly SafetyGate _gate;
@@ -79,7 +82,7 @@ public partial class ResourceWindow : Window
             ? "Drawings|*.pdf;*.dwg;*.dxf|PDF|*.pdf|AutoCAD|*.dwg;*.dxf|All files|*.*"
             : "All files|*.*";
         var dialog = new OpenFileDialog { Title = $"Upload {_resource.Label} for {_gate.Display} / {_unit.UnitDisplay}", Filter = filter, Multiselect = true };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(Owner ?? this) != true) return;
         var names = string.Join("\n", dialog.FileNames.Select(Path.GetFileName));
         var applies = _resource.AppliesToUnitIds.Count > 1
             ? "\n\nThis resource is shared by multiple units. The update will be visible from every linked unit."
@@ -94,27 +97,27 @@ public partial class ResourceWindow : Window
         if (FileList.SelectedItem is not ResourceFileItem item) { StatusText.Text = "Select the sheet or file you are replacing first."; return; }
         if (AssignedDrawings.IsDrawing(_resource)) { UploadDrawingPair(item.Path); return; }
         var dialog = new OpenFileDialog { Title = "Choose the replacement for " + item.Name, Multiselect = false, Filter = "All files|*.*" };
-        if (dialog.ShowDialog(this) != true) return;
-        if (MessageBox.Show(this, $"Replace '{item.Name}' with '{Path.GetFileName(dialog.FileName)}'?\n\nThe previous file will be archived. Every unit linked to this same file will use the replacement; unrelated sheets stay current.", "Replace selected file", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (dialog.ShowDialog(Owner ?? this) != true) return;
+        if (MessageBox.Show(Owner ?? this, $"Replace '{item.Name}' with '{Path.GetFileName(dialog.FileName)}'?\n\nThe previous file will be archived. Every unit linked to this same file will use the replacement; unrelated sheets stay current.", "Replace selected file", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         try { _data.ReplaceAssetFile(_resource, _gate, item.Path, dialog.FileName); RefreshFiles(); StatusText.Text = "Replacement saved. Previous revision archived; existing unit links preserved."; }
-        catch (Exception error) { MessageBox.Show(this, error.Message, "Unable to replace file", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception error) { MessageBox.Show(Owner ?? this, error.Message, "Unable to replace file", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
     private async void UploadDrawingPair(string? replacing)
     {
         if (_fileUpdateBusy) return;
         var dialog = new OpenFileDialog { Title = replacing is null ? "Select the PDF and DWG for one print" : "Select both replacement companions", Multiselect = true, Filter = "Print pair (PDF + DWG)|*.pdf;*.dwg" };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(Owner ?? this) != true) return;
         if (dialog.FileNames.Length != 2 || dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 || dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1)
-        { MessageBox.Show(this, "Select one PDF and its corresponding DWG together. The missing companion must be included before this print can be published.", "PDF/DWG companion required", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+        { MessageBox.Show(Owner ?? this, "Select one PDF and its corresponding DWG together. The missing companion must be included before this print can be published.", "PDF/DWG companion required", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         string action = replacing is null ? "Add this print pair?" : "Replace the selected print pair?";
-        if (MessageBox.Show(this, action + "\n\n" + string.Join("\n", dialog.FileNames.Select(Path.GetFileName)) + "\n\nBoth companions will be published together. Replacing a shared print retains all its existing unit links and archives its previous files. Other prints are unchanged.", "Publish PDF + DWG", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(Owner ?? this, action + "\n\n" + string.Join("\n", dialog.FileNames.Select(Path.GetFileName)) + "\n\nBoth companions will be published together. Replacing a shared print retains all its existing unit links and archives its previous files. Other prints are unchanged.", "Publish PDF + DWG", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         _fileUpdateBusy = true; IsEnabled = false; StatusText.Text = "Staging and verifying both drawing files…";
         try
         {
             var result = await System.Threading.Tasks.Task.Run(() => _data.SaveDrawingPair(_resource, _gate, _unit, dialog.FileNames, replacing));
             RefreshFiles(); StatusText.Text = result.ReviewNote.Length == 0 ? "PDF and DWG published together; unit links retained." : result.ReviewNote + " Verify the corresponding export; this warning is also shown beside the drawing.";
         }
-        catch (Exception error) { MessageBox.Show(this, error.Message, "Drawing pair not published", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception error) { MessageBox.Show(Owner ?? this, error.Message, "Drawing pair not published", MessageBoxButton.OK, MessageBoxImage.Warning); }
         finally { _fileUpdateBusy = false; IsEnabled = true; }
     }
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -157,8 +160,8 @@ public partial class ResourceWindow : Window
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) { MessageBox.Show($"{name} has not been configured on this computer.\n\nUse hidden setup mode to configure the executable path.", "Software path not configured", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         FileLauncherService.Open(path);
     }
-    private void UamDiagnostics_Click(object sender, RoutedEventArgs e) => new UamDiagnosticsWindow(_data, _gate, _unit) { Owner = this }.ShowDialog();
-    private async void SignalColumn_Click(object sender, RoutedEventArgs e) => await SignalColumnService.OpenAsync(this, _data, _gate, _unit, new[] { _resource });
+    private void UamDiagnostics_Click(object sender, RoutedEventArgs e) { if (EmbeddedScannerRequested is { } show) show(); else new UamDiagnosticsWindow(_data, _gate, _unit) { Owner = Owner ?? this }.ShowDialog(); }
+    private async void SignalColumn_Click(object sender, RoutedEventArgs e) { if (EmbeddedColumnRequested is { } show) show(); else await SignalColumnService.OpenAsync(this, _data, _gate, _unit, new[] { _resource }); }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
     private sealed class ResourceFileItem { public string Name { get; set; } = ""; public string Path { get; set; } = ""; public string Modified { get; set; } = ""; public string Size { get; set; } = ""; }
 }

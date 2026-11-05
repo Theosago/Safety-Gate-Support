@@ -24,11 +24,20 @@ public partial class UamDiagnosticsWindow : Window
         InitializeComponent(); _preview = data.IsHomePreview;
         ContextText.Text = $"{gate.Display} / {unit.UnitDisplay} • confirm the device label is UAM-05LP-T301";
     }
+    public FrameworkElement CreateEmbeddedView(Window owner)
+    {
+        Owner = owner;
+        var view = (FrameworkElement)Content; Content = null;
+        bool loaded = false;
+        view.Loaded += (sender, args) => { if (!loaded) { loaded = true; Window_Loaded(sender, args); } };
+        return view;
+    }
+    public bool IsEmbeddedBusy => _operation is not null;
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         MaxHeight = SystemParameters.WorkArea.Height;
         if (_preview) { DetectionText.Text = "Home preview: USB operations are disabled. Explore Look up a display code without hardware."; UpdateControls(); return; }
-        _deviceNotifications = HwndSource.FromVisual(this) as HwndSource;
+        _deviceNotifications = HwndSource.FromVisual(Owner ?? this) as HwndSource;
         _deviceNotifications?.AddHook(DeviceMessage);
         _deviceRefresh.Tick += async (_, _) =>
         {
@@ -89,10 +98,10 @@ public partial class UamDiagnosticsWindow : Window
         {
             string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SafetyGateSupport", "HokuyoReports"); Directory.CreateDirectory(folder);
             var save = new SaveFileDialog { Title = "Save UAM USB status report", Filter = "Diagnostic report (*.zip)|*.zip", DefaultExt = ".zip", AddExtension = true, InitialDirectory = folder, FileName = $"Hokuyo-UAM-USB-check-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..4]}.zip" };
-            if (save.ShowDialog(this) != true) return;
+            if (save.ShowDialog(Owner ?? this) != true) return;
             reportPath = save.FileName;
             if (File.Exists(reportPath)) throw new IOException("Choose a new report filename to preserve previous evidence.");
-            if (MessageBox.Show(this, $"Read identity and status from {port.DisplayName}?\n\nUse the test scanner isolated from operating equipment. Opening the serial port asserts DTR/RTS. This first hardware check sends only the fixed read requests; no reset, configuration, or mode-changing commands.\n\nKeep the generated report for comparison with Project Designer.", "Read UAM test scanner", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            if (MessageBox.Show(Owner ?? this, $"Read identity and status from {port.DisplayName}?\n\nUse the test scanner isolated from operating equipment. Opening the serial port asserts DTR/RTS. This first hardware check sends only the fixed read requests; no reset, configuration, or mode-changing commands.\n\nKeep the generated report for comparison with Project Designer.", "Read UAM test scanner", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         }
         catch (Exception error) { ResultText.Text = error.Message; return; }
         using var cancel = new CancellationTokenSource(); _operation = cancel; UpdateControls();

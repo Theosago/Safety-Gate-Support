@@ -32,6 +32,21 @@ public partial class MainWindow
         RailPartsList.ItemsSource = parts;
         RailPartsEmpty.Text = parts.Count == 0 ? unitView ? "No parts chosen for this unit. Use Choose unit parts to add them." : "No parts in the shared library." : "";
     }
+    private async void ChooseUnitManuals_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedUnit is not { } unit) { MessageBox.Show(this, "Select a unit first to choose its manuals."); return; }
+        var list = new ListBox { ItemsSource = _manuals.OrderBy(m => m.Title).ToList(), DisplayMemberPath = "Title", SelectionMode = SelectionMode.Multiple };
+        foreach (var manual in _manuals.Where(m => unit.ManualIds is { } ids ? ids.Contains(m.Id) : m.AppliesTo(unit.GateId, unit.Id))) list.SelectedItems.Add(manual);
+        var save = new Button { Content = "Save unit manuals", IsDefault = true }; var cancel = new Button { Content = "Cancel", IsCancel = true };
+        var buttons = new WrapPanel(); buttons.Children.Add(save); buttons.Children.Add(cancel);
+        var panel = new DockPanel { Margin = new Thickness(20) }; DockPanel.SetDock(buttons, Dock.Bottom); panel.Children.Add(buttons);
+        var label = new TextBlock { Text = unit.AdminDisplay + " — select the manuals used on this unit", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) }; DockPanel.SetDock(label, Dock.Top); panel.Children.Add(label); panel.Children.Add(list);
+        var dialog = new Window { Owner = this, Title = "Choose unit manuals", Width = 650, Height = 650, Content = panel, WindowStartupLocation = WindowStartupLocation.CenterOwner }; save.Click += (_, _) => dialog.DialogResult = true;
+        if (dialog.ShowDialog() != true) return;
+        var idsToSave = list.SelectedItems.Cast<ManualRecord>().Select(m => m.Id).ToList();
+        try { var result = await Task.Run(() => _data.SaveUnitManuals(unit.Id, idsToSave)); unit.ManualIds = result.ManualIds; _manualFilterGateId = unit.GateId; _manualFilterUnitId = unit.Id; RefreshManuals(); }
+        catch (Exception error) { MessageBox.Show(this, "Manual choices were not saved: " + error.Message); }
+    }
     private async void ConfigureUnitParts_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedUnit is not { } unit) return;

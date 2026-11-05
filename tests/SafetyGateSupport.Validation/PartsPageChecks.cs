@@ -35,6 +35,9 @@ internal static class PartsPageChecks
             data.SaveSystems([new() { Id = "a", DisplayName = "Preserve me" }, new() { Id = "b", ReplacementPartIds = ["one"] }]);
             data.SaveUnitReplacementParts("a", ["one", "one", "deleted"]);
             var units = data.LoadSystems(); Require(units.Single(u => u.Id == "a").ReplacementPartIds!.SequenceEqual(["one"]) && units.Single(u => u.Id == "a").DisplayName == "Preserve me" && units.Single(u => u.Id == "b").ReplacementPartIds!.SequenceEqual(["one"]), "Unit selection lost data or accepted deleted/duplicate parts.");
+            data.SaveManualRecords([new() { Id = "manual-one", Title = "Reference" }]);
+            data.SaveUnitManuals("a", ["manual-one", "deleted"]);
+            Require(data.LoadSystems().Single(u => u.Id == "a").ManualIds!.SequenceEqual(["manual-one"]) && data.LoadSystems().Single(u => u.Id == "a").ReplacementPartIds!.SequenceEqual(["one"]), "Manual choices overwrote parts or retained deleted manuals.");
             data.SaveUnitReplacementParts("a", []); Require(data.LoadSystems().Single(u => u.Id == "a").ReplacementPartIds is { Count: 0 }, "Empty selection reverted to all parts.");
             Require(part.AvailableDisplay == "Available: unknown", "Reported quantity was treated as available stock.");
             part.SetInventory(3, "LIVE BIN"); Require(part.AvailableDisplay == "Available: 3" && part.AvailableColor == "#16703C" && part.InventoryLocationDisplay == "LIVE BIN", "Live positive availability was not green.");

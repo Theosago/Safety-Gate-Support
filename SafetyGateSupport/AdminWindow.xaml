@@ -6,7 +6,7 @@
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <StackPanel>
    <TextBlock Text="Setup Mode" FontSize="26" FontWeight="Bold"/>
-   <TextBlock Text="Gate structure, buttons, troubleshooting, manuals, parts, and home content are stored on the shared drive. Changing them does not require rebuilding the EXE." Foreground="#555" TextWrapping="Wrap"/>
+   <TextBlock Text="Gate structure, buttons, troubleshooting, manuals, parts, and home content are stored on the shared drive. Changing them does not require rebuilding the EXE." Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
   </StackPanel>
   <TabControl x:Name="SetupTabs" Grid.Row="1" Margin="0,14,0,10">
 
@@ -27,16 +27,16 @@
        <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
        <TextBlock Text="Unit Number" VerticalAlignment="Center"/><TextBox x:Name="UnitNumberBox" Grid.Column="1" Margin="3"/>
-       <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0"><TextBlock Text="Equipment on this unit" FontWeight="SemiBold"/><WrapPanel><CheckBox x:Name="UnitHasSignalColumnCheck" Content="Signal column" Margin="0,8,20,0"/><CheckBox x:Name="UnitHasScannerCheck" Content="Safety scanner" Margin="0,8,0,0"/></WrapPanel><TextBlock Text="Uncheck equipment this unit does not have. Files are retained; the unit-page action is hidden." TextWrapping="Wrap" FontSize="12" Foreground="#61788A" Margin="0,6,0,0"/></StackPanel>
+       <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0"><TextBlock Text="Equipment on this unit" FontWeight="SemiBold"/><WrapPanel><CheckBox x:Name="UnitHasSignalColumnCheck" Content="Signal column" Margin="0,8,20,0"/><CheckBox x:Name="UnitHasScannerCheck" Content="Safety scanner" Margin="0,8,0,0"/></WrapPanel><TextBlock Text="Uncheck equipment this unit does not have. Files are retained; the unit-page action is hidden." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource ThemeForeground61788A}" Margin="0,6,0,0"/></StackPanel>
        <TextBlock Grid.Row="2" Text="Identification Photo" VerticalAlignment="Center"/><StackPanel Grid.Row="2" Grid.Column="1"><WrapPanel><Button Content="Choose Photo..." Click="ChoosePhoto_Click"/><Button Content="Paste Image" Click="PastePhoto_Click" Margin="6,0,0,0"/></WrapPanel><TextBlock x:Name="UnitPhotoText" TextWrapping="Wrap" FontSize="12" Margin="4,4,0,0"/></StackPanel>
-       <Border x:Name="UnitPhotoPreviewBorder" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="10" Background="#F7F9FB" BorderBrush="#D6DCE2" BorderThickness="1" CornerRadius="4" Focusable="True" AllowDrop="True" PreviewKeyDown="UnitPhotoPreviewBorder_PreviewKeyDown" MouseLeftButtonDown="UnitPhotoPreviewBorder_MouseLeftButtonDown" DragOver="UnitPhotoPreviewBorder_DragOver" Drop="UnitPhotoPreviewBorder_Drop" ToolTip="Click this preview and press Ctrl+V to paste an image, or drag an image file here.">
+       <Border x:Name="UnitPhotoPreviewBorder" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="10" Background="{DynamicResource ThemeBackgroundF7F9FB}" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}" BorderThickness="1" CornerRadius="4" Focusable="True" AllowDrop="True" PreviewKeyDown="UnitPhotoPreviewBorder_PreviewKeyDown" MouseLeftButtonDown="UnitPhotoPreviewBorder_MouseLeftButtonDown" DragOver="UnitPhotoPreviewBorder_DragOver" Drop="UnitPhotoPreviewBorder_Drop" ToolTip="Click this preview and press Ctrl+V to paste an image, or drag an image file here.">
         <StackPanel>
          <TextBlock Text="Identification photo preview" FontWeight="SemiBold" Margin="0,0,0,2"/>
-         <TextBlock Text="Click the preview and press Ctrl+V, use Paste Image, or drag and drop an image file." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"/>
-         <Border Height="260" Background="#ECEFF2" BorderBrush="#CDD3D9" BorderThickness="1">
-          <Grid><Image x:Name="UnitPhotoPreview" Stretch="Uniform"/><TextBlock Text="{Binding Text, ElementName=UnitPhotoPreviewStatus}" TextWrapping="Wrap" TextAlignment="Center" Margin="20" Foreground="#61788A" VerticalAlignment="Center"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Source, ElementName=UnitPhotoPreview}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
+         <TextBlock Text="Click the preview and press Ctrl+V, use Paste Image, or drag and drop an image file." Foreground="{DynamicResource ThemeForeground666666}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"/>
+         <Border Height="260" Background="{DynamicResource ThemeBackgroundECEFF2}" BorderBrush="{DynamicResource ThemeBorderBrushCDD3D9}" BorderThickness="1">
+          <Grid><Image x:Name="UnitPhotoPreview" Stretch="Uniform"/><TextBlock Text="{Binding Text, ElementName=UnitPhotoPreviewStatus}" TextWrapping="Wrap" TextAlignment="Center" Margin="20" Foreground="{DynamicResource ThemeForeground61788A}" VerticalAlignment="Center"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Source, ElementName=UnitPhotoPreview}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
          </Border>
-         <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Foreground="#666" TextWrapping="Wrap" Margin="0,6,0,0"/>
+         <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap" Margin="0,6,0,0"/>
         </StackPanel>
        </Border>
       </Grid></GroupBox>
@@ -57,8 +57,8 @@
       </Grid></GroupBox>
       <Button Content="Save Gate Information" Click="SaveGate_Click" HorizontalAlignment="Left" Padding="18,8"/>
 </StackPanel></Expander>
-      <Border Background="#F4F7FA" BorderBrush="#D6DCE2" BorderThickness="1" Padding="10" Margin="0,14,0,0">
-       <TextBlock Text="Drawings and other resources are configured on the Buttons / Resources tab. A single resource can be linked to multiple units, so paired units can share the exact same drawing and archive." TextWrapping="Wrap" Foreground="#444"/>
+      <Border Background="{DynamicResource ThemeBackgroundF4F7FA}" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}" BorderThickness="1" Padding="10" Margin="0,14,0,0">
+       <TextBlock Text="Drawings and other resources are configured on the Buttons / Resources tab. A single resource can be linked to multiple units, so paired units can share the exact same drawing and archive." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground444444}"/>
       </Border>
      </StackPanel></ScrollViewer>
     </Grid>
@@ -78,7 +78,7 @@
       <TextBlock Text="Type" Margin="0,8,0,3"/><ComboBox x:Name="ResourceKindBox" Height="34" SelectionChanged="ResourceKindBox_SelectionChanged"/>
       <TextBlock Text="Show on these units" Margin="0,10,0,3"/>
       <ListBox x:Name="ResourceUnitsList" Height="120" DisplayMemberPath="UnitDisplay" SelectionMode="Multiple"/>
-      <TextBlock Text="Select more than one unit to make one shared button/resource. Example: Units 4 and 5 can both point to one Electrical Drawings folder. Leave all units unselected to show the button on every unit under the gate." Foreground="#666" TextWrapping="Wrap" Margin="0,4,0,0"/>
+      <TextBlock Text="Select more than one unit to make one shared button/resource. Example: Units 4 and 5 can both point to one Electrical Drawings folder. Leave all units unselected to show the button on every unit under the gate." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap" Margin="0,4,0,0"/>
       <WrapPanel Margin="0,8,0,0"><CheckBox x:Name="ResourceVisibleCheck" Content="Visible" IsChecked="True" Margin="4,5,18,5"/><CheckBox x:Name="ResourceUploadCheck" Content="Regular users can upload / update files" Margin="4,5,18,5"/></WrapPanel>
       <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
        <StackPanel><TextBlock Text="Archive rule"/><ComboBox x:Name="ResourceArchiveBox" Height="34"/></StackPanel>
@@ -113,12 +113,12 @@
       <Button Content="Save Flow" Click="SaveFlow_Click" HorizontalAlignment="Left" Margin="0,8,0,12"/>
       <Separator/>
       <TextBlock Text="Selected step" FontSize="19" FontWeight="SemiBold" Margin="0,12,0,0"/>
-      <TextBlock x:Name="NodeIdText" Foreground="#777" Margin="0,3,0,5"/>
+      <TextBlock x:Name="NodeIdText" Foreground="{DynamicResource ThemeForeground777777}" Margin="0,3,0,5"/>
       <TextBlock Text="Question / heading"/><TextBox x:Name="NodePromptBox" Height="34"/>
       <TextBlock Text="Instructions" Margin="0,6,0,3"/><TextBox x:Name="NodeBodyBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"/>
       <WrapPanel Margin="0,6,0,0"><CheckBox x:Name="NodeTerminalCheck" Content="End of path" Margin="4"/><CheckBox x:Name="NodeStartCheck" Content="Starting step" Margin="16,4,4,4"/></WrapPanel>
       <TextBlock Text="Answer buttons" FontWeight="SemiBold" Margin="0,8,0,3"/>
-      <TextBlock Text="One per line: Button text => next-step-ID. The step IDs are shown under each selected step." Foreground="#666" TextWrapping="Wrap"/>
+      <TextBlock Text="One per line: Button text => next-step-ID. The step IDs are shown under each selected step." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap"/>
       <TextBox x:Name="NodeChoicesBox" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="90" VerticalScrollBarVisibility="Auto"/>
       <TextBlock Text="Linked resource buttons" FontWeight="SemiBold" Margin="0,8,0,3"/>
       <ListBox x:Name="NodeResourceList" Height="110" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
@@ -165,7 +165,7 @@
       <TextBlock Text="Document" Margin="0,7,0,3"/><WrapPanel><Button Content="Choose / Replace File..." Click="ChooseManualFile_Click"/><TextBlock x:Name="ManualFileText" VerticalAlignment="Center" TextWrapping="Wrap"/></WrapPanel>
       <TextBlock Text="Applies to gates" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="ManualGateAssignments" Height="120" DisplayMemberPath="Display" SelectionMode="Multiple"/>
       <TextBlock Text="Applies to specific units (optional)" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="ManualUnitAssignments" Height="110" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
-      <TextBlock Text="Leave both assignment lists empty to make the manual global. Gate assignment applies it to every unit under that gate; unit assignment can be used for exceptions." Foreground="#666" TextWrapping="Wrap" Margin="0,4,0,0"/>
+      <TextBlock Text="Leave both assignment lists empty to make the manual global. Gate assignment applies it to every unit under that gate; unit assignment can be used for exceptions." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap" Margin="0,4,0,0"/>
       <WrapPanel Margin="0,10,0,0"><Button Content="Save Manual" Click="SaveManual_Click"/><Button Content="Open Document" Click="OpenManualAdmin_Click"/></WrapPanel>
      </StackPanel></ScrollViewer>
     </Grid>
@@ -190,7 +190,7 @@
       <TextBlock Text="Document" Margin="0,7,0,3"/><WrapPanel><Button Content="Choose / Replace Document..." Click="ChoosePartDocument_Click"/><TextBlock x:Name="PartDocumentText" VerticalAlignment="Center" TextWrapping="Wrap"/></WrapPanel>
       <TextBlock Text="Applies to gates" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="PartGateAssignments" Height="110" DisplayMemberPath="Display" SelectionMode="Multiple"/>
       <TextBlock Text="Applies to specific units (optional)" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="PartUnitAssignments" Height="100" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
-      <TextBlock Text="Leave both assignment lists empty to make the part global." Foreground="#666"/>
+      <TextBlock Text="Leave both assignment lists empty to make the part global." Foreground="{DynamicResource ThemeForeground666666}"/>
       <Button Content="Save Part" Click="SavePart_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
      </StackPanel></ScrollViewer>
     </Grid>
@@ -199,21 +199,21 @@
    <TabItem Header="Areas">
     <Grid Margin="14"><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <ListBox x:Name="AreaList" SelectionChanged="AreaList_SelectionChanged"/>
-     <StackPanel Grid.Column="2"><TextBlock Text="Area name"/><TextBox x:Name="AreaNameBox" Height="34" Margin="0,4,0,8"/><WrapPanel><Button Content="Add" Click="AddArea_Click"/><Button x:Name="RenameAreaButton" Content="Rename" Click="RenameArea_Click"/><Button Content="Delete" Click="DeleteArea_Click"/></WrapPanel><TextBlock Text="An area cannot be deleted while gates are assigned to it." Foreground="#666" TextWrapping="Wrap" Margin="4,12,0,0"/></StackPanel>
+     <StackPanel Grid.Column="2"><TextBlock Text="Area name"/><TextBox x:Name="AreaNameBox" Height="34" Margin="0,4,0,8"/><WrapPanel><Button Content="Add" Click="AddArea_Click"/><Button x:Name="RenameAreaButton" Content="Rename" Click="RenameArea_Click"/><Button Content="Delete" Click="DeleteArea_Click"/></WrapPanel><TextBlock Text="An area cannot be deleted while gates are assigned to it." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap" Margin="4,12,0,0"/></StackPanel>
     </Grid>
    </TabItem>
 
    <TabItem Header="Shared Data / Software">
     <ScrollViewer><StackPanel Margin="18" MaxWidth="820" HorizontalAlignment="Left">
-     <TextBlock Text="Shared data location" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Every computer should point to the same shared folder. Default: Q:\SafetyGateSupport" Foreground="#555" Margin="0,4,0,6"/>
+     <TextBlock Text="Shared data location" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Every computer should point to the same shared folder. Default: Q:\SafetyGateSupport" Foreground="{DynamicResource ThemeForeground555555}" Margin="0,4,0,6"/>
      <TextBox x:Name="SharedRootBox" Height="34"/><WrapPanel><Button Content="Choose Folder..." Click="ChooseSharedRoot_Click"/><Button Content="Initialize Starter Data" Click="Initialize_Click"/></WrapPanel>
      <Separator Margin="0,16"/>
      <Button x:Name="OrganizeAssetFoldersButton" Content="Organize asset folders…" Click="OrganizeAssetFolders_Click" HorizontalAlignment="Left"/>
-     <TextBlock Text="Preview a readable asset folder layout, merge identical copies, and review conflicting revisions before applying. Existing files and metadata are backed up." TextWrapping="Wrap" Foreground="#61788A" Margin="0,6,0,14"/>
+     <TextBlock Text="Preview a readable asset folder layout, merge identical copies, and review conflicting revisions before applying. Existing files and metadata are backed up." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}" Margin="0,6,0,14"/>
      <TextBlock Text="Application distribution" FontWeight="SemiBold" FontSize="17"/>
-     <TextBlock Text="Recommended: keep the published SafetyGateSupport.exe in Q:\SafetyGateSupport\Application and give users a shortcut to that master copy. This build does not self-modify or auto-update." Foreground="#555" TextWrapping="Wrap" Margin="0,4,0,6"/>
+     <TextBlock Text="Recommended: keep the published SafetyGateSupport.exe in Q:\SafetyGateSupport\Application and give users a shortcut to that master copy. This build does not self-modify or auto-update." Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap" Margin="0,4,0,6"/>
      <Separator Margin="0,16"/>
-     <TextBlock Text="Storeroom database" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Choose the stockroom plant on the Parts page. Each computer remembers its own choice." Foreground="#555" Margin="0,3,0,4"/><TextBox x:Name="StoreroomUrlBox" Visibility="Collapsed"/><Button Content="Save Shared Content Settings" Click="SaveSharedContent_Click" HorizontalAlignment="Left"/>
+     <TextBlock Text="Storeroom database" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Choose the stockroom plant on the Parts page. Each computer remembers its own choice." Foreground="{DynamicResource ThemeForeground555555}" Margin="0,3,0,4"/><TextBox x:Name="StoreroomUrlBox" Visibility="Collapsed"/><Button Content="Save Shared Content Settings" Click="SaveSharedContent_Click" HorizontalAlignment="Left"/>
      <Separator Margin="0,16"/>
      <TextBlock Text="Programming software on this computer" FontWeight="SemiBold" FontSize="17"/>
      <TextBlock Text="Siemens 8WD46 Configurator" Margin="0,10,0,3"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="SiemensBox" Height="34"/><Button Grid.Column="1" Content="Browse..." Click="BrowseSiemens_Click"/></Grid>
@@ -224,12 +224,12 @@
 
    <TabItem Header="Audit / History">
     <Grid Margin="14"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-     <WrapPanel><Button Content="Refresh" Click="RefreshAudit_Click"/><TextBlock Text="Recent setup and file changes. Shared notes are intentionally not logged on every autosave." VerticalAlignment="Center" Foreground="#666" Margin="10,0,0,0"/></WrapPanel>
+     <WrapPanel><Button Content="Refresh" Click="RefreshAudit_Click"/><TextBlock Text="Recent setup and file changes. Shared notes are intentionally not logged on every autosave." VerticalAlignment="Center" Foreground="{DynamicResource ThemeForeground666666}" Margin="10,0,0,0"/></WrapPanel>
      <ListBox x:Name="AuditList" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="Display"/>
     </Grid>
    </TabItem>
 
   </TabControl>
-  <TextBlock x:Name="AdminStatusText" Grid.Row="2" Foreground="#555" TextWrapping="Wrap"/>
+  <TextBlock x:Name="AdminStatusText" Grid.Row="2" Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
  </Grid>
 </Window>

@@ -7,14 +7,14 @@
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <StackPanel>
    <TextBlock Text="Shared Unit Notes" FontSize="24" FontWeight="Bold"/>
-   <TextBlock x:Name="SystemText" Foreground="#555" Margin="0,3,0,4"/>
-   <TextBlock Text="Type directly below. Changes auto-save to the shared Q: data and appear for other users." Foreground="#666" TextWrapping="Wrap"/>
+   <TextBlock x:Name="SystemText" Foreground="{DynamicResource ThemeForeground555555}" Margin="0,3,0,4"/>
+   <TextBlock Text="Type directly below. Changes auto-save to the shared Q: data and appear for other users." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap"/>
   </StackPanel>
   <TextBox x:Name="NotesBox" Grid.Row="1" Margin="0,12,0,10" Padding="10" AcceptsReturn="True" TextWrapping="Wrap"
            VerticalScrollBarVisibility="Auto" FontSize="14" TextChanged="NotesBox_TextChanged"/>
   <Grid Grid.Row="2">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <TextBlock x:Name="StatusText" Foreground="#666" VerticalAlignment="Center"/>
+   <TextBlock x:Name="StatusText" Foreground="{DynamicResource ThemeForeground666666}" VerticalAlignment="Center"/>
    <Button Grid.Column="1" Content="Close" Click="Close_Click" Padding="24,8"/>
   </Grid>
  </Grid>

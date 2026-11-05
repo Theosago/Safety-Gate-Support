@@ -107,6 +107,7 @@ internal static class Program
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
             ("Plant selection is local, starts unselected and cancels stale stockroom results", StockroomPlantSelection),
+            ("Inline unit files, scanner and column tools retain context and theme selection persists", InlineWorkspace),
             ("Unit parts stay beside the unit and live availability changes without snapshots", ReplacementPartsRail),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
@@ -362,7 +363,7 @@ internal static class Program
         main.Width = 1000; main.Height = 680; main.UpdateLayout();
         var hero = Control<Image>(main, "GateImage");
         Require(Control<Button>(main, "EnlargePhotoButton").ActualWidth > 200 && Math.Max(hero.ActualWidth, hero.ActualHeight) >= 240 && hero.Stretch == Stretch.Uniform, "Workspace photo is cropped or cannot be enlarged.");
-        foreach (string task in new[] { "TroubleshootButton", "FilesButton" })
+        foreach (string task in new[] { "TroubleshootButton" })
         {
             Exception? failure = null;
             bool completed = false;
@@ -687,6 +688,33 @@ internal static class Program
         Require(saved.StockroomPlantId == "04" && new AppSettings().StockroomPlantId == "", "Choice was not saved locally or new installations assume a plant.");
     }
 
+    private static async Task InlineWorkspace()
+    {
+        var fixture = NewFixture(); var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main);
+        await WaitUntil(() => main.IsEnabled, "Main window did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
+        var original = ((SolidColorBrush)main.Background).Color;
+        Control<ComboBox>(main, "ThemeBox").SelectedIndex = 1; await DispatcherSettled();
+        Require(((SolidColorBrush)main.Background).Color != original, "Dark mode did not change window surfaces.");
+        Require(new DataService(false, Path.GetDirectoryName(fixture.Data.DrawingOrientationCache)!).Settings.ThemeMode == "Dark", "Theme choice did not persist.");
+        Control<ComboBox>(main, "ThemeBox").SelectedIndex = 0;
+        Require(Control<Button>(main, "ChangeUnitButton").Content.Equals("← Back to units"), "Return action remains unclear.");
+        foreach (string action in new[] { "FilesButton", "ScannerButton", "LightColumnButton" })
+        {
+            Click(Control<Button>(main, action));
+            await WaitUntil(() => Control<ContentControl>(main, "InlineToolContent").Content is not null, "Unit tool did not load inline.");
+            Require(Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible && Control<Grid>(main, "InlineToolPanel").Visibility == Visibility.Visible, "Inline tool lost the unit workspace.");
+            var tool = (Window)typeof(MainWindow).GetField("_inlineWindow", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(main)!;
+            Require(!tool.IsVisible, "Tool opened a separate visible window.");
+            if (tool is ResourceWindow resource)
+            {
+                Require(Control<TextBlock>(resource, "SystemText").Text.Contains(fixture.BlueUnit.UnitDisplay), "File tool lost unit identity.");
+                Require(Control<Button>(resource, "UpdateButton").Visibility == Visibility.Visible, "Regular users cannot upload unit files.");
+                if (action == "ScannerButton") Require(Control<Button>(resource, "UamDiagnosticsButton").Visibility == Visibility.Visible, "Scanner diagnostics were removed.");
+            }
+            typeof(MainWindow).GetMethod("CloseInlineTool", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(main, null);
+        }
+    }
+
     private static async Task ReplacementPartsRail()
     {
         var fixture = NewFixture();
@@ -761,7 +789,7 @@ internal static class Program
         var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main window did not load.");
         await SelectGalleryUnit(main, fixture.BlueUnit); main.UpdateLayout();
         Control<Expander>(main, "UnitDetailsExpander").IsExpanded = true; main.UpdateLayout();
-        foreach (string action in new[] { "ScannerButton", "PlcButton" })
+        foreach (string action in new[] { "PlcButton" })
         {
             Require(Control<Button>(main, action).IsVisible, "Device action is hidden.");
             Exception? failure = null; bool visited = false;

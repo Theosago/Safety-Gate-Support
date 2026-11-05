@@ -1,29 +1,82 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<SolidColorBrush x:Key="ThemeForeground555555" Color="#555555"/>
+<SolidColorBrush x:Key="ThemeForeground61788A" Color="#61788A"/>
+<SolidColorBrush x:Key="ThemeBackgroundF7F9FB" Color="#F7F9FB"/>
+<SolidColorBrush x:Key="ThemeBorderBrushD6DCE2" Color="#D6DCE2"/>
+<SolidColorBrush x:Key="ThemeForeground666666" Color="#666666"/>
+<SolidColorBrush x:Key="ThemeBackgroundECEFF2" Color="#ECEFF2"/>
+<SolidColorBrush x:Key="ThemeBorderBrushCDD3D9" Color="#CDD3D9"/>
+<SolidColorBrush x:Key="ThemeBackgroundF4F7FA" Color="#F4F7FA"/>
+<SolidColorBrush x:Key="ThemeForeground444444" Color="#444444"/>
+<SolidColorBrush x:Key="ThemeForeground777777" Color="#777777"/>
+<SolidColorBrush x:Key="ThemeForeground1769AA" Color="#1769AA"/>
+<SolidColorBrush x:Key="ThemeBackgroundFAFBFC" Color="#FAFBFC"/>
+<SolidColorBrush x:Key="ThemeForeground333333" Color="#333333"/>
+<SolidColorBrush x:Key="ThemeBackgroundF3F6FA" Color="#F3F6FA"/>
+<SolidColorBrush x:Key="ThemeForeground172D40" Color="#172D40"/>
+<SolidColorBrush x:Key="ThemeBorderBrushD5DFE8" Color="#D5DFE8"/>
+<SolidColorBrush x:Key="ThemeForeground617585" Color="#617585"/>
+<SolidColorBrush x:Key="ThemeForegroundAEC4D3" Color="#AEC4D3"/>
+<SolidColorBrush x:Key="ThemeForeground999999" Color="#999999"/>
+<SolidColorBrush x:Key="ThemeBackgroundFFFFFF" Color="#FFFFFF"/>
+<SolidColorBrush x:Key="ThemeForeground536E81" Color="#536E81"/>
+<SolidColorBrush x:Key="ThemeBackgroundEDF1F4" Color="#EDF1F4"/>
+<SolidColorBrush x:Key="ThemeForeground176B87" Color="#176B87"/>
+<SolidColorBrush x:Key="ThemeForeground965813" Color="#965813"/>
+<SolidColorBrush x:Key="ThemeBackgroundE9EEF2" Color="#E9EEF2"/>
+<SolidColorBrush x:Key="ThemeForeground566D7C" Color="#566D7C"/>
+<SolidColorBrush x:Key="ThemeBackgroundEDF1F5" Color="#EDF1F5"/>
+<SolidColorBrush x:Key="ThemeForeground8293A1" Color="#8293A1"/>
+<SolidColorBrush x:Key="ThemeForeground1B637A" Color="#1B637A"/>
+<SolidColorBrush x:Key="ThemeForeground687A88" Color="#687A88"/>
+<SolidColorBrush x:Key="ThemeBackgroundCED8E1" Color="#CED8E1"/>
+<SolidColorBrush x:Key="ThemeBackgroundF7F9FC" Color="#F7F9FC"/>
+<SolidColorBrush x:Key="ThemeBackgroundEAF2F7" Color="#EAF2F7"/>
+<SolidColorBrush x:Key="ThemeBorderBrushC8C8C8" Color="#C8C8C8"/>
+<SolidColorBrush x:Key="ThemeBackgroundF7F7F7" Color="#F7F7F7"/>
+<SolidColorBrush x:Key="ThemeBackgroundFFF8E6" Color="#FFF8E6"/>
+<SolidColorBrush x:Key="ThemeBorderBrushE1C36A" Color="#E1C36A"/>
+<SolidColorBrush x:Key="ThemeForegroundBCD0DE" Color="#BCD0DE"/>
+<SolidColorBrush x:Key="ThemeBackgroundEAF3F7" Color="#EAF3F7"/>
+<SolidColorBrush x:Key="ThemeForeground6C8090" Color="#6C8090"/>
+<SolidColorBrush x:Key="ThemeBackgroundF5F7FA" Color="#F5F7FA"/>
+<SolidColorBrush x:Key="ThemeForeground14263D" Color="#14263D"/>
+<SolidColorBrush x:Key="ThemeForeground394C60" Color="#394C60"/>
+<SolidColorBrush x:Key="ThemeBorderBrushD6DEE8" Color="#D6DEE8"/>
+<SolidColorBrush x:Key="ThemeForeground88520A" Color="#88520A"/>
+<SolidColorBrush x:Key="ThemeBorderBrushDFE6ED" Color="#DFE6ED"/>
+<SolidColorBrush x:Key="ThemeForeground405D70" Color="#405D70"/>
+<SolidColorBrush x:Key="ThemeForeground18384D" Color="#18384D"/>
+<SolidColorBrush x:Key="ThemeBorderBrushCDD9E3" Color="#CDD9E3"/>
+<SolidColorBrush x:Key="ThemeBorderBrush17859C" Color="#17859C"/>
+<SolidColorBrush x:Key="ThemeBorderBrush176B87" Color="#176B87"/>
+<SolidColorBrush x:Key="ThemeBorderBrush179CB5" Color="#179CB5"/>
+
  <SolidColorBrush x:Key="Accent" Color="#176B87"/>
  <SolidColorBrush x:Key="Sidebar" Color="#122638"/>
- <Style TargetType="Window"><Setter Property="Background" Value="#F3F6FA"/><Setter Property="Foreground" Value="#172D40"/><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="14"/></Style>
+ <Style TargetType="Window"><Setter Property="Background" Value="{DynamicResource ThemeBackgroundF3F6FA}"/><Setter Property="Foreground" Value="{DynamicResource ThemeForeground172D40}"/><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="14"/></Style>
  <Style TargetType="Button">
-  <Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#18384D"/><Setter Property="BorderBrush" Value="#CDD9E3"/><Setter Property="BorderThickness" Value="1"/>
+  <Setter Property="Background" Value="{DynamicResource ThemeBackgroundFFFFFF}"/><Setter Property="Foreground" Value="{DynamicResource ThemeForeground18384D}"/><Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrushCDD9E3}"/><Setter Property="BorderThickness" Value="1"/>
   <Setter Property="Padding" Value="16,11"/><Setter Property="Margin" Value="4"/><Setter Property="FontSize" Value="14"/><Setter Property="Cursor" Value="Hand"/>
   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
    <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
     <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" RecognizesAccessKey="True"/>
    </Border>
    <ControlTemplate.Triggers>
-    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#17859C"/><Setter TargetName="Surface" Property="Opacity" Value="0.85"/></Trigger>
+    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush17859C}"/><Setter TargetName="Surface" Property="Opacity" Value="0.85"/></Trigger>
     <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.65"/></Trigger>
-    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#17859C"/><Setter TargetName="Surface" Property="BorderThickness" Value="2"/></Trigger>
+    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush17859C}"/><Setter TargetName="Surface" Property="BorderThickness" Value="2"/></Trigger>
     <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.42"/></Trigger>
    </ControlTemplate.Triggers>
   </ControlTemplate></Setter.Value></Setter>
  </Style>
- <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Background" Value="#176B87"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderBrush" Value="#176B87"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+ <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Background" Value="#176B87"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush176B87}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
  <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#E1EDF4"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Margin" Value="10,4"/><Setter Property="Padding" Value="14,13"/></Style>
  <Style x:Key="TaskCard" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="18"/><Setter Property="MinHeight" Value="112"/><Setter Property="Margin" Value="0,0,12,12"/></Style>
- <Style TargetType="TextBox"><Setter Property="Padding" Value="9,7"/><Setter Property="BorderBrush" Value="#CDD9E3"/><Setter Property="Background" Value="White"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
- <Style TargetType="ComboBox"><Setter Property="Padding" Value="9,7"/><Setter Property="MinHeight" Value="36"/><Setter Property="BorderBrush" Value="#CDD9E3"/><Setter Property="Background" Value="White"/></Style>
- <Style TargetType="ListBox"><Setter Property="BorderBrush" Value="#DFE6ED"/><Setter Property="Background" Value="White"/><Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/></Style>
+ <Style TargetType="TextBox"><Setter Property="Padding" Value="9,7"/><Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrushCDD9E3}"/><Setter Property="Background" Value="{DynamicResource ThemeBackgroundFFFFFF}"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+ <Style TargetType="ComboBox"><Setter Property="Padding" Value="9,7"/><Setter Property="MinHeight" Value="36"/><Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrushCDD9E3}"/><Setter Property="Background" Value="{DynamicResource ThemeBackgroundFFFFFF}"/></Style>
+ <Style TargetType="ListBox"><Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrushDFE6ED}"/><Setter Property="Background" Value="{DynamicResource ThemeBackgroundFFFFFF}"/><Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/></Style>
  <Style TargetType="ListBoxItem"><Setter Property="Padding" Value="8,10"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
- <Style TargetType="GroupBox"><Setter Property="Margin" Value="0,6"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupBox"><Border Background="White" BorderBrush="#DFE6ED" BorderThickness="1" CornerRadius="10" Padding="12"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><ContentPresenter ContentSource="Header" Margin="2,0,0,10" TextElement.FontWeight="SemiBold" TextElement.Foreground="#405D70"/><ContentPresenter Grid.Row="1"/></Grid></Border></ControlTemplate></Setter.Value></Setter></Style>
- <Style TargetType="ToggleButton"><Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#405D70"/><Setter Property="BorderBrush" Value="#CDD9E3"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton"><Border x:Name="Switch" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"><StackPanel><ContentPresenter HorizontalAlignment="Center"/><TextBlock x:Name="Value" Text="OFF" HorizontalAlignment="Center" FontSize="11" Margin="0,3,0,0"/></StackPanel></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Switch" Property="Background" Value="#176B87"/><Setter Property="Foreground" Value="White"/><Setter TargetName="Value" Property="Text" Value="ON"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Switch" Property="BorderBrush" Value="#179CB5"/><Setter TargetName="Switch" Property="BorderThickness" Value="2"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Switch" Property="Opacity" Value="0.42"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+ <Style TargetType="GroupBox"><Setter Property="Margin" Value="0,6"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupBox"><Border Background="{DynamicResource ThemeBackgroundFFFFFF}" BorderBrush="{DynamicResource ThemeBorderBrushDFE6ED}" BorderThickness="1" CornerRadius="10" Padding="12"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><ContentPresenter ContentSource="Header" Margin="2,0,0,10" TextElement.FontWeight="SemiBold" TextElement.Foreground="{DynamicResource ThemeForeground405D70}"/><ContentPresenter Grid.Row="1"/></Grid></Border></ControlTemplate></Setter.Value></Setter></Style>
+ <Style TargetType="ToggleButton"><Setter Property="Background" Value="{DynamicResource ThemeBackgroundFFFFFF}"/><Setter Property="Foreground" Value="{DynamicResource ThemeForeground405D70}"/><Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrushCDD9E3}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton"><Border x:Name="Switch" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"><StackPanel><ContentPresenter HorizontalAlignment="Center"/><TextBlock x:Name="Value" Text="OFF" HorizontalAlignment="Center" FontSize="11" Margin="0,3,0,0"/></StackPanel></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Switch" Property="Background" Value="#176B87"/><Setter Property="Foreground" Value="White"/><Setter TargetName="Value" Property="Text" Value="ON"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Switch" Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush179CB5}"/><Setter TargetName="Switch" Property="BorderThickness" Value="2"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Switch" Property="Opacity" Value="0.42"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
 </ResourceDictionary>

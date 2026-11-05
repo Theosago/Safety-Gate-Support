@@ -5,6 +5,15 @@ namespace SafetyGateSupport.Services;
 
 public partial class DataService
 {
+    public SafetySystem SaveUnitManuals(string unitId, IEnumerable<string> manualIds)
+    {
+        using var lease = AcquireAssetWriteLock();
+        var units = JsonSerializer.Deserialize<List<SafetySystem>>(File.ReadAllText(SystemsFile), _read) ?? throw new InvalidDataException("Unit records unavailable.");
+        var unit = units.SingleOrDefault(u => u.Id == unitId) ?? throw new InvalidOperationException("Unit removed. Refresh first.");
+        var valid = LoadManualRecords().Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        unit.ManualIds = manualIds.Where(valid.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        SaveSystems(units); return unit;
+    }
     public SafetySystem SaveUnitReplacementParts(string unitId, IEnumerable<string> partIds)
     {
         using var lease = AcquireAssetWriteLock();

@@ -11,6 +11,7 @@ namespace SiemensUsbCheck;
 
 public partial class MainWindow : Window
 {
+    public bool IsEmbeddedBusy => _operationCancellation is not null;
     private CancellationTokenSource? _operationCancellation;
     private bool _isRefreshing;
     private bool _closeWhenFinished;
@@ -103,6 +104,15 @@ public partial class MainWindow : Window
         };
     }
 
+    public FrameworkElement CreateEmbeddedView(Window owner)
+    {
+        Owner = owner;
+        foreach (var tab in WorkflowTabs.Items.OfType<TabItem>().Skip(2)) tab.Visibility = Visibility.Collapsed;
+        var view = (FrameworkElement)Content; Content = null;
+        bool loaded = false;
+        view.Loaded += (sender, args) => { if (!loaded) { loaded = true; Window_Loaded(sender, args); } };
+        return view;
+    }
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         MaxHeight = SystemParameters.WorkArea.Height;
@@ -190,7 +200,7 @@ public partial class MainWindow : Window
         try
         {
             destination.InitialDirectory = LocalReportFolder();
-            if (destination.ShowDialog(this) != true)
+            if (destination.ShowDialog(Owner ?? this) != true)
                 return;
         }
         catch (Exception error)
@@ -245,7 +255,7 @@ public partial class MainWindow : Window
         try
         {
             var source = new OpenFileDialog { Title = "Choose a column configuration", Filter = "Siemens configuration (*.signal)|*.signal", CheckFileExists = true };
-            if (source.ShowDialog(this) != true) return;
+            if (source.ShowDialog(Owner ?? this) != true) return;
             AssignedFilesCombo.SelectedIndex = -1;
             await SelectFileAsync(source.FileName);
         }
@@ -274,11 +284,11 @@ public partial class MainWindow : Window
                 InitialDirectory = LocalReportFolder(),
                 FileName = $"Siemens-8WD46-upload-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..4]}.zip"
             };
-            if (destination.ShowDialog(this) != true) return;
+            if (destination.ShowDialog(Owner ?? this) != true) return;
             reportPath = destination.FileName;
             if (System.IO.File.Exists(reportPath) || System.IO.File.Exists(System.IO.Path.ChangeExtension(reportPath, ".before.signal")))
                 throw new System.IO.IOException("Choose a new filename so existing reports and backups are preserved.");
-            if (MessageBox.Show(this,
+            if (MessageBox.Show(Owner ?? this,
                 $"Replace the settings on {port.DisplayName} with '{selected.FileName}'?\n{_context}\n\nIsolate equipment for servicing. Confirm this is the intended column and approved file.\n\nThe tool will save the current configuration first, upload the selected file, request a restart, and verify the stored settings.\n\nContinue?",
                 "Upload column configuration", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         }
