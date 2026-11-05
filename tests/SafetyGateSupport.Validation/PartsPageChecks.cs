@@ -56,6 +56,8 @@ internal static class PartsPageChecks
         Require(result.Rows.Count == 1 && StockroomService.Find(result, new PartRecord { PartNumber = "0115639" }, true)?.Quantity == 7, "Desktop/mobile copies hid a valid quantity.");
         var conflict = StockroomService.Parse(table + "<table>" + Headers + Row("0115639", "8") + "</table>");
         Require(StockroomService.Find(conflict, new PartRecord { PartNumber = "0115639" }, true) is null, "Conflicting quantities were guessed.");
+        var lots = StockroomService.Parse("<table><tr><th>Item ID</th><th>Available</th><th>Lot</th></tr><tr><td>0115639</td><td>7</td><td>A</td></tr><tr><td>0115639</td><td>7</td><td>B</td></tr></table>");
+        Require(StockroomService.Find(lots, new PartRecord { PartNumber = "0115639" }, true) is null, "Different lot rows were merged into a false quantity.");
         Require(result.TableSample.Length > 0 && result.TableSample.Any(row => row.Contains("0115639")), "Diagnostic table sample missing.");
     }
     private static void LegacyParts()

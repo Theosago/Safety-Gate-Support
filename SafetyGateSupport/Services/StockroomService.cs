@@ -22,7 +22,7 @@ public static class StockroomService
     public static Snapshot Parse(string html)
     {
         if (Encoding.UTF8.GetByteCount(html) > 4 * 1024 * 1024) throw new InvalidDataException("The stockroom page is larger than the supported 4 MB response.");
-        var document = new HtmlDocument(); document.LoadHtml(html); var rows = new List<Row>();
+        var document = new HtmlDocument(); document.LoadHtml(html); var rows = new List<Row>(); var seenRows = new HashSet<string>(StringComparer.Ordinal);
         foreach (var table in document.DocumentNode.Descendants("table"))
         {
             int stock = -1, quantity = -1, site = -1, location = -1; string label = "";
@@ -48,10 +48,12 @@ public static class StockroomService
                 string amount = Text(cells[quantity]);
                 if (!Regex.IsMatch(amount, @"^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$", RegexOptions.None, TimeSpan.FromMilliseconds(100))) continue;
                 if (!decimal.TryParse(amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var count) || count < 0) continue;
+                string identity = System.Text.Json.JsonSerializer.Serialize(new { stock, quantity, site, location, Cells = cells.Select(Text).ToArray() });
+                if (!seenRows.Add(identity)) continue;
                 rows.Add(new(number, count, site >= 0 && site < cells.Length ? Text(cells[site]) : "", location >= 0 && location < cells.Length ? Text(cells[location]) : "", label));
             }
         }
-        return new(rows.GroupBy(r => (StockKey(r.Stock), r.Quantity, r.Site.Trim().ToUpperInvariant(), r.Location.Trim().ToUpperInvariant())).Select(g => g.First()).ToArray(), DateTimeOffset.UtcNow)
+        return new(rows, DateTimeOffset.UtcNow)
         {
             TableSample = document.DocumentNode.Descendants("tr").Where(r => r.Ancestors("table").Any()).Take(250).Select(r => r.ChildNodes.Where(c => c.Name is "th" or "td").Take(16).Select(c => { string value = Text(c); return value[..Math.Min(value.Length, 500)]; }).ToArray()).ToArray()
         };
