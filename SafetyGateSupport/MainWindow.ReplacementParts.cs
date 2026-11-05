@@ -1,11 +1,30 @@
+using System.IO;
+using System.IO.Compression;
+using System.Text.Json;
+using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using SafetyGateSupport.Models;
+using SafetyGateSupport.Services;
 namespace SafetyGateSupport;
 
 public partial class MainWindow
 {
+    private void SaveStockroomReport_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog { Title = "Save stockroom lookup report", Filter = "Stockroom report|*.zip", FileName = "Stockroom-lookup-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".zip" };
+        if (dialog.ShowDialog(this) != true) return;
+        var snapshot = _stockroomSnapshot; var plant = SelectedStockroomPlant;
+        var report = new { Plant = plant?.Name, Source = plant?.Url, Status = _stockroomMessage, Snapshot = snapshot, Items = _parts.Select(p => new { ItemId = p.PartNumber, Matches = snapshot?.Rows.Where(r => StockroomService.StockKey(r.Stock) == StockroomService.StockKey(p.PartNumber)).ToArray(), Matched = snapshot is not null && StockroomService.Find(snapshot, p, true) is not null }).ToArray() };
+        try
+        {
+            using var file = new FileStream(dialog.FileName, FileMode.Create, FileAccess.Write); using var zip = new ZipArchive(file, ZipArchiveMode.Create); using var entry = zip.CreateEntry("stockroom-lookup.json").Open();
+            JsonSerializer.Serialize(entry, report, new JsonSerializerOptions { WriteIndented = true });
+            MessageBox.Show(this, "Stockroom report saved. It contains returned inventory table text and lookup results, without browser cookies or sign-in fields.");
+        }
+        catch (Exception error) { MessageBox.Show(this, "Report could not be saved: " + error.Message); }
+    }
     private readonly DispatcherTimer _inventoryTimer = new() { Interval = TimeSpan.FromMinutes(2) };
     private void InitializeReplacementParts()
     {

@@ -10,6 +10,7 @@ internal static class PartsPageChecks
     [
         ("Selected plant inventories ignore legacy snapshot sites and reject duplicate stocks", PlantInventories),
         ("Unit replacement-part choices preserve other units and never invent availability", UnitParts),
+        ("Repeated inventory tables deduplicate identical stock without hiding conflicting quantities", RepeatedTables),
         ("Legacy part notes expose location and whole-number snapshot without re-entry", LegacyParts),
         ("Part photos copy into the shared library, preserve edits and archive replacements", PhotoStorage),
         ("Stockroom tables require exact stock identity, clear quantity headers and a unique site/bin match", StockroomTables),
@@ -45,6 +46,17 @@ internal static class PartsPageChecks
             part.SetInventory(null); Require(part.AvailableDisplay == "Available: unknown" && part.QuantityValue == 9, "Failed refresh retained live stock or changed snapshot.");
         }
         finally { Directory.Delete(root, true); }
+    }
+    private static void RepeatedTables()
+    {
+        var available = StockroomService.Parse("<table><tr><th>Item ID</th><th>On hand</th><th>Available</th></tr><tr><td>0115639</td><td>9</td><td>2</td></tr></table>");
+        Require(available.Rows.Single().Quantity == 2, "On-hand quantity was shown instead of explicit available quantity.");
+        string table = "<table>" + Headers + Row("0115639", "7") + "</table>";
+        var result = StockroomService.Parse(table + table);
+        Require(result.Rows.Count == 1 && StockroomService.Find(result, new PartRecord { PartNumber = "0115639" }, true)?.Quantity == 7, "Desktop/mobile copies hid a valid quantity.");
+        var conflict = StockroomService.Parse(table + "<table>" + Headers + Row("0115639", "8") + "</table>");
+        Require(StockroomService.Find(conflict, new PartRecord { PartNumber = "0115639" }, true) is null, "Conflicting quantities were guessed.");
+        Require(result.TableSample.Length > 0 && result.TableSample.Any(row => row.Contains("0115639")), "Diagnostic table sample missing.");
     }
     private static void LegacyParts()
     {
@@ -97,7 +109,7 @@ internal static class PartsPageChecks
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             Requests++;
-            if (Requests == 1) return new(HttpStatusCode.OK) { Content = new StringContent("<form action='/inventory/search?site=HRM' method='" + (post ? "post" : "get") + "'><input type='hidden' name='token' value='abc&amp;123'><input name='keyword' type='search'><input type='submit' name='find' value='Search'></form>") };
+            if (Requests == 1) return new(HttpStatusCode.OK) { Content = new StringContent("<table>" + Headers + Row("0999999", "9") + "</table><form action='/inventory/search?site=HRM' method='" + (post ? "post" : "get") + "'><input type='hidden' name='token' value='abc&amp;123'><input name='keyword' type='search'><input type='submit' name='find' value='Search'></form>") };
             Require(request.RequestUri!.Host == "inventory.invalid" && request.RequestUri.AbsolutePath == "/inventory/search", "Search used the wrong form action.");
             string parameters = post ? await request.Content!.ReadAsStringAsync(token) : request.RequestUri.Query;
             Require(request.Method == (post ? HttpMethod.Post : HttpMethod.Get) && parameters.Contains("keyword=Safe2Cross") && parameters.Contains("token=abc%26123"), "Search query or hidden form fields were lost.");

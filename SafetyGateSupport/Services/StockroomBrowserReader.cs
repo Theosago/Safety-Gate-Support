@@ -73,7 +73,7 @@ public static class StockroomBrowserReader
                 {
                     string html = await client.EvaluateAsync(ReadTables, deadline.Token);
                     var direct = StockroomService.Parse(html);
-                    if (direct.Rows.Count > 0 && client.IsIdle) return direct;
+                    if (direct.Rows.Count > 0 && client.IsIdle) return direct with { Reader = "Browser search" };
                     await Task.Delay(150, deadline.Token);
                 }
             }
@@ -84,7 +84,7 @@ public static class StockroomBrowserReader
                 string html = await client.EvaluateAsync(ReadTables, deadline.Token);
                 if (html == previous) stable++; else { previous = html; stable = 0; }
                 var result = StockroomService.Parse(html);
-                if (stable >= 2 && client.IsIdle) return result;
+                if (stable >= 2 && client.IsIdle) return result with { Reader = "Browser search" };
             }
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException("The stockroom search did not finish within 25 seconds. Check plant-network access and stockroom sign-in."); }

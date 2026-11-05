@@ -33,7 +33,7 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18"><TextBlock Text="Appearance" Foreground="{DynamicResource ThemeForegroundAEC4D3}"/><ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" Margin="0,6,0,12"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.2.0" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.2.1" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -46,7 +46,7 @@
       <TextBlock Text="Stockroom plant" Margin="0,14,0,4"/>
       <ComboBox x:Name="RailPlantBox" DisplayMemberPath="Name" SelectionChanged="RailPlant_SelectionChanged"/>
       <TextBlock x:Name="RailStockStatus" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground617585}" Margin="0,8"/>
-      <WrapPanel><Button Content="Refresh stock" Click="CheckStoreroom_Click"/><Button x:Name="ConfigureUnitPartsButton" Content="Choose unit parts…" Click="ConfigureUnitParts_Click" Visibility="Collapsed"/></WrapPanel>
+      <WrapPanel><Button Content="Refresh stock" Click="CheckStoreroom_Click"/><Button Content="Save stockroom report…" Click="SaveStockroomReport_Click"/><Button x:Name="ConfigureUnitPartsButton" Content="Choose unit parts…" Click="ConfigureUnitParts_Click" Visibility="Collapsed"/></WrapPanel>
       <TextBlock x:Name="RailPartsEmpty" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground617585}" Margin="0,8"/>
      </StackPanel>
      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="RailPartsList" ItemTemplate="{StaticResource ReplacementPartCard}"/></ScrollViewer>

@@ -11,7 +11,11 @@ namespace SafetyGateSupport.Services;
 public static class StockroomService
 {
     public sealed record Row(string Stock, decimal Quantity, string Site, string Location, string QuantityLabel);
-    public sealed record Snapshot(IReadOnlyList<Row> Rows, DateTimeOffset CheckedUtc);
+    public sealed record Snapshot(IReadOnlyList<Row> Rows, DateTimeOffset CheckedUtc)
+    {
+        public string[][] TableSample { get; init; } = [];
+        public string Reader { get; init; } = "HTML";
+    }
     public static string StockKey(string? text) => (text ?? "").Trim().TrimStart('0');
     private static string Text(HtmlNode node) => WebUtility.HtmlDecode(node.InnerText).Replace('\u00a0', ' ').Trim();
     private static string Header(string text) => new(text.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
@@ -27,7 +31,8 @@ public static class StockroomService
                 var cells = row.ChildNodes.Where(n => n.Name is "td" or "th").ToArray(); if (cells.Length == 0) continue;
                 var names = cells.Select(c => Header(Text(c))).ToArray();
                 int stockHeader = Array.FindIndex(names, n => new[] { "stocknumber", "stockno", "stock", "itemnumber", "itemno", "materialnumber", "material", "partnumber", "partno", "part", "item", "itemid", "itemcode", "stockcode", "inventorynumber" }.Contains(n));
-                int qtyHeader = Array.FindIndex(names, n => new[] { "quantityonhand", "qtyonhand", "onhand", "currentquantity", "onhandqty", "qoh" }.Contains(n));
+                int qtyHeader = Array.FindIndex(names, n => new[] { "availablequantity", "qtyavailable", "quantityavailable", "available" }.Contains(n));
+                if (qtyHeader < 0) qtyHeader = Array.FindIndex(names, n => new[] { "quantityonhand", "qtyonhand", "onhand", "currentquantity", "onhandqty", "qoh" }.Contains(n));
                 if (qtyHeader < 0) qtyHeader = Array.FindIndex(names, n => new[] { "quantity", "qty", "availablequantity", "qtyavailable", "quantityavailable", "available", "qtyinstock", "quantityinstock" }.Contains(n));
                 if (stockHeader >= 0 && qtyHeader >= 0)
                 {
@@ -46,7 +51,10 @@ public static class StockroomService
                 rows.Add(new(number, count, site >= 0 && site < cells.Length ? Text(cells[site]) : "", location >= 0 && location < cells.Length ? Text(cells[location]) : "", label));
             }
         }
-        return new(rows, DateTimeOffset.UtcNow);
+        return new(rows.GroupBy(r => (StockKey(r.Stock), r.Quantity, r.Site.Trim().ToUpperInvariant(), r.Location.Trim().ToUpperInvariant())).Select(g => g.First()).ToArray(), DateTimeOffset.UtcNow)
+        {
+            TableSample = document.DocumentNode.Descendants("tr").Where(r => r.Ancestors("table").Any()).Take(250).Select(r => r.ChildNodes.Where(c => c.Name is "th" or "td").Take(16).Select(c => { string value = Text(c); return value[..Math.Min(value.Length, 500)]; }).ToArray()).ToArray()
+        };
     }
     public static Row? Find(Snapshot snapshot, PartRecord part, bool plantScoped = false)
     {
@@ -82,7 +90,7 @@ public static class StockroomService
         return null;
     }
     private static bool SameOrigin(Uri a, Uri b) => a.Scheme == b.Scheme && a.Host.Equals(b.Host, StringComparison.OrdinalIgnoreCase) && a.Port == b.Port;
-    public static async Task<Snapshot> FetchAsync(string url, CancellationToken token, HttpMessageHandler? transport = null)
+    public static async Task<Snapshot> FetchAsync(string url, CancellationToken token, HttpMessageHandler? transport = null, IReadOnlyCollection<string>? requested = null)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) throw new InvalidOperationException("Configure a valid stockroom HTTP/HTTPS address in Setup.");
         CancellationToken originalToken = token;
@@ -91,7 +99,7 @@ public static class StockroomService
         using var client = new HttpClient(handler, false) { Timeout = TimeSpan.FromSeconds(8) };
         var landing = await ReadPageAsync(client, new HttpRequestMessage(HttpMethod.Get, uri), uri, token);
         var snapshot = await Task.Run(() => Parse(landing.Html), token);
-        if (snapshot.Rows.Count > 0) return snapshot;
+        bool Complete(Snapshot value) => value.Rows.Count > 0 && (requested is null || requested.All(id => Find(value, new PartRecord { PartNumber = id }, true) is not null));
         if (FindSearchForm(landing.Html, landing.Uri) is { } form)
         {
             HttpRequestMessage request;
@@ -103,11 +111,17 @@ public static class StockroomService
                 request = new(form.Method, builder.Uri);
             }
             var result = await ReadPageAsync(client, request, uri, token); snapshot = await Task.Run(() => Parse(result.Html), token);
-            if (snapshot.Rows.Count > 0) return snapshot;
+            if (Complete(snapshot)) return snapshot;
         }
+        if (Complete(snapshot)) return snapshot;
         // A search which does not change the address often populates its table with JavaScript.
         // Use the actual page in an isolated browser only when the lightweight reader cannot read it.
-        if (transport is null && OperatingSystem.IsWindows()) return await StockroomBrowserReader.FetchAsync(url, originalToken);
+        if (transport is null && OperatingSystem.IsWindows())
+        {
+            try { return await StockroomBrowserReader.FetchAsync(url, originalToken); }
+            catch (Exception error) when (!originalToken.IsCancellationRequested && snapshot.TableSample.Length > 0 && error is IOException or TimeoutException or InvalidOperationException)
+            { return snapshot with { Reader = "Incomplete HTML result; browser search failed: " + error.Message }; }
+        }
         return snapshot;
     }
     private static async Task<(string Html, Uri Uri)> ReadPageAsync(HttpClient client, HttpRequestMessage request, Uri origin, CancellationToken token)

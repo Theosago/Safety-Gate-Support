@@ -49,7 +49,10 @@ public partial class MainWindow
             var snapshot = await _stockroomReader(plant.Url, source.Token);
             if (_isClosed || source.IsCancellationRequested || !ReferenceEquals(_stockroomRefresh, source)) return;
             _stockroomSnapshot = snapshot;
-            _stockroomMessage = snapshot.Rows.Count == 0 ? $"{plant.Name}: the Safe2Cross search returned no readable stock rows. Open the stockroom to check its search results." : $"{plant.Name} stockroom checked {snapshot.CheckedUtc.LocalDateTime:g}.";
+            int matched = _parts.Count(p => StockroomService.Find(snapshot, p, true) is not null);
+            _stockroomMessage = $"{plant.Name}: matched {matched} of {_parts.Count} Item IDs; {snapshot.Rows.Count} inventory rows read at {snapshot.CheckedUtc.LocalDateTime:g}.";
+            if (matched == 0) _stockroomMessage += " Quantity lookup failed. Save a stockroom report so the returned table can be checked.";
+            else if (matched < _parts.Count) _stockroomMessage += " Some Item IDs were missing or ambiguous.";
         }
         catch (OperationCanceledException) { if (!_isClosed && ReferenceEquals(_stockroomRefresh, source)) { _stockroomSnapshot = null; _stockroomMessage = $"{plant.Name} check timed out or was canceled. Reported snapshot retained."; } }
         catch (Exception error) { if (!_isClosed && ReferenceEquals(_stockroomRefresh, source)) { _stockroomSnapshot = null; _stockroomMessage = $"{plant.Name} stockroom unavailable: " + error.Message + " Reported snapshot retained."; } }
