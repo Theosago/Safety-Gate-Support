@@ -131,7 +131,7 @@ public partial class ResourceWindow : Window
         if (FileList.SelectedItem is not ResourceFileItem item) { StatusText.Text = "Select a file to view or change the units it covers."; return; }
         var record = _data.LoadResources().Single(r => r.Id == _resource.Id);
         var linked = record.FileAssignments.First(p => p.Key.Equals(item.Name, StringComparison.OrdinalIgnoreCase)).Value;
-        var window = new Window { Owner = this, Title = "Units covered by " + item.Name, Width = 540, Height = 520, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var window = new Window { Owner = Owner ?? this, Title = "Units covered by " + item.Name, Width = 540, Height = 520, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var panel = new DockPanel { Margin = new Thickness(20) }; var save = new Button { Content = "Save unit links", HorizontalAlignment = HorizontalAlignment.Right };
         var info = new TextBlock { Text = "Select only the units covered by this file. A shared drawing stays one physical file. Other units keep their own drawings.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
         DockPanel.SetDock(info, Dock.Top); panel.Children.Add(info); DockPanel.SetDock(save, Dock.Bottom); panel.Children.Add(save);
