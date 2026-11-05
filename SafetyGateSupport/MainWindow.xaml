@@ -8,7 +8,7 @@
    <Border BorderBrush="#D5DFE8" BorderThickness="0,0,0,1" Padding="0,10">
     <StackPanel><TextBlock Text="{Binding Description}" FontWeight="SemiBold" TextWrapping="Wrap"/>
      <TextBlock Text="{Binding AvailableDisplay}" Foreground="{Binding AvailableColor}" FontWeight="Bold" Margin="0,6,0,3"/>
-     <TextBlock TextWrapping="Wrap"><Run Text="{Binding InventoryLocationLabel}"/><Run Text="{Binding InventoryLocationDisplay}" FontWeight="Bold"/></TextBlock>
+     <TextBlock TextWrapping="Wrap"><Run Text="{Binding InventoryLocationLabel, Mode=OneWay}"/><Run Text="{Binding InventoryLocationDisplay, Mode=OneWay}" FontWeight="Bold"/></TextBlock>
      <TextBlock Text="{Binding PartNumber, StringFormat='Item ID: {0}'}" Foreground="#617585"/>
     </StackPanel>
    </Border>
@@ -177,7 +177,7 @@
       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="9"/></Style></ListBox.ItemContainerStyle>
       <ListBox.ItemTemplate><DataTemplate><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="76"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
        <Border Background="#EDF1F5" CornerRadius="6" Width="66" Height="76" VerticalAlignment="Top"><Grid><TextBlock Text="Photo" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#8293A1"/><Image Stretch="Uniform" Margin="3" Loaded="PartThumbnail_Loaded" Unloaded="PartThumbnail_Unloaded" DataContextChanged="PartThumbnail_DataContextChanged"/></Grid></Border>
-       <StackPanel Grid.Column="1"><TextBlock Text="{Binding Description}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding AvailableDisplay}" Foreground="{Binding AvailableColor}" FontWeight="Bold" Margin="0,6,0,3"/><TextBlock Foreground="#1B637A" Margin="0,5,0,3" TextWrapping="Wrap"><Run Text="{Binding InventoryLocationLabel}"/><Run Text="{Binding InventoryLocationDisplay}" FontWeight="Bold"/></TextBlock><TextBlock Text="{Binding PartNumber, StringFormat='Item ID: {0}'}" Foreground="#687A88" TextWrapping="Wrap"/></StackPanel>
+       <StackPanel Grid.Column="1"><TextBlock Text="{Binding Description}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding AvailableDisplay}" Foreground="{Binding AvailableColor}" FontWeight="Bold" Margin="0,6,0,3"/><TextBlock Foreground="#1B637A" Margin="0,5,0,3" TextWrapping="Wrap"><Run Text="{Binding InventoryLocationLabel, Mode=OneWay}"/><Run Text="{Binding InventoryLocationDisplay, Mode=OneWay}" FontWeight="Bold"/></TextBlock><TextBlock Text="{Binding PartNumber, StringFormat='Item ID: {0}'}" Foreground="#687A88" TextWrapping="Wrap"/></StackPanel>
       </Grid></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
      <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#CED8E1" ToolTip="Drag to adjust the parts list and detail widths"/>
