@@ -701,8 +701,7 @@ internal static class Program
         Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Visible && Control<ItemsControl>(main, "RailPartsList").Items.Count >= 2, "Common parts rail absent on home.");
         Control<ComboBox>(main, "RailPlantBox").SelectedItem = StockroomPlant.Find("02");
         await WaitUntil(() => reads == 1 && Control<ListBox>(main, "PartList").Items.Cast<PartRecord>().Any(p => p.Id == part.Id && p.AvailableQuantity == 7), "Rail plant did not refresh live stock.");
-        var unit = Control<ItemsControl>(main, "UnitGallery").Items.Cast<object>().Single(x => x.GetType().GetProperty("Unit")!.GetValue(x) is SafetySystem u && u.Id == fixture.RedUnit.Id);
-        var card = Descendants<Button>(Control<ItemsControl>(main, "UnitGallery")).Single(b => ReferenceEquals(b.DataContext, unit)); Click(card);
+        await SelectGalleryUnit(main, fixture.RedUnit);
         await WaitUntil(() => Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible, "Unit workspace did not open.");
         Click(Control<Button>(main, "UnitPartsButton"));
         Require(Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible && Control<Grid>(main, "PartsView").Visibility == Visibility.Collapsed && Control<ItemsControl>(main, "RailPartsList").Items.Count == 1, "Unit Parts navigated away or ignored the saved choice.");
