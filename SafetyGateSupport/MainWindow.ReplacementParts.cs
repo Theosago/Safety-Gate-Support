@@ -1,0 +1,61 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
+using SafetyGateSupport.Models;
+namespace SafetyGateSupport;
+
+public partial class MainWindow
+{
+    private readonly DispatcherTimer _inventoryTimer = new() { Interval = TimeSpan.FromMinutes(2) };
+    private void InitializeReplacementParts()
+    {
+        _inventoryTimer.Tick += async (_, _) => { if (SelectedStockroomPlant is not null && _sharedDataReady) await RefreshStockroomAsync(); };
+        _inventoryTimer.Start(); Closed += (_, _) => _inventoryTimer.Stop();
+    }
+    private void RailPlant_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_data is not null && !Equals(StockroomPlantBox.SelectedItem, RailPlantBox.SelectedItem)) StockroomPlantBox.SelectedItem = RailPlantBox.SelectedItem;
+    }
+    private void SetPartsRail(bool visible)
+    {
+        PartsRail.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        PartsRailColumn.Width = visible ? new GridLength(330) : new GridLength(0);
+        if (visible) RefreshReplacementParts();
+    }
+    private List<PartRecord> ReplacementPartsFor(SafetySystem unit) => _parts.Where(p => unit.ReplacementPartIds is { } ids ? ids.Contains(p.Id, StringComparer.OrdinalIgnoreCase) : p.AppliesTo(unit.GateId, unit.Id)).OrderBy(p => p.Description).ToList();
+    private void RefreshReplacementParts()
+    {
+        bool unitView = SystemsView.Visibility == Visibility.Visible && SelectedUnit is not null;
+        PartsRailTitle.Text = unitView ? "Replacement parts · " + SelectedUnit!.UnitDisplay : "Common replacement parts";
+        ConfigureUnitPartsButton.Visibility = unitView ? Visibility.Visible : Visibility.Collapsed;
+        var parts = unitView ? ReplacementPartsFor(SelectedUnit!) : _parts.OrderBy(p => p.Description).ToList();
+        RailPartsList.ItemsSource = parts;
+        RailPartsEmpty.Text = parts.Count == 0 ? unitView ? "No parts chosen for this unit. Use Choose unit parts to add them." : "No parts in the shared library." : "";
+    }
+    private async void ConfigureUnitParts_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedUnit is not { } unit) return;
+        var chosen = ReplacementPartsFor(unit).Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var search = new TextBox { Margin = new Thickness(0, 8, 0, 12), MinHeight = 34, ToolTip = "Search descriptions, locations or Item IDs" };
+        var checks = _parts.OrderBy(p => p.Description).Select(p => new CheckBox { Tag = p, Content = new TextBlock { Text = p.Description + " · " + p.LocationDisplay + " · Item ID: " + p.PartNumber, TextWrapping = TextWrapping.Wrap }, IsChecked = chosen.Contains(p.Id), Margin = new Thickness(0, 7, 0, 7) }).ToList();
+        var options = new StackPanel(); foreach (var check in checks) options.Children.Add(check);
+        search.TextChanged += (_, _) => { foreach (var check in checks) { var p = (PartRecord)check.Tag; check.Visibility = (p.Description + " " + p.PartNumber + " " + p.LocationValue).Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed; } };
+        var save = new Button { Content = "Save unit parts", IsDefault = true }; var cancel = new Button { Content = "Cancel", IsCancel = true };
+        var buttons = new WrapPanel(); buttons.Children.Add(save); buttons.Children.Add(cancel);
+        var panel = new DockPanel { Margin = new Thickness(20) }; DockPanel.SetDock(buttons, Dock.Bottom); panel.Children.Add(buttons);
+        var header = new StackPanel(); header.Children.Add(new TextBlock { Text = unit.AdminDisplay, FontSize = 20, TextWrapping = TextWrapping.Wrap }); header.Children.Add(new TextBlock { Text = "Choose only the parts used on this unit. Saved to shared data.", TextWrapping = TextWrapping.Wrap }); header.Children.Add(search); DockPanel.SetDock(header, Dock.Top); panel.Children.Add(header); panel.Children.Add(new ScrollViewer { Content = options, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        var dialog = new Window { Owner = this, Title = "Choose replacement parts", Content = panel, Width = 650, Height = 700, MinWidth = 450, MinHeight = 400, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        save.Click += (_, _) => dialog.DialogResult = true;
+        if (dialog.ShowDialog() != true) return;
+        var ids = checks.Where(c => c.IsChecked == true).Select(c => ((PartRecord)c.Tag).Id).ToList();
+        try
+        {
+            ConfigureUnitPartsButton.IsEnabled = false;
+            var saved = await Task.Run(() => _data.SaveUnitReplacementParts(unit.Id, ids));
+            unit.ReplacementPartIds = saved.ReplacementPartIds;
+            if (!_isClosed) RefreshReplacementParts();
+        }
+        catch (Exception error) { if (!_isClosed) MessageBox.Show(this, "Unit parts were not saved: " + error.Message); }
+        finally { if (!_isClosed) ConfigureUnitPartsButton.IsEnabled = true; }
+    }
+}

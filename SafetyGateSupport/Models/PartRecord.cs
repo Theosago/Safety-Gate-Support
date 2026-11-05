@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 namespace SafetyGateSupport.Models;
 
-public class PartRecord
+public class PartRecord : System.ComponentModel.INotifyPropertyChanged
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string PartNumber { get; set; } = "";
@@ -22,6 +22,18 @@ public class PartRecord
     public List<string> AppliesToGateIds { get; set; } = new();
     public List<string> AppliesToUnitIds { get; set; } = new();
 
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    [JsonIgnore] public decimal? AvailableQuantity { get; private set; }
+    [JsonIgnore] public string AvailableDisplay => AvailableQuantity is { } n ? "Available: " + FormatQuantity(n) : "Available: unknown";
+    [JsonIgnore] public string AvailableColor => AvailableQuantity is null ? "#617585" : AvailableQuantity > 0 ? "#16703C" : "#BA2525";
+    [JsonIgnore] public string InventoryLocation { get; private set; } = "";
+    [JsonIgnore] public string InventoryLocationDisplay => InventoryLocation.Length > 0 ? InventoryLocation : LocationDisplay;
+    [JsonIgnore] public string InventoryLocationLabel => InventoryLocation.Length > 0 ? "Bin: " : "Reported bin: ";
+    public void SetInventory(decimal? quantity, string location = "")
+    {
+        AvailableQuantity = quantity; InventoryLocation = location;
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(null));
+    }
     private string NoteValue(string label) => Regex.Match(Notes ?? "", @"(?im)^" + label + @":[ \t]*([^\r\n]*)", RegexOptions.None, TimeSpan.FromMilliseconds(100)).Groups[1].Value.Trim();
     [JsonIgnore] public string LocationValue => string.IsNullOrWhiteSpace(BinLocation) ? NoteValue("(?:Bin location|Bin|Location)") : BinLocation;
     [JsonIgnore] public string LocationDisplay => LocationValue.Length == 0 ? "Location not supplied" : LocationValue;

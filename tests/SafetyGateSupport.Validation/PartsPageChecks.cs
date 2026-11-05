@@ -9,6 +9,7 @@ internal static class PartsPageChecks
     public static IEnumerable<(string Name, Action Check)> Cases =>
     [
         ("Selected plant inventories ignore legacy snapshot sites and reject duplicate stocks", PlantInventories),
+        ("Unit replacement-part choices preserve other units and never invent availability", UnitParts),
         ("Legacy part notes expose location and whole-number snapshot without re-entry", LegacyParts),
         ("Part photos copy into the shared library, preserve edits and archive replacements", PhotoStorage),
         ("Stockroom tables require exact stock identity, clear quantity headers and a unique site/bin match", StockroomTables),
@@ -23,6 +24,24 @@ internal static class PartsPageChecks
         Require(StockroomService.Find(snapshot, part, plantScoped: true)?.Quantity == 12 && StockroomService.Find(snapshot, part) is null, "Legacy snapshot site leaked into selected-plant matching.");
         var duplicates = snapshot with { Rows = [..snapshot.Rows, new("0115639", 6, "HRM", "TOP K-12", "Quantity")] };
         Require(StockroomService.Find(duplicates, part, plantScoped: true) is null, "Ambiguous stocks were guessed from an old plant snapshot.");
+    }
+    private static void UnitParts()
+    {
+        string root = Directory.CreateTempSubdirectory("unit-parts-").FullName;
+        try
+        {
+            var data = new DataService(false, Path.Combine(root, "local")); data.SetSharedRoot(Path.Combine(root, "share")); data.InitializeSharedData();
+            var part = new PartRecord { Id = "one", ReportedQuantity = 9 }; data.SaveParts([part]);
+            data.SaveSystems([new() { Id = "a", DisplayName = "Preserve me" }, new() { Id = "b", ReplacementPartIds = ["one"] }]);
+            data.SaveUnitReplacementParts("a", ["one", "one", "deleted"]);
+            var units = data.LoadSystems(); Require(units.Single(u => u.Id == "a").ReplacementPartIds!.SequenceEqual(["one"]) && units.Single(u => u.Id == "a").DisplayName == "Preserve me" && units.Single(u => u.Id == "b").ReplacementPartIds!.SequenceEqual(["one"]), "Unit selection lost data or accepted deleted/duplicate parts.");
+            data.SaveUnitReplacementParts("a", []); Require(data.LoadSystems().Single(u => u.Id == "a").ReplacementPartIds is { Count: 0 }, "Empty selection reverted to all parts.");
+            Require(part.AvailableDisplay == "Available: unknown", "Reported quantity was treated as available stock.");
+            part.SetInventory(3, "LIVE BIN"); Require(part.AvailableDisplay == "Available: 3" && part.AvailableColor == "#16703C" && part.InventoryLocationDisplay == "LIVE BIN", "Live positive availability was not green.");
+            part.SetInventory(0); Require(part.AvailableDisplay == "Available: 0" && part.AvailableColor == "#BA2525", "Zero availability was not red.");
+            part.SetInventory(null); Require(part.AvailableDisplay == "Available: unknown" && part.QuantityValue == 9, "Failed refresh retained live stock or changed snapshot.");
+        }
+        finally { Directory.Delete(root, true); }
     }
     private static void LegacyParts()
     {

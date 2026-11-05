@@ -18,6 +18,7 @@ public partial class MainWindow
     private StockroomPlant? SelectedStockroomPlant => StockroomPlantBox.SelectedItem as StockroomPlant;
     private void InitializeStockroomPlants()
     {
+        RailPlantBox.ItemsSource = StockroomPlant.All;
         StockroomPlantBox.ItemsSource = StockroomPlant.All;
         StockroomPlantBox.SelectedItem = StockroomPlant.Find(_data.Settings.StockroomPlantId);
         UpdatePartQuantity();
@@ -28,6 +29,7 @@ public partial class MainWindow
         _stockroomRefresh?.Cancel(); _stockroomRefresh = null;
         _stockroomSnapshot = null; _stockroomRequestedUrl = "";
         var plant = SelectedStockroomPlant;
+        RailPlantBox.SelectedItem = plant;
         _data.Settings.StockroomPlantId = plant?.Id ?? "";
         try { _data.SaveLocalSettings(); }
         catch (Exception error) { MessageBox.Show(this, "The plant choice could not be saved on this computer: " + error.Message); }
@@ -64,6 +66,9 @@ public partial class MainWindow
         PartCurrentQuantityText.Text = row is null ? "Current quantity unavailable" : "Current quantity: " + PartRecord.FormatQuantity(row.Quantity);
         PartStockroomStatusText.Text = row is not null ? $"{plant?.Name} • {row.QuantityLabel} • bin: {(row.Location.Length > 0 ? row.Location : "not provided")} • checked {_stockroomSnapshot!.CheckedUtc.LocalDateTime:g}" : _stockroomSnapshot?.Rows.Count > 0 && p is not null ? $"{plant?.Name}: no unique stockroom quantity matched this stock number." : plant is null ? "Choose a plant above. Reported quantities and locations are the original supplied snapshot, not current inventory for this plant." : _stockroomMessage;
         StockroomPlantHint.Text = plant is null ? "Choose a plant for current stock levels" : plant.Url + " • saved on this PC";
+        foreach (var part in _parts) { var live = _stockroomSnapshot is null ? null : StockroomService.Find(_stockroomSnapshot, part, plantScoped: true); part.SetInventory(live?.Quantity, live?.Location ?? ""); }
+        PartAvailableText.Text = p?.AvailableDisplay ?? "Available: unknown"; PartAvailableText.Foreground = (Brush)new BrushConverter().ConvertFromString(p?.AvailableColor ?? "#617585")!;
+        RailStockStatus.Text = plant is null ? "Select your plant to check live availability. Supplied quantities are snapshots only." : _stockroomMessage + " Updates every 2 minutes while open.";
         StoreroomResultText.Text = plant is null ? "Choose a stockroom plant. No plant has been checked." : _stockroomMessage;
     }
     private async void LoadPartPhoto(PartRecord part)

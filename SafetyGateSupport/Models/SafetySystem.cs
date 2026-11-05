@@ -5,6 +5,7 @@ namespace SafetyGateSupport.Models;
 public class SafetySystem
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public List<string>? ReplacementPartIds { get; set; }
     public string GateId { get; set; } = "";
     public string? UnitNumber { get; set; }
     public string DisplayName { get; set; } = "";

@@ -107,6 +107,7 @@ internal static class Program
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
             ("Plant selection is local, starts unselected and cancels stale stockroom results", StockroomPlantSelection),
+            ("Unit parts stay beside the unit and live availability changes without snapshots", ReplacementPartsRail),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
             ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
             ("Electrical PDFs detect reading direction automatically and open click-to-zoom without manual controls", AutomaticDrawingOrientation),
@@ -684,6 +685,30 @@ internal static class Program
         Require(Control<TextBlock>(main, "PartCurrentQuantityText").Text == "Current quantity: 12" && Control<TextBlock>(main, "PartStockroomStatusText").Text.Contains("Salisbury") && Control<TextBlock>(main, "PartStockroomStatusText").Text.Contains("NEW BIN"), "Stale Huntingdon result replaced Salisbury quantity or source details.");
         var saved = new DataService(false, Path.GetDirectoryName(fixture.Data.DrawingOrientationCache)!).Settings;
         Require(saved.StockroomPlantId == "04" && new AppSettings().StockroomPlantId == "", "Choice was not saved locally or new installations assume a plant.");
+    }
+
+    private static async Task ReplacementPartsRail()
+    {
+        var fixture = NewFixture();
+        var part = new PartRecord { Id = "rail-one", PartNumber = "0115639", Description = "Yellow module", ReportedQuantity = 5, BinLocation = "TOP T-01" };
+        fixture.Data.SaveParts([part, new() { Id = "rail-other", PartNumber = "0115638", Description = "Red module" }]);
+        fixture.Data.SaveUnitReplacementParts(fixture.RedUnit.Id, [part.Id]);
+        int reads = 0;
+        Task<StockroomService.Snapshot> Read(string url, CancellationToken token) => Task.FromResult(new StockroomService.Snapshot([new("0115639", ++reads == 1 ? 7 : 0, "", "LIVE BIN", "Available")], DateTimeOffset.UtcNow));
+        var main = Track(new MainWindow(fixture.Data, Read));
+        Require(main.WindowState == WindowState.Maximized, "App does not default to maximized.");
+        ShowOffscreen(main); await WaitUntil(() => main.IsEnabled && Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "Gallery did not load.");
+        Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Visible && Control<ItemsControl>(main, "RailPartsList").Items.Count >= 2, "Common parts rail absent on home.");
+        Control<ComboBox>(main, "RailPlantBox").SelectedItem = StockroomPlant.Find("02");
+        await WaitUntil(() => reads == 1 && Control<ListBox>(main, "PartList").Items.Cast<PartRecord>().Any(p => p.Id == part.Id && p.AvailableQuantity == 7), "Rail plant did not refresh live stock.");
+        var unit = Control<ItemsControl>(main, "UnitGallery").Items.Cast<object>().Single(x => x.GetType().GetProperty("Unit")!.GetValue(x) is SafetySystem u && u.Id == fixture.RedUnit.Id);
+        var card = Descendants<Button>(Control<ItemsControl>(main, "UnitGallery")).Single(b => ReferenceEquals(b.DataContext, unit)); Click(card);
+        await WaitUntil(() => Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible, "Unit workspace did not open.");
+        Click(Control<Button>(main, "UnitPartsButton"));
+        Require(Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible && Control<Grid>(main, "PartsView").Visibility == Visibility.Collapsed && Control<ItemsControl>(main, "RailPartsList").Items.Count == 1, "Unit Parts navigated away or ignored the saved choice.");
+        Click(Control<Button>(main, "RefreshStockroomButton"));
+        await WaitUntil(() => Control<ItemsControl>(main, "RailPartsList").Items.Cast<PartRecord>().Single().AvailableQuantity == 0, "Refresh did not replace the quantity.");
+        Require(Control<ItemsControl>(main, "RailPartsList").Items.Cast<PartRecord>().Single().AvailableColor == "#BA2525", "Zero stock did not become red.");
     }
 
     private static async Task PartsPhotosAndStock()

@@ -1,8 +1,19 @@
 <Window x:Class="SafetyGateSupport.MainWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Safety Gate Support" Height="790" Width="1220" MinHeight="680" MinWidth="900" ResizeMode="CanResize"
+ Title="Safety Gate Support" Height="790" Width="1220" MinHeight="680" MinWidth="900" ResizeMode="CanResize" WindowState="Maximized"
  Background="#F3F6FA" Foreground="#172D40" FontFamily="Segoe UI" FontSize="14" WindowStartupLocation="CenterScreen" PreviewKeyDown="MainWindow_PreviewKeyDown">
+ <Window.Resources>
+  <DataTemplate x:Key="ReplacementPartCard">
+   <Border BorderBrush="#D5DFE8" BorderThickness="0,0,0,1" Padding="0,10">
+    <StackPanel><TextBlock Text="{Binding Description}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+     <TextBlock Text="{Binding AvailableDisplay}" Foreground="{Binding AvailableColor}" FontWeight="Bold" Margin="0,6,0,3"/>
+     <TextBlock TextWrapping="Wrap"><Run Text="{Binding InventoryLocationLabel}"/><Run Text="{Binding InventoryLocationDisplay}" FontWeight="Bold"/></TextBlock>
+     <TextBlock Text="{Binding PartNumber, StringFormat='Item ID: {0}'}" Foreground="#617585"/>
+    </StackPanel>
+   </Border>
+  </DataTemplate>
+ </Window.Resources>
  <Grid>
   <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
   <Border Grid.Column="0" Background="{StaticResource Sidebar}" BorderBrush="#D6DCE2" BorderThickness="0,0,1,0">
@@ -22,18 +33,31 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18">
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.1.3" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.2.0" Foreground="#999" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
 
   <Grid Grid.Column="1" Margin="22">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="PartsRailColumn" Width="330"/></Grid.ColumnDefinitions>
+   <Border x:Name="PartsRail" Grid.Column="1" Background="White" CornerRadius="8" Padding="16" Margin="18,0,0,0">
+    <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <StackPanel><TextBlock x:Name="PartsRailTitle" Text="Common replacement parts" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap"/>
+      <TextBlock Text="Stockroom plant" Margin="0,14,0,4"/>
+      <ComboBox x:Name="RailPlantBox" DisplayMemberPath="Name" SelectionChanged="RailPlant_SelectionChanged"/>
+      <TextBlock x:Name="RailStockStatus" TextWrapping="Wrap" Foreground="#617585" Margin="0,8"/>
+      <WrapPanel><Button Content="Refresh stock" Click="CheckStoreroom_Click"/><Button x:Name="ConfigureUnitPartsButton" Content="Choose unit parts…" Click="ConfigureUnitParts_Click" Visibility="Collapsed"/></WrapPanel>
+      <TextBlock x:Name="RailPartsEmpty" TextWrapping="Wrap" Foreground="#617585" Margin="0,8"/>
+     </StackPanel>
+     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="RailPartsList" ItemTemplate="{StaticResource ReplacementPartCard}"/></ScrollViewer>
+    </Grid>
+   </Border>
    <!-- HOME -->
    <ScrollViewer x:Name="HomeView" VerticalScrollBarVisibility="Auto">
-    <StackPanel MaxWidth="930" HorizontalAlignment="Stretch">
+    <StackPanel HorizontalAlignment="Stretch">
      <DockPanel Margin="0,0,0,14">
-      <Image Source="{StaticResource GrangesHorizontal}" Width="200" Height="52" Stretch="Uniform" DockPanel.Dock="Right" Margin="20,0,0,0" AutomationProperties.Name="Gränges"/>
-      <StackPanel><TextBlock Text="Which unit are you working on?" FontSize="30" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Find it by asset number, location, or photograph. Select its photo to continue." Foreground="#536E81" FontSize="15" TextWrapping="Wrap" Margin="0,7,0,0"/></StackPanel>
+      <Image Source="{StaticResource GrangesHorizontal}" Width="140" Height="42" Stretch="Uniform" DockPanel.Dock="Right" Margin="20,0,0,0" AutomationProperties.Name="Gränges"/>
+      <StackPanel><TextBlock Text="Which unit are you working on?" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Find it by asset number, location, or photograph. Select its photo to continue." Foreground="#536E81" FontSize="15" TextWrapping="Wrap" Margin="0,7,0,0"/></StackPanel>
      </DockPanel>
      <TextBlock Text="Search units" FontWeight="SemiBold" Margin="0,4,0,5"/>
      <TextBox x:Name="UnitSearchBox" MinHeight="46" FontSize="18" TextChanged="UnitSearch_Changed" KeyDown="UnitSearch_KeyDown" ToolTip="Asset number, unit, location, model or description" AutomationProperties.Name="Search units by asset number or location"/>
@@ -153,14 +177,15 @@
       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="9"/></Style></ListBox.ItemContainerStyle>
       <ListBox.ItemTemplate><DataTemplate><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="76"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
        <Border Background="#EDF1F5" CornerRadius="6" Width="66" Height="76" VerticalAlignment="Top"><Grid><TextBlock Text="Photo" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#8293A1"/><Image Stretch="Uniform" Margin="3" Loaded="PartThumbnail_Loaded" Unloaded="PartThumbnail_Unloaded" DataContextChanged="PartThumbnail_DataContextChanged"/></Grid></Border>
-       <StackPanel Grid.Column="1"><TextBlock Text="{Binding Description}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding LocationDisplay, StringFormat='Reported bin: {0}'}" Foreground="#1B637A" Margin="0,5,0,3" TextWrapping="Wrap"/><TextBlock Text="{Binding PartNumber, StringFormat='Stock {0}'}" Foreground="#687A88" TextWrapping="Wrap"/></StackPanel>
+       <StackPanel Grid.Column="1"><TextBlock Text="{Binding Description}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding AvailableDisplay}" Foreground="{Binding AvailableColor}" FontWeight="Bold" Margin="0,6,0,3"/><TextBlock Foreground="#1B637A" Margin="0,5,0,3" TextWrapping="Wrap"><Run Text="{Binding InventoryLocationLabel}"/><Run Text="{Binding InventoryLocationDisplay}" FontWeight="Bold"/></TextBlock><TextBlock Text="{Binding PartNumber, StringFormat='Item ID: {0}'}" Foreground="#687A88" TextWrapping="Wrap"/></StackPanel>
       </Grid></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
      <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#CED8E1" ToolTip="Drag to adjust the parts list and detail widths"/>
      <ScrollViewer x:Name="PartDetailScroll" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="8,0,10,12">
       <TextBlock x:Name="PartTitleText" FontSize="23" FontWeight="SemiBold" Text="Select a part." TextWrapping="Wrap"/>
+      <TextBlock x:Name="PartAvailableText" FontSize="20" FontWeight="Bold" Margin="0,8,0,0"/>
       <TextBlock Text="Reported bin (original snapshot)" Foreground="#687A88" Margin="0,7,0,0"/>
-      <TextBlock x:Name="PartLocationText" FontSize="20" Foreground="#1B637A" Margin="0,7,0,4" TextWrapping="Wrap"/>
+      <TextBlock x:Name="PartLocationText" FontWeight="Bold" FontSize="20" Foreground="#1B637A" Margin="0,7,0,4" TextWrapping="Wrap"/>
       <TextBlock x:Name="PartStockText" Foreground="#617585" TextWrapping="Wrap"/>
       <Border Height="300" Background="#F7F9FC" BorderBrush="#D5DFE8" BorderThickness="1" CornerRadius="8" Margin="0,14,0,6"><Grid>
        <TextBlock x:Name="PartPhotoMessage" Text="Select a part to see its photo." TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20" Foreground="#687A88"/>

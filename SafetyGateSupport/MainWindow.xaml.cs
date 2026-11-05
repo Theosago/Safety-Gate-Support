@@ -53,7 +53,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _data = data; _stockroomReader = stockroomReader ?? ((url, token) => Task.Run(() => StockroomService.FetchAsync(url, token), token));
-        InitializeStockroomPlants();
+        InitializeStockroomPlants(); InitializeReplacementParts();
         InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
@@ -135,7 +135,7 @@ public partial class MainWindow : Window
             RefreshUnitGallery();
             BuildHelpPanels();
             RefreshManuals();
-            RefreshParts();
+            RefreshParts(); RefreshReplacementParts();
             if (!_data.IsHomePreview && _parts.Count > 0 && SelectedStockroomPlant is { } plant && _stockroomRequestedUrl != plant.Url) { _stockroomRequestedUrl = plant.Url; _ = RefreshStockroomAsync(); }
             BuildFastSearchIndex();
             _ = RefreshSearchIndexAsync();
@@ -199,9 +199,9 @@ public partial class MainWindow : Window
     private void ManualsNav_Click(object sender, RoutedEventArgs e) { _manualFilterGateId = _manualFilterUnitId = ""; ShowManuals(); RefreshManuals(); }
     private void PartsNav_Click(object sender, RoutedEventArgs e) { _partFilterGateId = _partFilterUnitId = ""; ShowParts(); RefreshParts(); }
 
-    private void HideAllViews() { HomeView.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
-    private void ShowHome() { HideAllViews(); HomeView.Visibility = Visibility.Visible; SetActiveNavigation(HomeNav); }
-    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
+    private void HideAllViews() { SetPartsRail(false); HomeView.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
+    private void ShowHome() { HideAllViews(); HomeView.Visibility = Visibility.Visible; SetPartsRail(true); SetActiveNavigation(HomeNav); }
+    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetPartsRail(true); SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
     private void ShowManuals() { HideAllViews(); ManualsView.Visibility = Visibility.Visible; SetActiveNavigation(ManualsNav); }
     private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; SetActiveNavigation(PartsNav); if (SelectedPart is { } part) LoadPartPhoto(part); }
 
@@ -474,7 +474,7 @@ public partial class MainWindow : Window
         TypeInfoText.Text = string.IsNullOrWhiteSpace(gate.EquipmentType) ? "" : "Type: " + gate.EquipmentType;
         ModelInfoText.Text = string.IsNullOrWhiteSpace(gate.Model) ? "" : "Model: " + gate.Model;
         LocationInfoText.Text = string.IsNullOrWhiteSpace(gate.Location) ? "" : "Location: " + gate.Location;
-        LoadPhoto(unit); LoadSharedNotes(unit); BuildResourceButtons(gate, unit); LoadDrawings(gate, unit);
+        RefreshReplacementParts(); LoadPhoto(unit); LoadSharedNotes(unit); BuildResourceButtons(gate, unit); LoadDrawings(gate, unit);
     }
 
     private void ClearUnit()
@@ -500,7 +500,7 @@ public partial class MainWindow : Window
     private void UnitParts_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
-        _partFilterGateId = gate.Id; _partFilterUnitId = unit.Id; ShowParts(); RefreshParts();
+        RefreshReplacementParts(); PartsRail.Visibility = Visibility.Visible; PartsRail.BringIntoView();
     }
 
     private async void SupportLibrary_Click(object sender, RoutedEventArgs e)
@@ -520,7 +520,7 @@ public partial class MainWindow : Window
         switch (resource.Kind.ToLowerInvariant())
         {
             case "manuals": _manualFilterGateId = gate.Id; _manualFilterUnitId = unit.Id; ShowManuals(); RefreshManuals(); break;
-            case "parts": _partFilterGateId = gate.Id; _partFilterUnitId = unit.Id; ShowParts(); RefreshParts(); break;
+            case "parts": RefreshReplacementParts(); PartsRail.Visibility = Visibility.Visible; PartsRail.BringIntoView(); break;
             case "url": if (!string.IsNullOrWhiteSpace(resource.Target)) FileLauncherService.Open(resource.Target); break;
             case "folder": var folder = _data.Resolve(resource.Target); Directory.CreateDirectory(folder); FileLauncherService.Open(folder); break;
             default: new ResourceWindow(_data, gate, unit, resource) { Owner = this }.ShowDialog(); _ = RefreshSearchIndexAsync(); break;
@@ -670,7 +670,7 @@ public partial class MainWindow : Window
             PartTitleText.Text = "Select a part."; PartLocationText.Text = PartStockText.Text = PartManufacturerText.Text = PartRelatedText.Text = PartNotesText.Text = PartReportedQuantityText.Text = "";
             _partPhotoLoad?.Cancel(); PartPhotoImage.Source = null; PartPhotoMessage.Text = "Select a part to see its photo."; PartPhotoMessage.Visibility = Visibility.Visible; EnlargePartPhotoButton.IsEnabled = false; UpdatePartQuantity(); return;
         }
-        PartTitleText.Text = p.Description; PartLocationText.Text = p.LocationDisplay; PartStockText.Text = "Stock number: " + p.PartNumber;
+        PartTitleText.Text = p.Description; PartLocationText.Text = p.LocationDisplay; PartStockText.Text = "Item ID: " + p.PartNumber;
         PartManufacturerText.Text = string.IsNullOrWhiteSpace(p.Manufacturer) ? "" : "Manufacturer: " + p.Manufacturer;
         var related = new List<string>(); related.AddRange(_gates.Where(g => p.AppliesToGateIds.Contains(g.Id)).Select(g => g.Display)); related.AddRange(_systems.Where(u => p.AppliesToUnitIds.Contains(u.Id)).Select(u => $"{GateFor(u)?.Display} / {u.UnitDisplay}"));
         PartRelatedText.Text = related.Count == 0 ? (string.IsNullOrWhiteSpace(p.RelatedAssets) ? "" : "Related: " + p.RelatedAssets) : "Applies to: " + string.Join(", ", related);
