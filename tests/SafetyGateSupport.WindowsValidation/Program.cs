@@ -105,6 +105,7 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
+            ("Embedded stockroom reader searches past unrelated initial inventory without launching Edge debugging", () => InteractiveStockroomSearch(true)),
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
             ("Plant selection is local, starts unselected and cancels stale stockroom results", StockroomPlantSelection),
             ("Inline unit files, scanner and column tools retain context and theme selection persists", InlineWorkspace),
@@ -616,7 +617,8 @@ internal static class Program
         await WaitUntil(() => status.Text.Contains("DWG changed, but the PDF has not") && HasColor(image.Source, Colors.Red), "Other shared unit did not show the same print and warning.");
     }
 
-    private static async Task InteractiveStockroomSearch()
+    private static Task InteractiveStockroomSearch() => InteractiveStockroomSearch(false);
+    private static async Task InteractiveStockroomSearch(bool embedded)
     {
         var portFinder = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0); portFinder.Start(); int port = ((System.Net.IPEndPoint)portFinder.LocalEndpoint).Port; portFinder.Stop();
         using var listener = new System.Net.HttpListener(); string url = $"http://127.0.0.1:{port}/"; listener.Prefixes.Add(url); listener.Start();
@@ -647,13 +649,20 @@ internal static class Program
                     """; context.Response.ContentType = "text/html";
                 }
                 else { body = ""; context.Response.StatusCode = 204; }
+                if (embedded && context.Request.Url!.AbsolutePath == "/") body = body.Replace("<div id=\"results\"></div>", "<div id=\"results\"><table><tr><th>ITEM ID</th><th>ITEM NAME</th><th>AVAILABLE</th><th>LOCATION</th><th>DESCRIPTION</th><th>PLANT</th></tr><tr><td>0116139</td><td>Flux</td><td>22000.00</td><td>906 RACK</td><td>Unrelated initial inventory</td><td>HRM</td></tr></table></div>");
+                if (embedded && context.Request.Url!.AbsolutePath == "/" && Environment.GetEnvironmentVariable("SAFETYGATE_WEBVIEW_SMOKE_FIXTURE") is { Length: > 0 } fixturePath)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+                    File.WriteAllText(fixturePath, body.Replace("const stocks=await(await fetch('/inventory?query='+encodeURIComponent(e.target.value))).json();", "const stocks=['0117719'];"));
+                }
                 byte[] bytes = Encoding.UTF8.GetBytes(body); context.Response.ContentLength64 = bytes.Length; await context.Response.OutputStream.WriteAsync(bytes); context.Response.Close();
             }
         });
         try
         {
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(18));
-            var result = await StockroomService.FetchAsync(url, deadline.Token);
+            var result = embedded ? await StockroomService.FetchAsync(url, deadline.Token, requested: ["0117719"], interactiveReader: StockroomWebViewReader.FetchAsync) : await StockroomService.FetchAsync(url, deadline.Token);
+            if (embedded) Require(result.Reader == "WebView2: Safe2Cross search", "Embedded reader fell back to the unfiltered initial table.");
             Require(searches > 0 && result.Rows.Select(r => r.Stock).Distinct().Count() == 19 && result.Rows.Single(r => r.Stock == "0117719").Quantity == 0, "Interactive stockroom search did not return all 19 items, including the zero-stock scanner.");
         }
         finally { stop.Cancel(); listener.Stop(); await server; }

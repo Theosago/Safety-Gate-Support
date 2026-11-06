@@ -92,7 +92,7 @@ public static class StockroomService
         return null;
     }
     private static bool SameOrigin(Uri a, Uri b) => a.Scheme == b.Scheme && a.Host.Equals(b.Host, StringComparison.OrdinalIgnoreCase) && a.Port == b.Port;
-    public static async Task<Snapshot> FetchAsync(string url, CancellationToken token, HttpMessageHandler? transport = null, IReadOnlyCollection<string>? requested = null)
+    public static async Task<Snapshot> FetchAsync(string url, CancellationToken token, HttpMessageHandler? transport = null, IReadOnlyCollection<string>? requested = null, Func<string, CancellationToken, Task<Snapshot>>? interactiveReader = null)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) throw new InvalidOperationException("Configure a valid stockroom HTTP/HTTPS address in Setup.");
         CancellationToken originalToken = token;
@@ -120,7 +120,7 @@ public static class StockroomService
         // Use the actual page in an isolated browser only when the lightweight reader cannot read it.
         if (transport is null && OperatingSystem.IsWindows())
         {
-            try { return await StockroomBrowserReader.FetchAsync(url, originalToken); }
+            try { return await (interactiveReader ?? StockroomBrowserReader.FetchAsync)(url, originalToken); }
             catch (Exception error) when (!originalToken.IsCancellationRequested && snapshot.TableSample.Length > 0 && error is IOException or TimeoutException or InvalidOperationException)
             { return snapshot with { Reader = "Incomplete HTML result; browser search failed: " + error.Message }; }
         }

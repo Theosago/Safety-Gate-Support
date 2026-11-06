@@ -36,6 +36,7 @@ jobs:
         run: dotnet run --project tests/SafetyGateSupport.HokuyoValidation/SafetyGateSupport.HokuyoValidation.csproj -c Release
       - name: Run Windows desktop regression checks
         env:
+          SAFETYGATE_WEBVIEW_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/webview-smoke.html
           SAFETYGATE_OCR_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/ocr-smoke.png
           SAFETYGATE_PDF_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/pdf-smoke.pdf
         shell: pwsh
@@ -95,6 +96,16 @@ jobs:
           if ($ocrCheck.ExitCode -ne 0 -or !(Test-Path $resultPath)) { throw "Published drawing OCR failed: $($ocrCheck.ExitCode)" }
           $result = Get-Content $resultPath -Raw | ConvertFrom-Json
           if ($result.Angle -ne 180 -or $result.Confidence -le 0) { throw 'Published drawing OCR did not correct the upside-down print' }
+      - name: Smoke-test embedded stockroom search in the published executable
+        shell: pwsh
+        run: |
+          $resultPath = Join-Path $env:RUNNER_TEMP ('webview-' + [guid]::NewGuid().ToString('N') + '.json')
+          $inputPath = (Resolve-Path artifacts/webview-smoke.html).Path
+          $check = Start-Process -FilePath (Resolve-Path artifacts/win-x64/SafetyGateSupport.exe) -ArgumentList @('--validate-stockroom-webview', "`"$inputPath`"", "`"$resultPath`"") -PassThru
+          if (!$check.WaitForExit(45000)) { $check.Kill(); throw 'Packaged WebView stockroom check timed out' }
+          if ($check.ExitCode -ne 0 -or !(Test-Path $resultPath)) { throw "Packaged WebView stockroom failed: $($check.ExitCode)" }
+          $result = Get-Content $resultPath -Raw | ConvertFrom-Json
+          if ($result.Rows.Count -ne 1 -or $result.Rows[0].Stock -ne '0117719' -or $result.Rows[0].Quantity -ne 0) { throw 'Packaged WebView did not search past the unrelated initial inventory' }
       - name: Smoke-test the normal published app with isolated settings
         shell: pwsh
         run: |

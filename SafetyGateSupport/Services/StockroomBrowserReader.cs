@@ -108,7 +108,7 @@ public static class StockroomBrowserReader
         return null;
     }
     private const string Documents = "const docs=[document]; for(const f of document.querySelectorAll('iframe,frame')){try{if(f.contentDocument)docs.push(f.contentDocument);}catch{}};";
-    private static readonly string FindSearch = "(()=>{" + Documents + """
+    public static readonly string FindSearch = "(()=>{" + Documents + """
         let best=null, score=0;
         for(const doc of docs) for(const el of doc.querySelectorAll('input')) {
           if(doc.readyState==='loading')continue;
@@ -126,7 +126,7 @@ public static class StockroomBrowserReader
         return JSON.stringify({found:!!best,url:location.href});
         })()
         """;
-    private static readonly string ReadTables = "(()=>{" + Documents + """
+    public static readonly string ReadTables = "(()=>{" + Documents + """
         let html='';
         for(const doc of docs){
           const win=doc.defaultView;const captured=new Set();

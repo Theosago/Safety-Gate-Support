@@ -51,6 +51,7 @@ public partial class MainWindow
             _stockroomSnapshot = snapshot;
             int matched = _parts.Count(p => StockroomService.Find(snapshot, p, true) is not null);
             _stockroomMessage = $"{plant.Name}: matched {matched} of {_parts.Count} Item IDs; {snapshot.Rows.Count} inventory rows read at {snapshot.CheckedUtc.LocalDateTime:g}.";
+            if (snapshot.Reader.StartsWith("Incomplete HTML result", StringComparison.Ordinal)) _stockroomMessage += " " + snapshot.Reader;
             if (matched == 0) _stockroomMessage += " Quantity lookup failed. Save a stockroom report so the returned table can be checked.";
             else if (matched < _parts.Count) _stockroomMessage += " Some Item IDs were missing or ambiguous.";
         }

@@ -9,7 +9,7 @@ public partial class App : Application
 {
     protected override async void OnStartup(StartupEventArgs e)
     {
-        if (e.Args.Length == 0 || e.Args[0] is not ("--validate-pdf-preview" or "--validate-drawing-orientation")) { base.OnStartup(e); return; }
+        if (e.Args.Length == 0 || e.Args[0] is not ("--validate-pdf-preview" or "--validate-drawing-orientation" or "--validate-stockroom-webview")) { base.OnStartup(e); return; }
         // Package verification is explicit and isolated: never create the normal
         // window or read its shared-root settings when validating the bundled engine.
         Navigating += (_, navigation) => navigation.Cancel = true;
@@ -19,7 +19,12 @@ public partial class App : Application
         try
         {
             if (e.Args.Length != 3) throw new ArgumentException("Supply an input PDF and a new verification-result path.");
-            if (e.Args[0] == "--validate-drawing-orientation")
+            if (e.Args[0] == "--validate-stockroom-webview")
+            {
+                var result = await StockroomWebViewReader.FetchAsync(new Uri(Path.GetFullPath(e.Args[1])).AbsoluteUri, CancellationToken.None);
+                using var output = new FileStream(e.Args[2], FileMode.CreateNew, FileAccess.Write, FileShare.None); JsonSerializer.Serialize(output, result);
+            }
+            else if (e.Args[0] == "--validate-drawing-orientation")
             {
                 var image = await IdentificationPhotoLoader.LoadAsync(e.Args[1], 2000, CancellationToken.None);
                 if (image.Source is null) throw new InvalidDataException("The OCR verification image could not be decoded.");

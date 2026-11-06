@@ -1,0 +1,6 @@
+Microsoft.Web.WebView2 1.0.3650.58
+Microsoft Edge WebView2 SDK
+Copyright Microsoft Corporation. Distributed under Microsoft's WebView2 SDK license.
+Package and license: https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.3650.58
+Runtime information: https://developer.microsoft.com/microsoft-edge/webview2/
+The Evergreen WebView2 Runtime is a separate Microsoft component required on Windows.
