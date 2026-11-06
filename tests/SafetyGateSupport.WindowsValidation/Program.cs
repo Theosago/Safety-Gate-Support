@@ -105,6 +105,7 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
+            ("Blazor inventory waits for delayed change handlers and server-confirmed search", () => InteractiveStockroomSearch(true, true)),
             ("Embedded stockroom reader searches past unrelated initial inventory without launching Edge debugging", () => InteractiveStockroomSearch(true)),
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
             ("Plant selection is local, starts unselected and cancels stale stockroom results", StockroomPlantSelection),
@@ -618,7 +619,7 @@ internal static class Program
     }
 
     private static Task InteractiveStockroomSearch() => InteractiveStockroomSearch(false);
-    private static async Task InteractiveStockroomSearch(bool embedded)
+    private static async Task InteractiveStockroomSearch(bool embedded, bool delayedBlazor = false)
     {
         var portFinder = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0); portFinder.Start(); int port = ((System.Net.IPEndPoint)portFinder.LocalEndpoint).Port; portFinder.Stop();
         using var listener = new System.Net.HttpListener(); string url = $"http://127.0.0.1:{port}/"; listener.Prefixes.Add(url); listener.Start();
@@ -650,6 +651,13 @@ internal static class Program
                 }
                 else { body = ""; context.Response.StatusCode = 204; }
                 if (embedded && context.Request.Url!.AbsolutePath == "/") body = body.Replace("<div id=\"results\"></div>", "<div id=\"results\"><table><tr><th>ITEM ID</th><th>ITEM NAME</th><th>AVAILABLE</th><th>LOCATION</th><th>DESCRIPTION</th><th>PLANT</th></tr><tr><td>0116139</td><td>Flux</td><td>22000.00</td><td>906 RACK</td><td>Unrelated initial inventory</td><td>HRM</td></tr></table></div>");
+                if (delayedBlazor && context.Request.Url!.AbsolutePath == "/")
+                {
+                    body = body.Replace("<body>", "<body><div class='inventory-container'>").Replace("type=\"search\" id=\"search\"", "type=\"text\" class=\"search-input\" id=\"search\"")
+                        .Replace("document.getElementById('search').addEventListener('input'", "setTimeout(()=>{document.getElementById('search').addEventListener('change'")
+                        .Replace("document.getElementById('results').replaceChildren(table);", "document.querySelector('.search-info')?.remove(); const info=document.createElement('div'); info.className='search-info';info.innerHTML='Searching: <span class=search-terms>Safe2Cross</span>';document.body.append(info);document.getElementById('results').replaceChildren(table);")
+                        .Replace("});</script>", "});},2200);</script>");
+                }
                 if (embedded && context.Request.Url!.AbsolutePath == "/" && Environment.GetEnvironmentVariable("SAFETYGATE_WEBVIEW_SMOKE_FIXTURE") is { Length: > 0 } fixturePath)
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
