@@ -8,6 +8,7 @@ namespace SafetyGateSupport.Services;
 /// <summary>Use WebView2's supported in-process API, without launching Edge in remote-debugging mode.</summary>
 public static class StockroomWebViewReader
 {
+    public static string LastSearchDiagnostics { get; private set; } = "";
     private static readonly SemaphoreSlim Slot = new(1);
     public static async Task<StockroomService.Snapshot> FetchAsync(string url, CancellationToken token)
     {
@@ -37,6 +38,7 @@ public static class StockroomWebViewReader
             };
             core.NavigationCompleted += (_, args) => { loaded = true; activity = DateTime.UtcNow; if (!args.IsSuccess) navigationError = "Stockroom navigation failed: " + args.WebErrorStatus; };
             core.WebResourceResponseReceived += (_, _) => activity = DateTime.UtcNow;
+            await core.AddScriptToExecuteOnDocumentCreatedAsync("window.addEventListener('error',e=>globalThis.__safetyGateScriptError=e.message);").WaitAsync(deadline.Token);
             core.Navigate(url);
             async Task<string> Evaluate(string script) => JsonSerializer.Deserialize<string>(await core.ExecuteScriptAsync(script).WaitAsync(deadline.Token)) ?? "";
             bool searched = false; string? previous = null, baseline = null; int stable = 0; DateTime lastAttempt = DateTime.MinValue;
@@ -45,7 +47,8 @@ public static class StockroomWebViewReader
                 await Task.Delay(250, deadline.Token);
                 if (navigationError is not null) throw new IOException(navigationError);
                 if (!loaded) continue;
-                using var state = JsonDocument.Parse(await Evaluate("(()=>JSON.stringify({specific:!!document.querySelector('.inventory-container input.search-input'),applied:document.querySelector('.search-info .search-terms')?.textContent.trim()||''}))()"));
+                using var state = JsonDocument.Parse(await Evaluate("(()=>JSON.stringify({specific:!!document.querySelector('.inventory-container input.search-input'),applied:document.querySelector('.search-info .search-terms')?.textContent.trim()||'',value:document.querySelector('input.search-input')?.value||'',error:globalThis.__safetyGateScriptError||''}))()"));
+                LastSearchDiagnostics = state.RootElement.ToString();
                 serverSearch = state.RootElement.GetProperty("specific").GetBoolean();
                 serverConfirmed = state.RootElement.GetProperty("applied").GetString()?.Equals("Safe2Cross", StringComparison.OrdinalIgnoreCase) == true;
                 if (!searched || serverSearch && !serverConfirmed && DateTime.UtcNow - lastAttempt > TimeSpan.FromMilliseconds(1500))
@@ -69,6 +72,7 @@ public static class StockroomWebViewReader
                     }
                 }
                 string html = await Evaluate(StockroomBrowserReader.ReadTables);
+                LastSearchDiagnostics += "; highlighted=" + html.Contains("<mark>Safe2Cross</mark>", StringComparison.OrdinalIgnoreCase) + "; rows=" + StockroomService.Parse(html).Rows.Count;
                 stable = html == previous ? stable + 1 : 0; previous = html;
                 if (stable >= 3 && (serverSearch ? serverConfirmed : html != baseline) && DateTime.UtcNow - activity > TimeSpan.FromMilliseconds(750))
                 {

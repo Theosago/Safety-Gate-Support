@@ -673,6 +673,7 @@ internal static class Program
             if (embedded) Require(result.Reader == "WebView2: Safe2Cross search", "Embedded reader fell back to the unfiltered initial table.");
             Require(searches > 0 && result.Rows.Select(r => r.Stock).Distinct().Count() == 19 && result.Rows.Single(r => r.Stock == "0117719").Quantity == 0, "Interactive stockroom search did not return all 19 items, including the zero-stock scanner.");
         }
+        catch (Exception error) when (embedded) { throw new InvalidOperationException("Embedded search failed: " + StockroomWebViewReader.LastSearchDiagnostics + "; searches=" + searches, error); }
         finally { stop.Cancel(); listener.Stop(); await server; }
     }
 
