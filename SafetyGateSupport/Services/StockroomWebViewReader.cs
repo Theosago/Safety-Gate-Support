@@ -73,7 +73,11 @@ public static class StockroomWebViewReader
                 if (stable >= 3 && (serverSearch ? serverConfirmed : html != baseline) && DateTime.UtcNow - activity > TimeSpan.FromMilliseconds(750))
                 {
                     if (!searched) throw new IOException("Inventory loaded, but its search field was not found. The initial unfiltered page is not a completed lookup.");
-                    return StockroomService.Parse(html) with { Reader = "WebView2: Safe2Cross search" };
+                    var snapshot = StockroomService.Parse(html);
+                    // This inventory highlights the applied term in result cells. A changed
+                    // search caption alone may precede the server's table update.
+                    if (serverSearch && snapshot.Rows.Count > 0 && !html.Contains("<mark>Safe2Cross</mark>", StringComparison.OrdinalIgnoreCase)) continue;
+                    return snapshot with { Reader = "WebView2: Safe2Cross search" };
                 }
             }
         }

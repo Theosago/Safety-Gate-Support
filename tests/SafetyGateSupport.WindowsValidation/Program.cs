@@ -655,7 +655,7 @@ internal static class Program
                 {
                     body = body.Replace("<body>", "<body><div class='inventory-container'>").Replace("type=\"search\" id=\"search\"", "type=\"text\" class=\"search-input\" id=\"search\"")
                         .Replace("document.getElementById('search').addEventListener('input'", "setTimeout(()=>{document.getElementById('search').addEventListener('change'")
-                        .Replace("document.getElementById('results').replaceChildren(table);", "document.querySelector('.search-info')?.remove(); const info=document.createElement('div'); info.className='search-info';info.innerHTML='Searching: <span class=search-terms>Safe2Cross</span>';document.body.append(info);document.getElementById('results').replaceChildren(table);")
+                        .Replace("document.getElementById('results').replaceChildren(table);", "document.querySelector('.search-info')?.remove(); const info=document.createElement('div'); info.className='search-info';info.innerHTML='Searching: <span class=search-terms>Safe2Cross</span>';document.body.append(info);for(const cell of table.querySelectorAll('td'))if(cell.textContent==='Safe2Cross Gate')cell.innerHTML='<mark>Safe2Cross</mark> Gate';setTimeout(()=>document.getElementById('results').replaceChildren(table),1500);")
                         .Replace("});</script>", "});},2200);</script>");
                 }
                 if (embedded && context.Request.Url!.AbsolutePath == "/" && Environment.GetEnvironmentVariable("SAFETYGATE_WEBVIEW_SMOKE_FIXTURE") is { Length: > 0 } fixturePath)
