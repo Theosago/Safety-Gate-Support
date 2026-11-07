@@ -1,7 +1,7 @@
 <Window x:Class="SiemensUsbCheck.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Signal column • v0.4.0 • Safety Gate Support 7"
+        Title="Signal column configuration"
         Width="1040" Height="900" MinWidth="720" MinHeight="650"
         WindowStartupLocation="CenterScreen" Background="{DynamicResource ThemeBackgroundF5F7FA}"
         FontFamily="Segoe UI" FontSize="14"
@@ -20,8 +20,8 @@
 
         <StackPanel Grid.Row="0" Margin="0,0,0,18">
             <TextBlock x:Name="ContextText" TextWrapping="Wrap" FontWeight="Bold" Margin="0,0,0,8" Visibility="Collapsed"/>
-            <TextBlock Text="Check the light. Fix the configuration." FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource ThemeForeground14263D}" />
-            <TextBlock Text="Connect → choose this unit’s file → read and compare → check the actual lights."
+            <TextBlock Text="Reupload signal column configuration" FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource ThemeForeground14263D}" />
+            <TextBlock Text="Connect the column, select this unit’s approved configuration, then reupload. Current settings are backed up and the upload is verified automatically."
                        Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground394C60}" />
         </StackPanel>
 
@@ -36,7 +36,7 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="2" Margin="0,20,0,0">
+        <Expander Grid.Row="2" Header="USB connection details" Margin="0,16,0,0"><Grid Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -48,31 +48,32 @@
             </StackPanel>
             <Button x:Name="RefreshButton" Grid.Column="1" Content="_Refresh" Margin="10,0,0,0"
                     VerticalAlignment="Bottom" Click="RefreshButton_Click" />
-        </Grid>
+        </Grid></Expander>
 
         <TextBlock x:Name="DetectionText" Grid.Row="3" Margin="0,7,0,0" Foreground="{DynamicResource ThemeForeground394C60}"
                    TextWrapping="Wrap" Text="Checking connected devices…" />
 
         <StackPanel Grid.Row="4" Margin="0,16,0,14">
             <ComboBox x:Name="AssignedFilesCombo" DisplayMemberPath="Label" SelectionChanged="AssignedFiles_SelectionChanged" MinHeight="32" Margin="0,0,0,8" Visibility="Collapsed" ToolTip="Explicitly select the approved file for this asset and unit. Multiple files require review."/>
-            <DockPanel>
-                <Button x:Name="BrowseButton" Content="Choose .signal file…" DockPanel.Dock="Left"
-                        Click="BrowseButton_Click" Margin="0,0,12,0" />
-                <TextBlock x:Name="SelectedSignalText" VerticalAlignment="Center" TextWrapping="Wrap"
-                           Text="Choose this unit’s approved file to compare settings. Reading a backup does not need a file." />
-            </DockPanel>
+            <TextBlock x:Name="SelectedSignalText" TextWrapping="Wrap" Margin="0,0,0,12" Text="Select this unit’s approved configuration. Use Advanced diagnostics to choose a file if none is assigned."/>
+            <WrapPanel>
+                <Button x:Name="UploadButton" Content="Reupload signal column configuration" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="UploadButton_Click" MinHeight="48"/>
+                <Button x:Name="CancelButton" Content="Cancel" Margin="10,0,0,0" IsEnabled="False" Visibility="Collapsed" Click="CancelButton_Click"/>
+            </WrapPanel>
+            <TextBlock Text="A successful upload confirms stored settings. Check actual lights and sound before returning the equipment to service." TextWrapping="Wrap" Margin="0,10,0,14"/>
+            <Expander Header="Advanced diagnostics / choose another file"><StackPanel>
+            <Button x:Name="BrowseButton" Content="Choose .signal file…" Click="BrowseButton_Click" HorizontalAlignment="Left" Margin="0,10"/>
             <TabControl x:Name="WorkflowTabs" Margin="0,14,0,0">
              <TabItem Header="Read &amp; compare"><StackPanel Margin="14">
             <WrapPanel Margin="0,0,0,0">
                 <Button x:Name="ReadButton" Content="_Read &amp; compare…" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="ReadButton_Click" />
-                <Button x:Name="UploadButton" Content="_Upload selected file…" FontWeight="SemiBold" Margin="10,0,0,0"
-                        IsEnabled="False" Click="UploadButton_Click" />
-                <Button x:Name="CancelButton" Content="_Cancel" Margin="10,0,0,0" IsEnabled="False" Click="CancelButton_Click" />
+
+
             </WrapPanel>
         <TextBox x:Name="ResultText" Height="140" Margin="0,12,0,6" IsReadOnly="True" TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                  Padding="12" BorderBrush="{DynamicResource ThemeBorderBrushD6DEE8}" Background="{DynamicResource ThemeBackgroundFFFFFF}"
-                 Text="Select the spare column. Read saves a backup report; Upload uses the selected .signal file. No device opens until you start a read or confirm an upload." />
+                 Text="Optional diagnostic read: saves a backup and compares stored settings with the selected file. It does not replace the configuration or verify physical operation." />
              </StackPanel></TabItem>
              <TabItem Header="Expected lights &amp; sound">
                 <StackPanel Margin="14">
@@ -100,7 +101,7 @@
                     <TextBlock x:Name="ObservationText" TextWrapping="Wrap"/>
                 </StackPanel>
             </TabItem>
-            </TabControl>
+            </TabControl></StackPanel></Expander>
         </StackPanel>
 
 

@@ -1139,7 +1139,7 @@ internal static class Program
         Require(!Control<Button>(window, "ReadButton").IsEnabled && !Control<Button>(window, "CancelButton").IsEnabled,
             "The tool must start idle, without opening a column.");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Upload must require a selected device and validated file.");
-        Require(window.Title.Contains("v0.4.0", StringComparison.Ordinal), "The upload tool version was not updated.");
+        Require(window.Title.Contains("Signal column", StringComparison.OrdinalIgnoreCase), "Signal column tool identity missing.");
         Require(Control<TextBox>(window, "ResultText").IsReadOnly, "The report preview must not be an editable command field.");
         var rendered = false;
         window.ContentRendered += (_, _) => rendered = true;
@@ -1149,9 +1149,9 @@ internal static class Program
         Require(!Control<Button>(window, "CancelButton").IsEnabled, "Passive discovery unexpectedly started a USB session.");
         Require(Control<TextBlock>(window, "StatusText").Text.Contains("does not open USB", StringComparison.Ordinal),
             "The idle tool should explain that detection has not opened USB.");
-        var actions = Descendants<Button>(window).Select(button => button.Name).Order().ToArray();
-        Require(actions.SequenceEqual(new[] { "BrowseButton", "CancelButton", "ReadButton", "RefreshButton", "UploadButton" }),
-            "The configuration window exposed an unexpected action.");
+        var actions = Descendants<Button>(window).Where(button => button.IsVisible).Select(button => button.Name).Order().ToArray();
+        Require(actions.SequenceEqual(new[] { "UploadButton" }),
+            "The signal column tool must expose only Reupload as its primary action.");
         Control<ComboBox>(window, "DeviceCombo").ItemsSource = new[] { TestColumnPort() };
         Control<ComboBox>(window, "DeviceCombo").SelectedIndex = 0;
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Selecting a port without a valid file enabled upload.");

@@ -357,6 +357,7 @@ public partial class MainWindow : Window
         RefreshButton.IsEnabled = !_previewOnly && !running && !_isRefreshing;
         ReadButton.IsEnabled = !_previewOnly && !running && !_isRefreshing && DeviceCombo.SelectedItem is UsbColumnPort;
         CancelButton.IsEnabled = running && !_operationCancellation!.IsCancellationRequested;
+        CancelButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
         if (BrowseButton is not null) BrowseButton.IsEnabled = !running && !_isRefreshing;
         if (UploadButton is not null) UploadButton.IsEnabled = !_previewOnly && !running && !_isRefreshing &&
             DeviceCombo.SelectedItem is UsbColumnPort && _selectedUpload is { IsPreviewOnly: false };
