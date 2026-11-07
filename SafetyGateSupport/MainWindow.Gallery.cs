@@ -32,7 +32,7 @@ public partial class MainWindow
 
     private void InitializeUnitGallery()
     {
-        _unitSearchTimer.Tick += (_, _) => { _unitSearchTimer.Stop(); _galleryPage = 0; RefreshUnitGallery(); };
+        _unitSearchTimer.Tick += (_, _) => { _unitSearchTimer.Stop(); _galleryPage = 0; RefreshUnitGallery(); HomeView.ScrollToTop(); };
     }
     private void UnitSearch_Changed(object sender, TextChangedEventArgs e)
     {
@@ -46,7 +46,7 @@ public partial class MainWindow
         // Enter filters; it never selects a potentially ambiguous unit automatically.
     }
     private void AllAreas_Click(object sender, RoutedEventArgs e) => SelectGalleryArea("");
-    private void SelectGalleryArea(string area) { _galleryArea = area; _galleryPage = 0; RefreshUnitGallery(); }
+    private void SelectGalleryArea(string area) { _galleryArea = area; _galleryPage = 0; RefreshUnitGallery(); HomeView.ScrollToTop(); }
     private void PreviousUnits_Click(object sender, RoutedEventArgs e) { _galleryPage = Math.Max(0, _galleryPage - 1); RefreshUnitGallery(); HomeView.ScrollToTop(); }
     private void NextUnits_Click(object sender, RoutedEventArgs e) { _galleryPage++; RefreshUnitGallery(); HomeView.ScrollToTop(); }
     private void UnitCard_Click(object sender, RoutedEventArgs e)
