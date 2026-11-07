@@ -15,6 +15,8 @@ public static class StockroomService
     {
         public string[][] TableSample { get; init; } = [];
         public string Reader { get; init; } = "HTML";
+        // Diagnostic rows must remain exportable without becoming current quantities.
+        public bool QuantitiesConfirmed { get; init; } = true;
     }
     public static string StockKey(string? text) => (text ?? "").Trim().TrimStart('0');
     private static string Text(HtmlNode node) => WebUtility.HtmlDecode(node.InnerText).Replace('\u00a0', ' ').Trim();
@@ -60,6 +62,7 @@ public static class StockroomService
     }
     public static Row? Find(Snapshot snapshot, PartRecord part, bool plantScoped = false)
     {
+        if (!snapshot.QuantitiesConfirmed) return null;
         var matches = snapshot.Rows.Where(r => StockKey(r.Stock) == StockKey(part.PartNumber)).ToList();
         // A plant inventory endpoint is already scoped. Legacy snapshot site/bin values
         // must never select a different plant or hide a new plant's location.
@@ -101,7 +104,10 @@ public static class StockroomService
         using var client = new HttpClient(handler, false) { Timeout = TimeSpan.FromSeconds(8) };
         var landing = await ReadPageAsync(client, new HttpRequestMessage(HttpMethod.Get, uri), uri, token);
         var snapshot = await Task.Run(() => Parse(landing.Html), token);
-        bool Complete(Snapshot value) => value.Rows.Count > 0 && (requested is null || requested.All(id => Find(value, new PartRecord { PartNumber = id }, true) is not null));
+        var landingDocument = new HtmlDocument(); landingDocument.LoadHtml(landing.Html);
+        bool serverSearchRequired = landingDocument.DocumentNode.Descendants("input").Any(n =>
+            n.GetClasses().Contains("search-input") && n.Ancestors().Any(a => a.GetClasses().Contains("inventory-container")));
+        bool Complete(Snapshot value) => !serverSearchRequired && value.Rows.Count > 0 && (requested is null || requested.All(id => Find(value, new PartRecord { PartNumber = id }, true) is not null));
         if (FindSearchForm(landing.Html, landing.Uri) is { } form)
         {
             HttpRequestMessage request;
@@ -118,13 +124,13 @@ public static class StockroomService
         if (Complete(snapshot)) return snapshot;
         // A search which does not change the address often populates its table with JavaScript.
         // Use the actual page in an isolated browser only when the lightweight reader cannot read it.
-        if (transport is null && OperatingSystem.IsWindows())
+        if (interactiveReader is not null || transport is null && OperatingSystem.IsWindows())
         {
             try { return await (interactiveReader ?? StockroomBrowserReader.FetchAsync)(url, originalToken); }
             catch (Exception error) when (!originalToken.IsCancellationRequested && snapshot.TableSample.Length > 0 && error is IOException or TimeoutException or InvalidOperationException)
-            { return snapshot with { Reader = "Incomplete HTML result; browser search failed: " + error.Message }; }
+            { return snapshot with { QuantitiesConfirmed = false, Reader = "Incomplete HTML result; browser search failed: " + error.Message }; }
         }
-        return snapshot;
+        return serverSearchRequired ? snapshot with { QuantitiesConfirmed = false, Reader = "Incomplete HTML result; server-confirmed search requires the Windows stockroom reader." } : snapshot;
     }
     private static async Task<(string Html, Uri Uri)> ReadPageAsync(HttpClient client, HttpRequestMessage request, Uri origin, CancellationToken token)
     {

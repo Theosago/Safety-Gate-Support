@@ -43,7 +43,7 @@ public partial class MainWindow
         var plant = SelectedStockroomPlant;
         if (plant is null) { _stockroomMessage = "Choose a stockroom plant to check current quantities."; UpdatePartQuantity(); StockroomPlantBox.Focus(); return; }
         var source = new CancellationTokenSource(); _stockroomRefresh = source;
-        _stockroomSnapshot = null; _stockroomMessage = $"Checking {plant.Name} stockroom in the background…"; RefreshStockroomButton.IsEnabled = false; UpdatePartQuantity();
+        _stockroomSnapshot = null; _stockroomMessage = $"Checking {plant.Name} stockroom in the background…"; UpdatePartQuantity();
         try
         {
             var snapshot = await _stockroomReader(plant.Url, source.Token);
@@ -55,20 +55,24 @@ public partial class MainWindow
             if (matched == 0) _stockroomMessage += " Quantity lookup failed. Save a stockroom report so the returned table can be checked.";
             else if (matched < _parts.Count) _stockroomMessage += " Some Item IDs were missing or ambiguous.";
         }
-        catch (OperationCanceledException) { if (!_isClosed && ReferenceEquals(_stockroomRefresh, source)) { _stockroomSnapshot = null; _stockroomMessage = $"{plant.Name} check timed out or was canceled. Reported snapshot retained."; } }
-        catch (Exception error) { if (!_isClosed && ReferenceEquals(_stockroomRefresh, source)) { _stockroomSnapshot = null; _stockroomMessage = $"{plant.Name} stockroom unavailable: " + error.Message + " Reported snapshot retained."; } }
+        catch (OperationCanceledException) { if (!_isClosed && ReferenceEquals(_stockroomRefresh, source)) { _stockroomSnapshot = null; _stockroomMessage = $"{plant.Name} check stopped. Current quantities are unavailable. Refresh stock to retry. The supplied snapshot is unchanged."; } }
+        catch (Exception error) { if (!_isClosed && ReferenceEquals(_stockroomRefresh, source)) { _stockroomSnapshot = null; _stockroomMessage = $"{plant.Name} stockroom unavailable: " + error.Message + " Current quantities are unavailable. Check plant-network access, then refresh stock to retry."; } }
         finally
         {
-            if (ReferenceEquals(_stockroomRefresh, source)) { _stockroomRefresh = null; if (!_isClosed) { RefreshStockroomButton.IsEnabled = true; UpdatePartQuantity(); } }
+            if (ReferenceEquals(_stockroomRefresh, source)) { _stockroomRefresh = null; if (!_isClosed) { UpdatePartQuantity(); } }
             source.Dispose();
         }
     }
+    private void CancelStockroom_Click(object sender, RoutedEventArgs e) => _stockroomRefresh?.Cancel();
     private void UpdatePartQuantity()
     {
+        bool busy = _stockroomRefresh is not null;
+        RefreshStockroomButton.IsEnabled = RailRefreshStockroomButton.IsEnabled = !busy;
+        CancelStockroomButton.Visibility = RailCancelStockroomButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         var plant = SelectedStockroomPlant;
         var p = SelectedPart; var row = p is null || _stockroomSnapshot is null ? null : StockroomService.Find(_stockroomSnapshot, p, plantScoped: true);
         PartCurrentQuantityText.Text = row is null ? "Current quantity unavailable" : "Current quantity: " + PartRecord.FormatQuantity(row.Quantity);
-        PartStockroomStatusText.Text = row is not null ? $"{plant?.Name} • {row.QuantityLabel} • bin: {(row.Location.Length > 0 ? row.Location : "not provided")} • checked {_stockroomSnapshot!.CheckedUtc.LocalDateTime:g}" : _stockroomSnapshot?.Rows.Count > 0 && p is not null ? $"{plant?.Name}: no unique stockroom quantity matched this stock number." : plant is null ? "Choose a plant above. Reported quantities and locations are the original supplied snapshot, not current inventory for this plant." : _stockroomMessage;
+        PartStockroomStatusText.Text = row is not null ? $"{plant?.Name} • {row.QuantityLabel} • bin: {(row.Location.Length > 0 ? row.Location : "not provided")} • checked {_stockroomSnapshot!.CheckedUtc.LocalDateTime:g}" : _stockroomSnapshot is { QuantitiesConfirmed: true, Rows.Count: > 0 } && p is not null ? $"{plant?.Name}: no unique stockroom quantity matched this stock number." : plant is null ? "Choose a plant above. Reported quantities and locations are the original supplied snapshot, not current inventory for this plant." : _stockroomMessage;
         StockroomPlantHint.Text = plant is null ? "Choose a plant for current stock levels" : plant.Url + " • saved on this PC";
         foreach (var part in _parts) { var live = _stockroomSnapshot is null ? null : StockroomService.Find(_stockroomSnapshot, part, plantScoped: true); part.SetInventory(live?.Quantity, live?.Location ?? ""); }
         PartAvailableText.Text = p?.AvailableDisplay ?? "Available: unknown"; PartAvailableText.Foreground = (Brush)new BrushConverter().ConvertFromString(p?.AvailableColor ?? "#617585")!;

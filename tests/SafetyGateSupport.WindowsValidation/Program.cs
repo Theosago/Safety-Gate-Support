@@ -108,6 +108,7 @@ internal static class Program
             ("Blazor inventory waits for delayed change handlers and server-confirmed search", () => InteractiveStockroomSearch(true, true)),
             ("Embedded stockroom reader searches past unrelated initial inventory without launching Edge debugging", () => InteractiveStockroomSearch(true)),
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
+            ("Canceling stockroom lookup restores refresh controls and keeps unconfirmed rows unknown", CancelStockroomLookup),
             ("Plant selection is local, starts unselected and cancels stale stockroom results", StockroomPlantSelection),
             ("Inline unit files, scanner and column tools retain context and theme selection persists", InlineWorkspace),
             ("Unit parts stay beside the unit and live availability changes without snapshots", ReplacementPartsRail),
@@ -675,6 +676,31 @@ internal static class Program
         }
         catch (Exception error) when (embedded) { throw new InvalidOperationException("Embedded search failed: " + StockroomWebViewReader.LastSearchDiagnostics + "; searches=" + searches, error); }
         finally { stop.Cancel(); listener.Stop(); await server; }
+    }
+
+    private static async Task CancelStockroomLookup()
+    {
+        var fixture = NewFixture(); int requests = 0;
+        async Task<StockroomService.Snapshot> Fetch(string _, CancellationToken token)
+        {
+            if (++requests == 1) await Task.Delay(Timeout.Infinite, token);
+            return new StockroomService.Snapshot([new("0115639", 99, "", "INITIAL", "Available")], DateTimeOffset.UtcNow)
+                { QuantitiesConfirmed = false, Reader = "Incomplete HTML result; browser search failed: fixture timeout" };
+        }
+        var main = Track(new MainWindow(fixture.Data, Fetch)); ShowOffscreen(main);
+        await WaitUntil(() => main.IsEnabled && Control<ListBox>(main, "PartList").Items.Count > 0, "Parts not loaded.");
+        Control<ComboBox>(main, "RailPlantBox").SelectedItem = StockroomPlant.Find("02");
+        await WaitUntil(() => requests == 1, "Lookup did not start.");
+        Require(!Control<Button>(main, "RailRefreshStockroomButton").IsEnabled && !Control<Button>(main, "RefreshStockroomButton").IsEnabled, "Refresh controls disagree while busy.");
+        Click(Control<Button>(main, "RailCancelStockroomButton"));
+        await WaitUntil(() => Control<Button>(main, "RefreshStockroomButton").IsEnabled, "Cancel did not restore refresh.");
+        Require(Control<TextBlock>(main, "RailStockStatus").Text.Contains("check stopped"), "Cancellation has no retry guidance.");
+        Click(Control<Button>(main, "RefreshStockroomButton"));
+        await WaitUntil(() => requests == 2 && Control<Button>(main, "RefreshStockroomButton").IsEnabled, "Retry did not complete.");
+        var list = Control<ListBox>(main, "PartList"); list.SelectedItem = list.Items.Cast<PartRecord>().Single(p => p.PartNumber == "0115639");
+        Require(Control<TextBlock>(main, "PartCurrentQuantityText").Text == "Current quantity unavailable" &&
+            Control<TextBlock>(main, "PartStockroomStatusText").Text.Contains("browser search failed"), "Unconfirmed rows appeared as current stock or hid the failure.");
+        main.Close();
     }
 
     private static async Task StockroomPlantSelection()

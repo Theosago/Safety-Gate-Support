@@ -8,6 +8,7 @@ internal static class PartsPageChecks
 {
     public static IEnumerable<(string Name, Action Check)> Cases =>
     [
+        ("Unconfirmed Blazor inventory stays diagnostic even when every requested Item ID matches", UnconfirmedInventory),
         ("Selected plant inventories ignore legacy snapshot sites and reject duplicate stocks", PlantInventories),
         ("Unit replacement-part choices preserve other units and never invent availability", UnitParts),
         ("Repeated inventory tables deduplicate identical stock without hiding conflicting quantities", RepeatedTables),
@@ -17,6 +18,35 @@ internal static class PartsPageChecks
         ("Stockroom reader submits the Safe2Cross search form with its hidden fields", SearchForms),
         ("Stockroom HTTP fetch stays bounded, rejects failures and honors cancellation", StockroomFetch)
     ];
+    private static void UnconfirmedInventory()
+    {
+        string html = "<div class='inventory-container'><input class='search-input'></div><table>" + Headers + Row("0115639", "99") + "</table>";
+        int searches = 0;
+        Task<StockroomService.Snapshot> Fail(string _, CancellationToken token)
+        { searches++; throw new TimeoutException("Server search was not acknowledged."); }
+        var result = StockroomService.FetchAsync("https://inventory.invalid/parts", CancellationToken.None,
+            new Reply(HttpStatusCode.OK, html), ["0115639"], Fail).GetAwaiter().GetResult();
+        var part = new PartRecord { PartNumber = "0115639" };
+        Require(searches == 1, "A complete-looking initial Blazor table bypassed server search.");
+        Require(!result.QuantitiesConfirmed && result.Rows.Single().Quantity == 99 && result.TableSample.Length > 0,
+            "Failed search lost diagnostic rows or marked them confirmed.");
+        Require(StockroomService.Find(result, part, true) is null && StockroomService.Find(result, part) is null,
+            "Unconfirmed initial inventory was exposed as a current quantity.");
+        Require(result.Reader.Contains("Server search was not acknowledged"), "Failure detail was lost.");
+        var confirmed = StockroomService.FetchAsync("https://inventory.invalid/parts", CancellationToken.None,
+            new Reply(HttpStatusCode.OK, html), ["0115639"], (_, _) => Task.FromResult(
+                new StockroomService.Snapshot([new("0115639", 0, "", "NEW BIN", "Available")], DateTimeOffset.UtcNow))).GetAwaiter().GetResult();
+        Require(StockroomService.Find(confirmed, part, true)?.Quantity == 0, "Confirmed zero stock was lost after retry.");
+        using var cancel = new CancellationTokenSource();
+        bool canceled = false;
+        try
+        {
+            StockroomService.FetchAsync("https://inventory.invalid/parts", cancel.Token, new Reply(HttpStatusCode.OK, html),
+                ["0115639"], (_, token) => { cancel.Cancel(); token.ThrowIfCancellationRequested(); return Task.FromResult(confirmed); }).GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException) { canceled = true; }
+        Require(canceled, "User cancellation was converted to diagnostic success.");
+    }
     private static void PlantInventories()
     {
         Require(StockroomPlant.Find("02")?.Name == "Huntingdon" && StockroomPlant.Find("04")?.Url.EndsWith("/inventory/04") == true && StockroomPlant.Find("05")?.Name == "Newport" && StockroomPlant.Find("unknown") is null, "Plant mappings differ from the portal.");
