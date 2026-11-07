@@ -105,6 +105,7 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
+            ("Common Problems shows shared photos and opens fixes; Setup edits preserve photos", CommonProblemWorkflow),
             ("Setup imports an Item ID without manual detail entry", AdminItemImport),
             ("Item ID lookup waits for numeric server acknowledgement and returns metadata", () => InteractiveStockroomSearch(true, true, "0117719")),
             ("Blazor inventory waits for delayed change handlers and server-confirmed search", () => InteractiveStockroomSearch(true, true)),
@@ -624,6 +625,47 @@ internal static class Program
         Require(HasColor(image.Source, Colors.Red), "Companion warning hid the available PDF.");
         await SelectGalleryUnit(main, fixture.RedUnit);
         await WaitUntil(() => status.Text.Contains("DWG changed, but the PDF has not") && HasColor(image.Source, Colors.Red), "Other shared unit did not show the same print and warning.");
+    }
+
+    private static async Task CommonProblemWorkflow()
+    {
+        var fixture = NewFixture();
+        var topic = fixture.Data.SaveHelpTopic(new HelpItem { Section = "Common Problems", Title = "Broken sensor", Body = "Replace the damaged sensor using the approved procedure.", SortOrder = 1 }, fixture.Data.Resolve(fixture.RedUnit.PrimaryPhoto));
+        fixture.Data.SaveHelpTopic(new HelpItem { Section = "Common Problems", Title = "Hidden issue", Body = "Hidden instructions", Visible = false });
+        fixture.Data.SaveHelpTopic(new HelpItem { Section = "Common Problems", Title = "No photo issue", Body = "Still usable without a photo", SortOrder = 2 });
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main);
+        var list = Control<ItemsControl>(main, "CommonProblemsList");
+        await WaitUntil(() => main.IsEnabled && list.Items.Count == 2 && list.Items.Cast<MainWindow.CommonProblemCard>().First().Photo is not null, "Common problem cards/photos did not load.");
+        Require(list.Items.Cast<MainWindow.CommonProblemCard>().First().Topic.Id == topic.Id, "Common problems ignored order or included hidden entries.");
+        await WaitUntil(() => Descendants<Button>(list).Any(b => b.Tag is HelpItem h && h.Id == topic.Id), "Photo card not rendered.");
+        var opened = new TaskCompletionSource<bool>();
+        _ = main.Dispatcher.BeginInvoke(new Action(async () =>
+        {
+            HelpWindow? help = null;
+            try
+            {
+                await WaitUntil(() => Application.Current.Windows.OfType<HelpWindow>().Any(), "Click did not open fix instructions.");
+                help = Application.Current.Windows.OfType<HelpWindow>().Single();
+                await WaitUntil(() => Control<Image>(help, "ProblemPhoto").Source is not null, "Fix detail photo did not load.");
+                Require(Control<TextBlock>(help, "BodyText").Text == topic.Body, "Wrong fix instructions opened.");
+                opened.SetResult(true);
+            }
+            catch (Exception error) { opened.SetException(error); }
+            finally { help?.Close(); }
+        }));
+        Click(Descendants<Button>(list).Single(b => b.Tag is HelpItem h && h.Id == topic.Id));
+        await opened.Task;
+        var admin = Track(new AdminWindow(fixture.Data)); ShowOffscreen(admin);
+        await WaitUntil(() => admin.IsEnabled, "Setup not ready.");
+        Control<ListBox>(admin, "HelpList").SelectedItem = Control<ListBox>(admin, "HelpList").Items.Cast<HelpItem>().Single(h => h.Id == topic.Id);
+        await WaitUntil(() => Control<Image>(admin, "HelpPhotoPreview").Source is not null, "Setup photo preview unavailable.");
+        Control<TextBox>(admin, "HelpTitleBox").Text = "Broken sensor housing";
+        Click(Control<Button>(admin, "SaveHelpButton"));
+        await WaitUntil(() => Control<TabControl>(admin, "SetupTabs").IsEnabled, "Help save did not finish.");
+        Require(fixture.Data.LoadHelpItems().Single(h => h.Id == topic.Id).PhotoPath == topic.PhotoPath && fixture.Data.LoadHelpItems().Single(h => h.Id == topic.Id).Title == "Broken sensor housing", "Setup edit lost photo or title.");
+        Click(Control<Button>(admin, "NewCommonProblemButton"));
+        Require((Control<ComboBox>(admin, "HelpSectionBox").SelectedItem as ComboBoxItem)?.Content?.ToString() == "Common Problems", "Common problem shortcut did not select its section.");
+        admin.Close(); main.Close();
     }
 
     private static async Task AdminItemImport()

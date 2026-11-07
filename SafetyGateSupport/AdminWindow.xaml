@@ -130,7 +130,7 @@
    <TabItem Header="Home / Help">
     <Grid Margin="14"><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <WrapPanel><Button Content="+ New Topic" Click="NewHelp_Click"/><Button Content="Delete" Click="DeleteHelp_Click"/></WrapPanel>
+      <WrapPanel><Button Content="+ New Topic" Click="NewHelp_Click"/><Button x:Name="NewCommonProblemButton" Content="+ Common Problem" Click="NewCommonProblem_Click"/><Button Content="Delete" Click="DeleteHelp_Click"/></WrapPanel>
       <ListBox x:Name="HelpList" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="AdminDisplay" SelectionChanged="HelpList_SelectionChanged"/>
      </Grid>
      <ScrollViewer Grid.Column="2"><StackPanel>
@@ -140,13 +140,18 @@
       <TextBlock Text="Parts intro" Margin="0,8,0,3"/><TextBox x:Name="PartsIntroBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50"/>
       <Button Content="Save Home Text" Click="SaveSharedContent_Click" HorizontalAlignment="Left" Margin="0,8,0,16"/>
       <Separator/>
-      <TextBlock Text="Quick help topic" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,6"/>
-      <TextBlock Text="Section"/><ComboBox x:Name="HelpSectionBox" Height="34"><ComboBoxItem Content="Quick Help"/><ComboBoxItem Content="Troubleshooting"/></ComboBox>
+      <TextBlock Text="Help / Common Problem" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,6"/>
+      <TextBlock Text="Section"/><ComboBox x:Name="HelpSectionBox" Height="34"><ComboBoxItem Content="Quick Help"/><ComboBoxItem Content="Troubleshooting"/><ComboBoxItem Content="Common Problems"/></ComboBox>
       <TextBlock Text="Title" Margin="0,8,0,3"/><TextBox x:Name="HelpTitleBox" Height="34"/>
-      <TextBlock Text="Body" Margin="0,8,0,3"/><TextBox x:Name="HelpBodyBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="120"/>
+      <CheckBox x:Name="HelpVisibleCheck" Content="Show this entry to users" IsChecked="True" Margin="0,10"/>
+      <TextBlock Text="Problem photo (optional)" Margin="0,8,0,3"/>
+      <WrapPanel><Button Content="Choose / replace photo…" Click="ChooseHelpPhoto_Click"/><Button Content="Remove photo" Click="RemoveHelpPhoto_Click"/></WrapPanel>
+      <Image x:Name="HelpPhotoPreview" Height="160" Stretch="Uniform" HorizontalAlignment="Left"/>
+      <TextBlock x:Name="HelpPhotoStatus" TextWrapping="Wrap"/>
+      <TextBlock Text="How to recognize it and how to fix it" Margin="0,8,0,3"/><TextBox x:Name="HelpBodyBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="120"/>
       <TextBlock Text="Keywords" Margin="0,8,0,3"/><TextBox x:Name="HelpKeywordsBox" Height="34"/>
       <TextBlock Text="Sort order" Margin="0,8,0,3"/><TextBox x:Name="HelpSortBox" Height="34" Width="100" HorizontalAlignment="Left"/>
-      <Button Content="Save Topic" Click="SaveHelp_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+      <Button x:Name="SaveHelpButton" Content="Save Topic" Click="SaveHelp_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
      </StackPanel></ScrollViewer>
     </Grid>
    </TabItem>

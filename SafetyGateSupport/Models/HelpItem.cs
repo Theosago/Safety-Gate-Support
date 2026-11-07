@@ -7,6 +7,8 @@ public class HelpItem
     public string Title { get; set; } = "";
     public string Body { get; set; } = "";
     public string Keywords { get; set; } = "";
+    public string PhotoPath { get; set; } = "";
+    public bool Visible { get; set; } = true;
     public int SortOrder { get; set; }
 
     public string AdminDisplay => $"[{Section}] {Title}";

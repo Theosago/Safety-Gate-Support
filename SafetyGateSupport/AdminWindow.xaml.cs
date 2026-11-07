@@ -509,9 +509,37 @@ public partial class AdminWindow : Window
 
     // Home / Help
     private void HelpList_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedHelp = HelpList.SelectedItem as HelpItem; _newHelp = false; PopulateHelp(); }
-    private void PopulateHelp() { if (_selectedHelp is null) { HelpTitleBox.Text = HelpBodyBox.Text = HelpKeywordsBox.Text = ""; HelpSortBox.Text = "10"; HelpSectionBox.SelectedIndex = 0; return; } HelpSectionBox.SelectedIndex = _selectedHelp.Section.Equals("Troubleshooting", StringComparison.OrdinalIgnoreCase) ? 1 : 0; HelpTitleBox.Text = _selectedHelp.Title; HelpBodyBox.Text = _selectedHelp.Body; HelpKeywordsBox.Text = _selectedHelp.Keywords; HelpSortBox.Text = _selectedHelp.SortOrder.ToString(); }
+    private void PopulateHelp()
+    {
+        _pendingHelpPhoto = ""; _removeHelpPhoto = false;
+        HelpTitleBox.Text = _selectedHelp?.Title ?? ""; HelpBodyBox.Text = _selectedHelp?.Body ?? "";
+        HelpKeywordsBox.Text = _selectedHelp?.Keywords ?? ""; HelpSortBox.Text = (_selectedHelp?.SortOrder ?? 10).ToString();
+        HelpSectionBox.SelectedIndex = _selectedHelp?.Section == "Common Problems" ? 2 : _selectedHelp?.Section == "Troubleshooting" ? 1 : 0;
+        HelpVisibleCheck.IsChecked = _selectedHelp?.Visible ?? true; RefreshHelpPhoto();
+    }
     private void NewHelp_Click(object sender, RoutedEventArgs e) { _selectedHelp = null; _newHelp = true; PopulateHelp(); HelpTitleBox.Focus(); }
-    private void SaveHelp_Click(object sender, RoutedEventArgs e) { var title = HelpTitleBox.Text.Trim(); if (string.IsNullOrWhiteSpace(title)) { MessageBox.Show("A title is required."); return; } var section = (HelpSectionBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Quick Help"; if (_newHelp) { _selectedHelp = new HelpItem(); _help.Add(_selectedHelp); _newHelp = false; } if (_selectedHelp is null) return; _selectedHelp.Section = section; _selectedHelp.Title = title; _selectedHelp.Body = HelpBodyBox.Text.Trim(); _selectedHelp.Keywords = HelpKeywordsBox.Text.Trim(); _selectedHelp.SortOrder = int.TryParse(HelpSortBox.Text, out var n) ? n : 10; _data.SaveHelpItems(_help); _data.LogAudit("Help topic saved", details: title); HelpList.ItemsSource = _help.OrderBy(h => h.Section).ThenBy(h => h.SortOrder).ToList(); AdminStatusText.Text = "Help topic saved."; }
+    private async void SaveHelp_Click(object sender, RoutedEventArgs e)
+    {
+        string title = HelpTitleBox.Text.Trim(), body = HelpBodyBox.Text.Trim();
+        string section = (HelpSectionBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Quick Help";
+        if (title.Length == 0 || section == "Common Problems" && body.Length == 0) { AdminStatusText.Text = "Enter a title and fix instructions for the common problem."; return; }
+        if (!_newHelp && _selectedHelp is null) { AdminStatusText.Text = "Choose a topic or click + Topic first."; return; }
+        var item = new HelpItem { Id = _selectedHelp?.Id ?? Guid.NewGuid().ToString("N"), Section = section, Title = title, Body = body,
+            Keywords = HelpKeywordsBox.Text.Trim(), Visible = HelpVisibleCheck.IsChecked == true, SortOrder = int.TryParse(HelpSortBox.Text, out var n) ? n : 10 };
+        string photo = _pendingHelpPhoto; bool remove = _removeHelpPhoto;
+        SetupTabs.IsEnabled = false;
+        try
+        {
+            if (photo.Length > 0 && (await IdentificationPhotoLoader.LoadAsync(photo)).Source is null) throw new IOException("Choose a readable photo.");
+            await Task.Run(() => _data.SaveHelpTopic(item, photo, remove));
+            if (_isClosed) return;
+            _help = _data.LoadHelpItems(); _newHelp = false;
+            HelpList.ItemsSource = _help.OrderBy(h => h.Section).ThenBy(h => h.SortOrder).ThenBy(h => h.Title).ToList();
+            HelpList.SelectedItem = _help.Single(h => h.Id == item.Id); AdminStatusText.Text = "Help topic saved to shared data.";
+        }
+        catch (Exception error) { if (!_isClosed) AdminStatusText.Text = "Help topic not saved: " + error.Message; }
+        finally { if (!_isClosed) SetupTabs.IsEnabled = true; }
+    }
     private void DeleteHelp_Click(object sender, RoutedEventArgs e) { if (_selectedHelp is null) return; if (MessageBox.Show($"Delete '{_selectedHelp.Title}'?", "Delete", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return; _help.Remove(_selectedHelp); _data.SaveHelpItems(_help); _selectedHelp = null; HelpList.ItemsSource = _help.OrderBy(h => h.Section).ThenBy(h => h.SortOrder).ToList(); }
 
     // Manuals

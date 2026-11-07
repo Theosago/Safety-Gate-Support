@@ -68,7 +68,7 @@ public partial class MainWindow : Window
             _isClosed = true;
             _dataGeneration++;
             CancelSearchIndexRefresh();
-            CancelPhotoLoad(); CancelPartPhotos(); _stockroomRefresh?.Cancel();
+            CancelPhotoLoad(); CancelPartPhotos(); _commonProblemPhotos?.Cancel(); _stockroomRefresh?.Cancel();
             _drawingListing?.Cancel(); _drawingRendering?.Cancel(); _drawingOrientationCancellation?.Cancel(); _drawingPairCheck?.Cancel(); _drawingWatch.Stop();
             _galleryCancellation?.Cancel(); _unitSearchTimer.Stop();
             _notesSaveTimer.Stop();
@@ -115,6 +115,7 @@ public partial class MainWindow : Window
             {
                 _gates = new(); _systems = new(); _resources = new(); _categories = new(); _help = new(); _parts = new(); _manuals = new(); _flows = new(); _content = new();
                 _searchIndex = new(); _searchIndexReady = false;
+                CommonProblemsList.ItemsSource = null; _commonProblemPhotos?.Cancel(); CommonProblemsEmpty.Visibility = Visibility.Visible;
                 AreaBox.ItemsSource = null; HomeCategoryPanel.Children.Clear(); QuickHelpPanel.Children.Clear(); TroubleshootingPanel.Children.Clear();
                 GlobalSearchResults.ItemsSource = null; GlobalSearchResults.Visibility = Visibility.Collapsed;
                 SearchHintText.Text = "Shared data is unavailable.";
@@ -183,10 +184,11 @@ public partial class MainWindow : Window
     private void BuildHelpPanels()
     {
         QuickHelpPanel.Children.Clear(); TroubleshootingPanel.Children.Clear();
-        foreach (var item in _help.OrderBy(h => h.SortOrder).ThenBy(h => h.Title))
+        BuildCommonProblems();
+        foreach (var item in _help.Where(h => h.Visible && !h.Section.Equals("Common Problems", StringComparison.OrdinalIgnoreCase)).OrderBy(h => h.SortOrder).ThenBy(h => h.Title))
         {
             var button = new Button { Content = item.Title, Tag = item.Id, HorizontalContentAlignment = HorizontalAlignment.Left };
-            button.Click += (_, _) => new HelpWindow(item) { Owner = this }.ShowDialog();
+            button.Click += (_, _) => new HelpWindow(item, _data) { Owner = this }.ShowDialog();
             if (item.Section.Equals("Troubleshooting", StringComparison.OrdinalIgnoreCase)) TroubleshootingPanel.Children.Add(button);
             else QuickHelpPanel.Children.Add(button);
         }
@@ -284,7 +286,7 @@ public partial class MainWindow : Window
             var g = GateFor(s); if (g is null) continue;
             entries.Add(SystemIndexEntry(g, s, ""));
         }
-        foreach (var h in _help)
+        foreach (var h in _help.Where(h => h.Visible))
             entries.Add(new SearchIndexEntry { Title = h.Title, BaseSubtitle = h.Section, Kind = "Help", Body = h.Body, SearchText = $"{h.Title} {h.Body} {h.Keywords} {h.Section}" });
         foreach (var p in _parts)
             entries.Add(new SearchIndexEntry { Title = p.Display, BaseSubtitle = string.IsNullOrWhiteSpace(p.Manufacturer) ? "Part" : "Part • " + p.Manufacturer, Kind = "Part", Target = p.Id, SearchText = $"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} {p.LocationValue} {p.SiteValue} part parts" });
@@ -336,7 +338,7 @@ public partial class MainWindow : Window
                     string notes = ""; try { notes = _data.LoadSystemNotes(s); } catch { }
                     built.Add(SystemIndexEntry(g, s, notes));
                 }
-                foreach (var h in help) built.Add(new SearchIndexEntry { Title = h.Title, BaseSubtitle = h.Section, Kind = "Help", Body = h.Body, SearchText = $"{h.Title} {h.Body} {h.Keywords} {h.Section}" });
+                foreach (var h in help.Where(h => h.Visible)) built.Add(new SearchIndexEntry { Title = h.Title, BaseSubtitle = h.Section, Kind = "Help", Body = h.Body, SearchText = $"{h.Title} {h.Body} {h.Keywords} {h.Section}" });
                 foreach (var p in parts) built.Add(new SearchIndexEntry { Title = p.Display, BaseSubtitle = string.IsNullOrWhiteSpace(p.Manufacturer) ? "Part" : "Part • " + p.Manufacturer, Kind = "Part", Target = p.Id, SearchText = $"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} {p.LocationValue} {p.SiteValue} part parts" });
                 foreach (var m in manuals) built.Add(new SearchIndexEntry { Title = m.Display, BaseSubtitle = "Manual", Kind = "Manual", Target = m.Id, SearchText = $"{m.Title} {m.Manufacturer} {m.Model} {m.Keywords} manual documentation" });
                 foreach (var r in resources.Where(x => x.IsVisible))
@@ -401,7 +403,7 @@ public partial class MainWindow : Window
             case "System":
                 var u = _systems.FirstOrDefault(x => x.Id == r.SystemId); if (u is not null) NavigateToSystem(u, r.MatchSource == "SharedNotes" ? r.MatchText : null); break;
             case "File": if (File.Exists(r.Target)) FileLauncherService.Open(r.Target); break;
-            case "Help": var h = _help.FirstOrDefault(x => x.Title == r.Title && x.Body == r.Body); if (h is not null) new HelpWindow(h) { Owner = this }.ShowDialog(); break;
+            case "Help": var h = _help.FirstOrDefault(x => x.Title == r.Title && x.Body == r.Body); if (h is not null) new HelpWindow(h, _data) { Owner = this }.ShowDialog(); break;
             case "Part": var p = _parts.FirstOrDefault(x => x.Id == r.Target); _partFilterGateId = _partFilterUnitId = ""; ShowParts(); PartSearchBox.Text = p?.PartNumber ?? p?.Description ?? ""; PartList.SelectedItem = p; break;
             case "Manual": var m = _manuals.FirstOrDefault(x => x.Id == r.Target); if (m is not null) { var path = _data.Resolve(m.FilePath); if (File.Exists(path)) FileLauncherService.Open(path); } break;
             case "Resource": var resource = _resources.FirstOrDefault(x => x.Id == r.Target); if (resource is not null) NavigateToResource(resource); break;

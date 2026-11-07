@@ -33,7 +33,7 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18"><TextBlock Text="Appearance" Foreground="{DynamicResource ThemeForegroundAEC4D3}"/><ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" Margin="0,6,0,12"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.3.0" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.3.1" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -53,7 +53,7 @@
     </Grid>
    </Border>
    <!-- HOME -->
-   <Grid x:Name="HomeShell"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Grid x:Name="HomeShell"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <StackPanel>
      <DockPanel Margin="0,0,0,14">
       <Image Source="{StaticResource GrangesHorizontal}" Width="140" Height="42" Stretch="Uniform" DockPanel.Dock="Right" Margin="20,0,0,0" AutomationProperties.Name="Gränges"/>
@@ -110,7 +110,18 @@
       <GroupBox Header="Basic troubleshooting" Grid.Column="2"><StackPanel x:Name="TroubleshootingPanel" Margin="8"/></GroupBox>
      </Grid>
     </StackPanel>
-   </ScrollViewer></Grid>
+   </ScrollViewer>
+   <TabControl Grid.Column="1" Grid.RowSpan="2" Margin="16,0,0,0">
+    <TabItem Header="Common Problems"><Grid Margin="10"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <StackPanel><TextBlock Text="Does this look familiar?" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Select a photo to see the fix." TextWrapping="Wrap" Margin="0,5,0,12"/><TextBlock x:Name="CommonProblemsEmpty" Text="No common problems have been added yet. Add photos and fix instructions in Setup → Home / Help." TextWrapping="Wrap"/></StackPanel>
+     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsControl x:Name="CommonProblemsList"><ItemsControl.ItemTemplate><DataTemplate>
+      <Button Tag="{Binding Topic}" Click="CommonProblem_Click" HorizontalContentAlignment="Stretch" Padding="8" Margin="0,0,0,12" AutomationProperties.Name="{Binding Topic.Title}"><StackPanel>
+       <Border Height="160" Background="{DynamicResource ThemeBackgroundEDF1F4}"><Grid><Image Source="{Binding Photo}" Stretch="Uniform"/><TextBlock Text="{Binding PhotoMessage}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Photo}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid></Border>
+       <TextBlock Text="{Binding Topic.Title}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,5"/><TextBlock Text="See how to fix it →" Foreground="{DynamicResource ThemeForeground176B87}"/>
+      </StackPanel></Button>
+     </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+    </Grid></TabItem>
+   </TabControl></Grid>
 
    <!-- The unit workspace keeps the selected identity while tools open. -->
    <Grid x:Name="SystemsView" Visibility="Collapsed">

@@ -5,6 +5,29 @@ namespace SafetyGateSupport.Services;
 
 public partial class DataService
 {
+    public HelpItem SaveHelpTopic(HelpItem item, string photoSource = "", bool removePhoto = false)
+    {
+        if (string.IsNullOrWhiteSpace(item.Title) || item.Section == "Common Problems" && string.IsNullOrWhiteSpace(item.Body))
+            throw new InvalidOperationException("A common problem needs a title and fix instructions.");
+        using var lease = AcquireAssetWriteLock();
+        var topics = JsonSerializer.Deserialize<List<HelpItem>>(File.ReadAllText(HelpFile), _read) ?? throw new InvalidDataException("Shared help records unavailable.");
+        var old = topics.SingleOrDefault(h => h.Id == item.Id);
+        item.PhotoPath = removePhoto ? "" : old?.PhotoPath ?? "";
+        string? target = null;
+        if (photoSource.Length > 0)
+        {
+            string extension = Path.GetExtension(photoSource).ToLowerInvariant();
+            if (!new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff" }.Contains(extension)) throw new InvalidDataException("Choose a supported photo.");
+            if (new FileInfo(photoSource).Length > 64 * 1024 * 1024) throw new InvalidDataException("Choose a photo smaller than 64 MB.");
+            target = Path.Combine(SharedRoot, "HelpPhotos", Guid.NewGuid().ToString("N") + extension);
+            AtomicCopy(photoSource, target); item.PhotoPath = ToRelative(target);
+        }
+        if (old is not null) topics.Remove(old); topics.Add(item);
+        try { SaveHelpItems(topics); }
+        catch { if (target is not null) File.Delete(target); throw; }
+        // Keep previous photo files so backed-up help records remain usable.
+        LogAudit("Help topic saved", details: item.Title); return item;
+    }
     public PartRecord ImportStockroomPart(PartRecord imported)
     {
         using var lease = AcquireAssetWriteLock();

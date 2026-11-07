@@ -8,6 +8,7 @@ internal static class PartsPageChecks
 {
     public static IEnumerable<(string Name, Action Check)> Cases =>
     [
+        ("Common problem topics persist shared photos, visibility and edits without losing other topics", CommonProblems),
         ("Unconfirmed Blazor inventory stays diagnostic even when every requested Item ID matches", UnconfirmedInventory),
         ("Item ID import maps stockroom fields and preserves existing photos, documents and assignments", ItemImport),
         ("Selected plant inventories ignore legacy snapshot sites and reject duplicate stocks", PlantInventories),
@@ -19,6 +20,28 @@ internal static class PartsPageChecks
         ("Stockroom reader submits the Safe2Cross search form with its hidden fields", SearchForms),
         ("Stockroom HTTP fetch stays bounded, rejects failures and honors cancellation", StockroomFetch)
     ];
+    private static void CommonProblems()
+    {
+        string root = Directory.CreateTempSubdirectory("common-problems-").FullName;
+        try
+        {
+            var data = new DataService(false, Path.Combine(root, "local")); data.SetSharedRoot(Path.Combine(root, "share")); data.InitializeSharedData();
+            int original = data.LoadHelpItems().Count;
+            string source = Path.Combine(root, "broken.png"); File.WriteAllBytes(source, [1, 2, 3]);
+            var topic = data.SaveHelpTopic(new HelpItem { Title = "Broken bracket", Body = "Replace the damaged bracket following the approved procedure.", Section = "Common Problems", SortOrder = 2 }, source);
+            string firstPhoto = topic.PhotoPath;
+            File.Delete(source);
+            Require(File.Exists(data.Resolve(firstPhoto)), "Photo was not copied into shared storage.");
+            var updated = data.SaveHelpTopic(new HelpItem { Id = topic.Id, Section = "Common Problems", Title = "Updated bracket", Body = "Updated instructions", Visible = false });
+            Require(updated.PhotoPath == firstPhoto && data.LoadHelpItems().Count == original + 1, "Editing lost the photo or unrelated help.");
+            Require(!data.LoadHelpItems().Single(h => h.Id == topic.Id).Visible, "Hidden state was not saved.");
+            data.SaveHelpTopic(updated, removePhoto: true);
+            Require(data.LoadHelpItems().Single(h => h.Id == topic.Id).PhotoPath.Length == 0 && File.Exists(data.Resolve(firstPhoto)), "Photo removal broke backed-up records.");
+            bool refused = false; try { data.SaveHelpTopic(new HelpItem { Section = "Common Problems", Title = "No instructions" }); } catch (InvalidOperationException) { refused = true; }
+            Require(refused && data.LoadHelpItems().Count == original + 1, "Incomplete fix instructions were published.");
+        }
+        finally { Directory.Delete(root, true); }
+    }
     private static void UnconfirmedInventory()
     {
         string html = "<div class='inventory-container'><input class='search-input'></div><table>" + Headers + Row("0115639", "99") + "</table>";
