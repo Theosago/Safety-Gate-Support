@@ -5,6 +5,23 @@ namespace SafetyGateSupport.Services;
 
 public partial class DataService
 {
+    public PartRecord ImportStockroomPart(PartRecord imported)
+    {
+        using var lease = AcquireAssetWriteLock();
+        var parts = JsonSerializer.Deserialize<List<PartRecord>>(File.ReadAllText(PartsFile), _read) ?? throw new InvalidDataException("Shared parts records unavailable.");
+        var matches = parts.Where(p => StockroomService.StockKey(p.PartNumber) == StockroomService.StockKey(imported.PartNumber)).ToList();
+        if (matches.Count > 1) throw new InvalidOperationException("Duplicate Item IDs exist in the shared library. Resolve them before importing.");
+        var part = matches.SingleOrDefault();
+        if (part is null) { part = imported; parts.Add(part); }
+        else
+        {
+            part.Description = imported.Description; part.BinLocation = imported.BinLocation;
+            part.Site = imported.Site; part.ReportedQuantity = imported.ReportedQuantity;
+            if (imported.Manufacturer.Length > 0) part.Manufacturer = imported.Manufacturer;
+            if (part.Notes.Length == 0) part.Notes = imported.Notes;
+        }
+        SaveParts(parts); LogAudit("Part imported from stockroom", details: part.Display); return part;
+    }
     public SafetySystem SaveUnitManuals(string unitId, IEnumerable<string> manualIds)
     {
         using var lease = AcquireAssetWriteLock();

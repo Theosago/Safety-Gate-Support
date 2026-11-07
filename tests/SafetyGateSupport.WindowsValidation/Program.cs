@@ -105,6 +105,8 @@ internal static class Program
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
+            ("Setup imports an Item ID without manual detail entry", AdminItemImport),
+            ("Item ID lookup waits for numeric server acknowledgement and returns metadata", () => InteractiveStockroomSearch(true, true, "0117719")),
             ("Blazor inventory waits for delayed change handlers and server-confirmed search", () => InteractiveStockroomSearch(true, true)),
             ("Embedded stockroom reader searches past unrelated initial inventory without launching Edge debugging", () => InteractiveStockroomSearch(true)),
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
@@ -360,6 +362,11 @@ internal static class Program
         await WaitUntil(() => main.IsEnabled, "Unit-first home did not finish loading.");
         Equal(Visibility.Visible, Control<ScrollViewer>(main, "HomeView").Visibility, "Home must open directly to unit selection");
         Require(Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "The opening screen has no units.");
+        var search = Control<TextBox>(main, "UnitSearchBox");
+        var before = search.TranslatePoint(new Point(0, 0), main);
+        Control<ScrollViewer>(main, "HomeView").ScrollToBottom(); await DispatcherSettled();
+        Require(search.TranslatePoint(new Point(0, 0), main) == before && search.IsVisible, "Gallery scrolling moved or hid search.");
+        Control<ScrollViewer>(main, "HomeView").ScrollToTop();
         Require(!Control<Button>(main, "TroubleshootButton").IsVisible, "Troubleshooting must follow unit selection.");
         await SelectGalleryUnit(main, fixture.BlueUnit);
         await WaitUntil(() => HasColor(Control<Image>(main, "GateImage").Source, Colors.Blue), "Selected unit photo failed to load.");
@@ -619,8 +626,30 @@ internal static class Program
         await WaitUntil(() => status.Text.Contains("DWG changed, but the PDF has not") && HasColor(image.Source, Colors.Red), "Other shared unit did not show the same print and warning.");
     }
 
+    private static async Task AdminItemImport()
+    {
+        var fixture = NewFixture(); int reads = 0;
+        Task<StockroomService.Snapshot> Lookup(string url, string id, CancellationToken token)
+        {
+            Require(url.EndsWith("/inventory/02") && id == "987654", "Setup did not search the entered Item ID at the chosen plant."); reads++;
+            return Task.FromResult(StockroomService.Parse("<table><tr><th>Item ID</th><th>Item name</th><th>Available</th><th>Bin</th></tr><tr><td>987654</td><td>Imported switch</td><td>0</td><td>K-2</td></tr></table>"));
+        }
+        var admin = Track(new AdminWindow(fixture.Data, Lookup)); ShowOffscreen(admin);
+        await WaitUntil(() => admin.IsEnabled, "Setup not loaded.");
+        Control<ComboBox>(admin, "ImportPlantBox").SelectedItem = StockroomPlant.Find("02");
+        Control<TextBox>(admin, "PartNumberBox").Text = "987654";
+        Click(Control<Button>(admin, "ImportItemButton"));
+        await WaitUntil(() => Control<TextBlock>(admin, "ImportItemStatus").Text.StartsWith("Saved "), "Item ID import did not save automatically.");
+        var part = fixture.Data.LoadParts().Single(p => p.PartNumber == "987654");
+        Require(reads == 1 && part.Description == "Imported switch" && part.ReportedQuantity == 0 && part.BinLocation == "K-2", "Setup lost imported fields.");
+        Click(Control<Button>(admin, "ImportItemButton"));
+        await WaitUntil(() => reads == 2 && Control<TabControl>(admin, "SetupTabs").IsEnabled, "Repeat import did not finish.");
+        Require(fixture.Data.LoadParts().Count(p => p.PartNumber == "987654") == 1, "Setup created a duplicate Item ID.");
+        admin.Close();
+    }
+
     private static Task InteractiveStockroomSearch() => InteractiveStockroomSearch(false);
-    private static async Task InteractiveStockroomSearch(bool embedded, bool delayedBlazor = false)
+    private static async Task InteractiveStockroomSearch(bool embedded, bool delayedBlazor = false, string term = "Safe2Cross")
     {
         var portFinder = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0); portFinder.Start(); int port = ((System.Net.IPEndPoint)portFinder.LocalEndpoint).Port; portFinder.Stop();
         using var listener = new System.Net.HttpListener(); string url = $"http://127.0.0.1:{port}/"; listener.Prefixes.Add(url); listener.Start();
@@ -634,7 +663,7 @@ internal static class Program
                 string body;
                 if (context.Request.Url!.AbsolutePath == "/inventory")
                 {
-                    Require(context.Request.QueryString["query"] == "Safe2Cross", "Browser did not submit the Safe2Cross search."); Interlocked.Increment(ref searches);
+                    Require(context.Request.QueryString["query"] == term, "Browser did not submit the Safe2Cross search."); Interlocked.Increment(ref searches);
                     body = System.Text.Json.JsonSerializer.Serialize(new[] { "0115639", "0115638", "0115641", "0115640", "0115642", "0117369", "0117488", "0117489", "0117490", "0116820", "0117711", "0117712", "0117713", "0117714", "0117715", "0117716", "0117717", "0117718", "0117719" }); context.Response.ContentType = "application/json";
                 }
                 else if (context.Request.Url.AbsolutePath == "/")
@@ -659,7 +688,8 @@ internal static class Program
                         .Replace("document.getElementById('results').replaceChildren(table);", "document.querySelector('.search-info')?.remove(); const info=document.createElement('div'); info.className='search-info';info.innerHTML='Searching: <span class=search-terms>Safe2Cross</span>';document.body.append(info);for(const cell of table.querySelectorAll('td'))if(cell.textContent==='Safe2Cross Gate')cell.innerHTML='<mark>Safe2Cross</mark> Gate';setTimeout(()=>document.getElementById('results').replaceChildren(table),1500);")
                         .Replace("});</script>", "});},2200);</script>");
                 }
-                if (embedded && context.Request.Url!.AbsolutePath == "/" && Environment.GetEnvironmentVariable("SAFETYGATE_WEBVIEW_SMOKE_FIXTURE") is { Length: > 0 } fixturePath)
+                if (term != "Safe2Cross") body = body.Replace("Safe2Cross", term);
+                if (term == "Safe2Cross" && embedded && context.Request.Url!.AbsolutePath == "/" && Environment.GetEnvironmentVariable("SAFETYGATE_WEBVIEW_SMOKE_FIXTURE") is { Length: > 0 } fixturePath)
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
                     File.WriteAllText(fixturePath, body.Replace("const stocks=await(await fetch('/inventory?query='+encodeURIComponent(e.target.value))).json();", "const stocks=['0117719'];"));
@@ -670,8 +700,9 @@ internal static class Program
         try
         {
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(18));
-            var result = embedded ? await StockroomService.FetchAsync(url, deadline.Token, requested: ["0117719"], interactiveReader: StockroomWebViewReader.FetchAsync) : await StockroomService.FetchAsync(url, deadline.Token);
-            if (embedded) Require(result.Reader == "WebView2: Safe2Cross search", "Embedded reader fell back to the unfiltered initial table.");
+            var result = embedded ? await StockroomService.FetchAsync(url, deadline.Token, requested: ["0117719"], interactiveReader: (address, token) => StockroomWebViewReader.SearchAsync(address, term, token)) : await StockroomService.FetchAsync(url, deadline.Token);
+            if (term != "Safe2Cross") Require(StockroomService.ImportItem(result, term).Description == term + " Gate", "Item ID metadata not returned.");
+            if (embedded) Require(result.Reader == "WebView2: " + term + " search", "Embedded reader fell back to the unfiltered initial table.");
             Require(searches > 0 && result.Rows.Select(r => r.Stock).Distinct().Count() == 19 && result.Rows.Single(r => r.Stock == "0117719").Quantity == 0, "Interactive stockroom search did not return all 19 items, including the zero-stock scanner.");
         }
         catch (Exception error) when (embedded) { throw new InvalidOperationException("Embedded search failed: " + StockroomWebViewReader.LastSearchDiagnostics + "; searches=" + searches, error); }
@@ -770,12 +801,14 @@ internal static class Program
         var main = Track(new MainWindow(fixture.Data, Read));
         Require(main.WindowState == WindowState.Maximized, "App does not default to maximized.");
         ShowOffscreen(main); await WaitUntil(() => main.IsEnabled && Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "Gallery did not load.");
-        Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Visible && Control<ItemsControl>(main, "RailPartsList").Items.Count >= 2, "Common parts rail absent on home.");
+        Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Collapsed, "Parts rail must start collapsed.");
         Control<ComboBox>(main, "RailPlantBox").SelectedItem = StockroomPlant.Find("02");
         await WaitUntil(() => reads == 1 && Control<ListBox>(main, "PartList").Items.Cast<PartRecord>().Any(p => p.Id == part.Id && p.AvailableQuantity == 7), "Rail plant did not refresh live stock.");
         await SelectGalleryUnit(main, fixture.RedUnit);
         await WaitUntil(() => Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible, "Unit workspace did not open.");
+        Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Collapsed, "Unit parts opened before clicking Parts.");
         Click(Control<Button>(main, "UnitPartsButton"));
+        Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Visible, "Parts button did not open the rail.");
         Require(Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible && Control<Grid>(main, "PartsView").Visibility == Visibility.Collapsed && Control<ItemsControl>(main, "RailPartsList").Items.Count == 1, "Unit Parts navigated away or ignored the saved choice.");
         Click(Control<Button>(main, "RefreshStockroomButton"));
         await WaitUntil(() => Control<ItemsControl>(main, "RailPartsList").Items.Cast<PartRecord>().Single().AvailableQuantity == 0, "Refresh did not replace the quantity.");

@@ -22,7 +22,7 @@ public partial class MainWindow
         public required SafetyGate Gate { get; init; }
         public required SafetySystem Unit { get; init; }
         public string Title => $"{Gate.AssetDisplay} • {Unit.UnitDisplay}";
-        public string Location => string.Join(" • ", new[] { Gate.Category, Gate.Location, Gate.Manufacturer, Unit.DisplayName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        public string Location => string.Join(" • ", new[] { Gate.Category, Gate.Location, Gate.Manufacturer }.Where(s => !string.IsNullOrWhiteSpace(s)));
         private BitmapSource? _photo;
         public BitmapSource? Photo { get => _photo; set { _photo = value; PropertyChanged?.Invoke(this, new(nameof(Photo))); } }
         private string _message = "Loading identification photo…";
@@ -42,7 +42,7 @@ public partial class MainWindow
     private void UnitSearch_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
-        _unitSearchTimer.Stop(); _galleryPage = 0; RefreshUnitGallery();
+        _unitSearchTimer.Stop(); _galleryPage = 0; RefreshUnitGallery(); HomeView.ScrollToTop();
         // Enter filters; it never selects a potentially ambiguous unit automatically.
     }
     private void AllAreas_Click(object sender, RoutedEventArgs e) => SelectGalleryArea("");

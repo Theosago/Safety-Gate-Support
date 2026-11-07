@@ -150,7 +150,7 @@ public partial class MainWindow : Window
                 MessageBox.Show(ex.Message, "Unable to load shared data", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
-        finally { _loadingData = false; if (!_isClosed) { IsEnabled = true; if (HomeView.IsVisible) UnitSearchBox.Focus(); } }
+        finally { _loadingData = false; if (!_isClosed) { IsEnabled = true; if (HomeShell.IsVisible) UnitSearchBox.Focus(); } }
     }
 
     private void UpdateConnectionStatus()
@@ -199,9 +199,9 @@ public partial class MainWindow : Window
     private void ManualsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; _manualFilterGateId = _manualFilterUnitId = ""; ShowManuals(); RefreshManuals(); }
     private void PartsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; _partFilterGateId = _partFilterUnitId = ""; ShowParts(); RefreshParts(); }
 
-    private void HideAllViews() { SetPartsRail(false); HomeView.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
-    private void ShowHome() { HideAllViews(); HomeView.Visibility = Visibility.Visible; SetPartsRail(true); SetActiveNavigation(HomeNav); }
-    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetPartsRail(true); SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
+    private void HideAllViews() { SetPartsRail(false); HomeShell.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
+    private void ShowHome() { HideAllViews(); HomeShell.Visibility = Visibility.Visible; SetActiveNavigation(HomeNav); }
+    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
     private void ShowManuals() { HideAllViews(); ManualsView.Visibility = Visibility.Visible; SetActiveNavigation(ManualsNav); }
     private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; SetActiveNavigation(PartsNav); if (SelectedPart is { } part) LoadPartPhoto(part); }
 
@@ -502,7 +502,7 @@ public partial class MainWindow : Window
     private void UnitParts_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
-        RefreshReplacementParts(); PartsRail.Visibility = Visibility.Visible; PartsRail.BringIntoView();
+        SetPartsRail(PartsRail.Visibility != Visibility.Visible);
     }
 
     private async void SupportLibrary_Click(object sender, RoutedEventArgs e)
@@ -522,7 +522,7 @@ public partial class MainWindow : Window
         switch (resource.Kind.ToLowerInvariant())
         {
             case "manuals": _manualFilterGateId = gate.Id; _manualFilterUnitId = unit.Id; ShowManuals(); RefreshManuals(); break;
-            case "parts": RefreshReplacementParts(); PartsRail.Visibility = Visibility.Visible; PartsRail.BringIntoView(); break;
+            case "parts": SetPartsRail(PartsRail.Visibility != Visibility.Visible); break;
             case "url": if (!string.IsNullOrWhiteSpace(resource.Target)) FileLauncherService.Open(resource.Target); break;
             case "folder": var folder = _data.Resolve(resource.Target); Directory.CreateDirectory(folder); FileLauncherService.Open(folder); break;
             default: new ResourceWindow(_data, gate, unit, resource) { Owner = this }.ShowDialog(); _ = RefreshSearchIndexAsync(); break;

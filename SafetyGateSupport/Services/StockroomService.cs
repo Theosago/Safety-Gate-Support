@@ -10,7 +10,13 @@ namespace SafetyGateSupport.Services;
 
 public static class StockroomService
 {
-    public sealed record Row(string Stock, decimal Quantity, string Site, string Location, string QuantityLabel);
+    public sealed record Row(string Stock, decimal Quantity, string Site, string Location, string QuantityLabel)
+    {
+        public string Name { get; init; } = "";
+        public string Description { get; init; } = "";
+        public string Manufacturer { get; init; } = "";
+        public string Photo { get; init; } = "";
+    }
     public sealed record Snapshot(IReadOnlyList<Row> Rows, DateTimeOffset CheckedUtc)
     {
         public string[][] TableSample { get; init; } = [];
@@ -27,7 +33,7 @@ public static class StockroomService
         var document = new HtmlDocument(); document.LoadHtml(html); var rows = new List<Row>(); var seenRows = new HashSet<string>(StringComparer.Ordinal);
         foreach (var table in document.DocumentNode.Descendants("table"))
         {
-            int stock = -1, quantity = -1, site = -1, location = -1; string label = "";
+            int stock = -1, quantity = -1, site = -1, location = -1, name = -1, description = -1, manufacturer = -1; string label = "";
             foreach (var row in table.Descendants("tr").Where(r => r.Ancestors("table").FirstOrDefault() == table))
             {
                 var cells = row.ChildNodes.Where(n => n.Name is "td" or "th").ToArray(); if (cells.Length == 0) continue;
@@ -42,6 +48,9 @@ public static class StockroomService
                     if (cells.Any(c => c.GetAttributeValue("colspan", "1") != "1" || c.GetAttributeValue("rowspan", "1") != "1")) { stock = quantity = -1; continue; }
                     stock = stockHeader; quantity = qtyHeader; label = Text(cells[quantity]);
                     site = Array.FindIndex(names, n => new[] { "site", "plant", "warehouse" }.Contains(n));
+                    name = Array.FindIndex(names, n => n is "itemname" or "name" or "partname");
+                    description = Array.FindIndex(names, n => n is "description" or "itemdescription" or "partdescription");
+                    manufacturer = Array.FindIndex(names, n => n is "manufacturer" or "brand" or "make");
                     location = Array.FindIndex(names, n => new[] { "location", "bin", "binlocation", "storeroomlocation", "storagebin" }.Contains(n)); continue;
                 }
                 if (stock < 0 || quantity < 0 || cells.Length <= Math.Max(stock, quantity) || cells.Any(c => c.GetAttributeValue("colspan", "1") != "1" || c.GetAttributeValue("rowspan", "1") != "1")) continue;
@@ -52,7 +61,12 @@ public static class StockroomService
                 if (!decimal.TryParse(amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var count) || count < 0) continue;
                 string identity = System.Text.Json.JsonSerializer.Serialize(new { stock, quantity, site, location, Cells = cells.Select(Text).ToArray() });
                 if (!seenRows.Add(identity)) continue;
-                rows.Add(new(number, count, site >= 0 && site < cells.Length ? Text(cells[site]) : "", location >= 0 && location < cells.Length ? Text(cells[location]) : "", label));
+                string Value(int index) => index >= 0 && index < cells.Length ? Text(cells[index]) : "";
+                rows.Add(new(number, count, Value(site), Value(location), label)
+                {
+                    Name = Value(name), Description = Value(description), Manufacturer = Value(manufacturer),
+                    Photo = cells.SelectMany(c => c.Descendants("img")).Select(i => i.GetAttributeValue("src", "")).FirstOrDefault() ?? ""
+                });
             }
         }
         return new(rows, DateTimeOffset.UtcNow)
@@ -71,6 +85,17 @@ public static class StockroomService
         if (site.Length > 0 && !site.Equals("Not supplied", StringComparison.OrdinalIgnoreCase) && matches.Any(r => r.Site.Length > 0)) matches = matches.Where(r => r.Site.Equals(site, StringComparison.OrdinalIgnoreCase)).ToList();
         if (matches.Count > 1 && part.LocationValue.Length > 0 && matches.Any(r => r.Location.Length > 0)) matches = matches.Where(r => r.Location.Equals(part.LocationValue, StringComparison.OrdinalIgnoreCase)).ToList();
         return matches.Count == 1 ? matches[0] : null;
+    }
+    public static PartRecord ImportItem(Snapshot snapshot, string itemId)
+    {
+        if (!Regex.IsMatch(itemId, @"^[0-9]{5,12}$")) throw new InvalidOperationException("Enter a numeric Item ID (5–12 digits).");
+        var row = Find(snapshot, new PartRecord { PartNumber = itemId }, true)
+            ?? throw new InvalidOperationException("No unique, confirmed stockroom match for Item ID " + itemId + ". Nothing was imported.");
+        string title = row.Name.Length > 0 ? row.Name : row.Description;
+        if (title.Length == 0) throw new InvalidOperationException("The stockroom did not return an item name or description. Nothing was imported.");
+        return new PartRecord { PartNumber = row.Stock, Description = title, Manufacturer = row.Manufacturer,
+            BinLocation = row.Location, ReportedQuantity = row.Quantity, Site = row.Site,
+            Notes = row.Name.Length > 0 && row.Description != row.Name ? row.Description : "" };
     }
     private sealed record SearchForm(Uri Action, HttpMethod Method, List<KeyValuePair<string, string>> Values);
     private static SearchForm? FindSearchForm(string html, Uri page)

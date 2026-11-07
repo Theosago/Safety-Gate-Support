@@ -6,7 +6,7 @@
  <Window.Resources>
   <DataTemplate x:Key="ReplacementPartCard">
    <Border BorderBrush="{DynamicResource ThemeBorderBrushD5DFE8}" BorderThickness="0,0,0,1" Padding="0,10">
-    <StackPanel><TextBlock Text="{Binding Description}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+    <StackPanel><Border Height="130" Background="{DynamicResource ThemeBackgroundEDF1F4}" Margin="0,0,0,8"><Grid><TextBlock Text="No part photo" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource ThemeForeground617585}"/><Image Stretch="Uniform" Loaded="PartThumbnail_Loaded" Unloaded="PartThumbnail_Unloaded" DataContextChanged="PartThumbnail_DataContextChanged"/></Grid></Border><TextBlock Text="{Binding Description}" FontWeight="SemiBold" TextWrapping="Wrap"/>
      <TextBlock Text="{Binding AvailableDisplay}" Foreground="{Binding AvailableColor}" FontWeight="Bold" Margin="0,6,0,3"/>
      <TextBlock TextWrapping="Wrap"><Run Text="{Binding InventoryLocationLabel, Mode=OneWay}"/><Run Text="{Binding InventoryLocationDisplay, Mode=OneWay}" FontWeight="Bold"/></TextBlock>
      <TextBlock Text="{Binding PartNumber, StringFormat='Item ID: {0}'}" Foreground="{DynamicResource ThemeForeground617585}"/>
@@ -33,14 +33,14 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18"><TextBlock Text="Appearance" Foreground="{DynamicResource ThemeForegroundAEC4D3}"/><ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" Margin="0,6,0,12"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.2.3" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.3.0" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
 
   <Grid Grid.Column="1" Margin="22">
-   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="PartsRailColumn" Width="330"/></Grid.ColumnDefinitions>
-   <Border x:Name="PartsRail" Grid.Column="1" Background="{DynamicResource ThemeBackgroundFFFFFF}" CornerRadius="8" Padding="16" Margin="18,0,0,0">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="PartsRailColumn" Width="0"/></Grid.ColumnDefinitions>
+   <Border x:Name="PartsRail" Visibility="Collapsed" Grid.Column="1" Background="{DynamicResource ThemeBackgroundFFFFFF}" CornerRadius="8" Padding="16" Margin="18,0,0,0">
     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
      <StackPanel><TextBlock x:Name="PartsRailTitle" Text="Common replacement parts" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap"/>
       <TextBlock Text="Stockroom plant" Margin="0,14,0,4"/>
@@ -53,8 +53,8 @@
     </Grid>
    </Border>
    <!-- HOME -->
-   <ScrollViewer x:Name="HomeView" VerticalScrollBarVisibility="Auto">
-    <StackPanel HorizontalAlignment="Stretch">
+   <Grid x:Name="HomeShell"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <StackPanel>
      <DockPanel Margin="0,0,0,14">
       <Image Source="{StaticResource GrangesHorizontal}" Width="140" Height="42" Stretch="Uniform" DockPanel.Dock="Right" Margin="20,0,0,0" AutomationProperties.Name="Gränges"/>
       <StackPanel><TextBlock Text="Which unit are you working on?" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Find it by asset number, location, or photograph. Select its photo to continue." Foreground="{DynamicResource ThemeForeground536E81}" FontSize="15" TextWrapping="Wrap" Margin="0,7,0,0"/></StackPanel>
@@ -63,15 +63,16 @@
      <TextBox x:Name="UnitSearchBox" MinHeight="46" FontSize="18" TextChanged="UnitSearch_Changed" KeyDown="UnitSearch_KeyDown" ToolTip="Asset number, unit, location, model or description" AutomationProperties.Name="Search units by asset number or location"/>
      <WrapPanel Margin="0,12,0,8"><Button x:Name="AllAreasButton" HorizontalContentAlignment="Center" Content="All areas" Click="AllAreas_Click"/><WrapPanel x:Name="HomeCategoryPanel"/></WrapPanel>
      <TextBlock x:Name="GalleryStatusText" Text="Loading units…" Foreground="{DynamicResource ThemeForeground536E81}" TextWrapping="Wrap" Margin="4,0,0,12"/>
-     <ItemsControl x:Name="UnitGallery"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+    </StackPanel><ScrollViewer x:Name="HomeView" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+     <ItemsControl x:Name="UnitGallery"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate><DataTemplate>
-       <Button Click="UnitCard_Click" Tag="{Binding Unit}" HorizontalContentAlignment="Stretch" Padding="12" Margin="0,0,12,16" AutomationProperties.Name="{Binding Title}">
+       <Button Click="UnitCard_Click" Tag="{Binding Unit}" Width="250" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" Padding="10" Margin="0,0,12,12" AutomationProperties.Name="{Binding Title}">
         <StackPanel>
-         <Border Background="{DynamicResource ThemeBackgroundEDF1F4}" CornerRadius="8" Height="280" Padding="4"><Grid>
+         <Border Background="{DynamicResource ThemeBackgroundEDF1F4}" CornerRadius="8" Height="300" Padding="4"><Grid>
           <Image Source="{Binding Photo}" Stretch="Uniform" AutomationProperties.Name="{Binding Title}"/>
           <TextBlock Text="{Binding PhotoMessage}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource ThemeForeground61788A}" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding Photo}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers><Setter Property="Visibility" Value="Collapsed"/></Style></TextBlock.Style></TextBlock>
          </Grid></Border>
-         <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap" Margin="4,12,4,4"/>
+         <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" Margin="4,12,4,4"/>
          <TextBlock Text="{Binding Location}" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground536E81}" Margin="4,0,4,6"/>
          <TextBlock Text="Open this unit →" FontWeight="SemiBold" Foreground="{DynamicResource ThemeForeground176B87}" Margin="4,6,4,2"/>
         </StackPanel>
@@ -109,7 +110,7 @@
       <GroupBox Header="Basic troubleshooting" Grid.Column="2"><StackPanel x:Name="TroubleshootingPanel" Margin="8"/></GroupBox>
      </Grid>
     </StackPanel>
-   </ScrollViewer>
+   </ScrollViewer></Grid>
 
    <!-- The unit workspace keeps the selected identity while tools open. -->
    <Grid x:Name="SystemsView" Visibility="Collapsed">

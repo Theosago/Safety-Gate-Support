@@ -9,6 +9,7 @@ internal static class PartsPageChecks
     public static IEnumerable<(string Name, Action Check)> Cases =>
     [
         ("Unconfirmed Blazor inventory stays diagnostic even when every requested Item ID matches", UnconfirmedInventory),
+        ("Item ID import maps stockroom fields and preserves existing photos, documents and assignments", ItemImport),
         ("Selected plant inventories ignore legacy snapshot sites and reject duplicate stocks", PlantInventories),
         ("Unit replacement-part choices preserve other units and never invent availability", UnitParts),
         ("Repeated inventory tables deduplicate identical stock without hiding conflicting quantities", RepeatedTables),
@@ -46,6 +47,32 @@ internal static class PartsPageChecks
         }
         catch (OperationCanceledException) { canceled = true; }
         Require(canceled, "User cancellation was converted to diagnostic success.");
+    }
+    private static void ItemImport()
+    {
+        string html = "<table><tr><th>Item ID</th><th>Item name</th><th>Description</th><th>Available</th><th>Bin</th><th>Plant</th><th>Manufacturer</th><th>Photo</th></tr><tr><td>0115639</td><td>Yellow module</td><td>Replacement indicator</td><td>0</td><td>K-12</td><td>HRM</td><td>Banner</td><td><img src='/photos/115639.png'></td></tr></table>";
+        var snapshot = StockroomService.Parse(html);
+        var part = StockroomService.ImportItem(snapshot, "115639");
+        Require(part.Description == "Yellow module" && part.Notes == "Replacement indicator" && part.Manufacturer == "Banner" && part.BinLocation == "K-12" && part.Site == "HRM" && part.ReportedQuantity == 0, "Import lost supplied stockroom metadata or zero stock.");
+        Require(snapshot.Rows.Single().Photo == "/photos/115639.png", "Photo source lost.");
+        foreach (var bad in new[] { snapshot with { QuantitiesConfirmed = false }, snapshot with { Rows = [..snapshot.Rows, ..snapshot.Rows] }, snapshot with { Rows = [] } })
+        {
+            bool refused = false; try { StockroomService.ImportItem(bad, "115639"); } catch (InvalidOperationException) { refused = true; }
+            Require(refused, "Unconfirmed, ambiguous or missing item was imported.");
+        }
+        string root = Directory.CreateTempSubdirectory("part-import-").FullName;
+        try
+        {
+            var data = new DataService(false, Path.Combine(root, "local")); data.SetSharedRoot(Path.Combine(root, "share")); data.InitializeSharedData();
+            var old = data.LoadParts().Single(p => StockroomService.StockKey(p.PartNumber) == "115639");
+            old.PhotoPath = "keep.png"; old.DocumentPath = "keep.pdf"; old.AppliesToUnitIds = ["unit-one"];
+            var parts = data.LoadParts(); parts[parts.FindIndex(p => p.Id == old.Id)] = old; data.SaveParts(parts);
+            var saved = data.ImportStockroomPart(part);
+            Require(saved.Id == old.Id && saved.PhotoPath == "keep.png" && saved.DocumentPath == "keep.pdf" && saved.AppliesToUnitIds.SequenceEqual(["unit-one"]), "Reimport overwrote identity or local assignments/files.");
+            data.ImportStockroomPart(part);
+            Require(data.LoadParts().Count(p => StockroomService.StockKey(p.PartNumber) == "115639") == 1, "Repeated import duplicated an Item ID.");
+        }
+        finally { Directory.Delete(root, true); }
     }
     private static void PlantInventories()
     {

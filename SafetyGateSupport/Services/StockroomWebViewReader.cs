@@ -10,13 +10,14 @@ public static class StockroomWebViewReader
 {
     public static string LastSearchDiagnostics { get; private set; } = "";
     private static readonly SemaphoreSlim Slot = new(1);
-    public static async Task<StockroomService.Snapshot> FetchAsync(string url, CancellationToken token)
+    public static Task<StockroomService.Snapshot> FetchAsync(string url, CancellationToken token) => SearchAsync(url, "Safe2Cross", token);
+    public static async Task<StockroomService.Snapshot> SearchAsync(string url, string term, CancellationToken token)
     {
         await Slot.WaitAsync(token);
-        try { return await Application.Current.Dispatcher.InvokeAsync(() => ReadAsync(url, token)).Task.Unwrap(); }
+        try { return await Application.Current.Dispatcher.InvokeAsync(() => ReadAsync(url, term, token)).Task.Unwrap(); }
         finally { Slot.Release(); }
     }
-    private static async Task<StockroomService.Snapshot> ReadAsync(string url, CancellationToken token)
+    private static async Task<StockroomService.Snapshot> ReadAsync(string url, string term, CancellationToken token)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(TimeSpan.FromSeconds(35));
         var origin = new Uri(url); var view = new WebView2();
@@ -50,7 +51,7 @@ public static class StockroomWebViewReader
                 using var state = JsonDocument.Parse(await Evaluate("(()=>JSON.stringify({specific:!!document.querySelector('.inventory-container input.search-input'),applied:document.querySelector('.search-info .search-terms')?.textContent.trim()||'',value:document.querySelector('input.search-input')?.value||'',error:globalThis.__safetyGateScriptError||''}))()"));
                 LastSearchDiagnostics = state.RootElement.ToString();
                 serverSearch = state.RootElement.GetProperty("specific").GetBoolean();
-                serverConfirmed = state.RootElement.GetProperty("applied").GetString()?.Equals("Safe2Cross", StringComparison.OrdinalIgnoreCase) == true;
+                serverConfirmed = state.RootElement.GetProperty("applied").GetString()?.Equals(term, StringComparison.OrdinalIgnoreCase) == true;
                 if (!searched || serverSearch && !serverConfirmed && DateTime.UtcNow - lastAttempt > TimeSpan.FromMilliseconds(1500))
                 {
                     using var probe = JsonDocument.Parse(await Evaluate(StockroomBrowserReader.FindSearch));
@@ -58,7 +59,7 @@ public static class StockroomWebViewReader
                     {
                         baseline ??= await Evaluate(StockroomBrowserReader.ReadTables);
                         await core.ExecuteScriptAsync("(()=>{const e=globalThis.__safetyGateStockroomInput;e.focus();e.select();if(e.form)e.form.target='_self';})()").WaitAsync(deadline.Token);
-                        await core.CallDevToolsProtocolMethodAsync("Input.insertText", "{\"text\":\"Safe2Cross\"}").WaitAsync(deadline.Token);
+                        await core.CallDevToolsProtocolMethodAsync("Input.insertText", JsonSerializer.Serialize(new { text = term })).WaitAsync(deadline.Token);
                         // Blazor's default binding listens for change, not necessarily input.
                         // Blur commits trusted edits; change also supports server handlers registered after startup.
                         await core.ExecuteScriptAsync("(()=>{const e=globalThis.__safetyGateStockroomInput;e.dispatchEvent(new Event('change',{bubbles:true}));e.blur();})()").WaitAsync(deadline.Token);
@@ -72,7 +73,7 @@ public static class StockroomWebViewReader
                     }
                 }
                 string html = await Evaluate(StockroomBrowserReader.ReadTables);
-                LastSearchDiagnostics += "; highlighted=" + html.Contains("<mark>Safe2Cross</mark>", StringComparison.OrdinalIgnoreCase) + "; rows=" + StockroomService.Parse(html).Rows.Count;
+                LastSearchDiagnostics += "; highlighted=" + html.Contains("<mark>" + System.Net.WebUtility.HtmlEncode(term) + "</mark>", StringComparison.OrdinalIgnoreCase) + "; rows=" + StockroomService.Parse(html).Rows.Count;
                 stable = html == previous ? stable + 1 : 0; previous = html;
                 if (stable >= 3 && (serverSearch ? serverConfirmed : html != baseline) && DateTime.UtcNow - activity > TimeSpan.FromMilliseconds(750))
                 {
@@ -80,13 +81,13 @@ public static class StockroomWebViewReader
                     var snapshot = StockroomService.Parse(html);
                     // This inventory highlights the applied term in result cells. A changed
                     // search caption alone may precede the server's table update.
-                    if (serverSearch && snapshot.Rows.Count > 0 && !html.Contains("<mark>Safe2Cross</mark>", StringComparison.OrdinalIgnoreCase)) continue;
-                    return snapshot with { Reader = "WebView2: Safe2Cross search" };
+                    if (serverSearch && snapshot.Rows.Count > 0 && !html.Contains("<mark>" + System.Net.WebUtility.HtmlEncode(term) + "</mark>", StringComparison.OrdinalIgnoreCase)) continue;
+                    return snapshot with { Reader = "WebView2: " + term + " search" };
                 }
             }
         }
         catch (WebView2RuntimeNotFoundException error) { throw new InvalidOperationException("Microsoft Edge WebView2 Runtime is missing on this PC. Install Microsoft's Evergreen WebView2 Runtime to enable stockroom search.", error); }
-        catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException(serverSearch && !serverConfirmed ? "The stockroom server did not confirm Searching: Safe2Cross within 35 seconds. Unfiltered inventory was rejected." : "The embedded stockroom search did not finish within 35 seconds."); }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException(serverSearch && !serverConfirmed ? "The stockroom server did not confirm Searching: " + term + " within 35 seconds. Unfiltered inventory was rejected." : "The embedded stockroom search did not finish within 35 seconds."); }
         finally { view.Dispose(); window.Content = null; window.Close(); }
     }
 }

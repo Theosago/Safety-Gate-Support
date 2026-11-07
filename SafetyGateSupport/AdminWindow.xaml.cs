@@ -41,10 +41,14 @@ public partial class AdminWindow : Window
     private string _pendingPartDocumentSource = "";
     private string _pendingManualSource = "";
 
-    public AdminWindow(DataService data)
+    public AdminWindow(DataService data, Func<string, string, CancellationToken, Task<StockroomService.Snapshot>>? importReader = null)
     {
         InitializeComponent();
         _data = data;
+        _importReader = importReader ?? StockroomWebViewReader.SearchAsync;
+        ImportPlantBox.ItemsSource = StockroomPlant.All;
+        ImportPlantBox.SelectedItem = StockroomPlant.Find(_data.Settings.StockroomPlantId);
+        Closed += (_, _) => _importCancellation?.Cancel();
         ResourceKindBox.ItemsSource = new[] { "ManagedFiles", "Manuals", "Parts", "Photos", "Folder", "Url" };
         ResourceArchiveBox.ItemsSource = new[] { "SameExtension", "SameName", "All", "None" };
         ResourceLaunchBox.ItemsSource = new[] { "None", "Siemens", "UAM" };
@@ -524,7 +528,7 @@ public partial class AdminWindow : Window
 
     // Parts
     private void AdminPartList_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedPart = AdminPartList.SelectedItem as PartRecord; _newPart = false; _pendingPartDocumentSource = ""; PopulatePart(); }
-    private void NewPart_Click(object sender, RoutedEventArgs e) { _selectedPart = null; _newPart = true; _pendingPartDocumentSource = ""; PopulatePart(); PartDescriptionBox.Focus(); }
+    private void NewPart_Click(object sender, RoutedEventArgs e) { _selectedPart = null; _newPart = true; _pendingPartDocumentSource = ""; PopulatePart(); PartNumberBox.Focus(); }
     private void PopulatePart()
     {
         PartBinBox.Text = _selectedPart?.LocationValue ?? ""; PartQuantityBox.Text = _selectedPart?.QuantityValue is { } quantity ? PartRecord.FormatQuantity(quantity) : ""; PartSiteBox.Text = _selectedPart?.SiteValue ?? "";
