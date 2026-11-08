@@ -19,7 +19,11 @@ public partial class AdminWindow
         foreach (var tab in AdvancedSetupTabs) tab.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
     private void SetupTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    { if (ReferenceEquals(e.Source, SetupTabs) && StartSetupTab?.IsSelected == true && _data is not null) RefreshSetupGuide(); }
+    {
+        if (!ReferenceEquals(e.Source, SetupTabs)) return;
+        if (StartSetupTab?.IsSelected == true && _data is not null) RefreshSetupGuide();
+        else if (StartGuideStatus is not null) StartGuideStatus.Text = "";
+    }
     private void RefreshSetupGuide()
     {
         string? selectedId = (PilotUnitBox.SelectedItem as SafetySystem)?.Id;

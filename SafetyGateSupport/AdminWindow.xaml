@@ -8,6 +8,7 @@
    <TextBlock Text="Plant setup" FontSize="26" FontWeight="Bold"/>
    <TextBlock Text="Start with one useful unit. Add its photo, one approved document and one common fix, then try the operator view before expanding to the rest of the plant." Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
    <WrapPanel Margin="0,8,0,0"><CheckBox x:Name="AdvancedSetupCheck" Content="Show advanced tools" Click="AdvancedSetup_Click"/><TextBlock x:Name="SetupTaskText" Text="Start here shows the recommended path. Existing data stays available in the editors." TextWrapping="Wrap" Margin="16,0,0,0"/></WrapPanel>
+   <TextBlock x:Name="StartGuideStatus" TextWrapping="Wrap" FontWeight="SemiBold"/>
   </StackPanel>
   <TabControl x:Name="SetupTabs" Grid.Row="1" Margin="0,14,0,10" SelectionChanged="SetupTabs_SelectionChanged">
 
@@ -40,7 +41,6 @@
      <TextBlock Text="For phone-only crews, start with a printed photo guide and offline text QR label. An approved company-owned document link can be added later; a phone QR cannot grant access to Q:." TextWrapping="Wrap"/>
      <Button Content="Phone guides and QR labels" Click="StartPhoneGuides_Click" HorizontalAlignment="Left"/>
     </StackPanel></GroupBox>
-    <TextBlock x:Name="StartGuideStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,12"/>
    </StackPanel></ScrollViewer></TabItem>
 
    <TabItem x:Name="UnitsSetupTab" Header="Gates &amp; Units">

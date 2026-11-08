@@ -1420,6 +1420,9 @@ internal static class Program
         await WaitUntil(() => admin.IsEnabled, "Guided Setup did not load.");
         Require(Control<TabItem>(admin, "StartSetupTab").IsSelected && Control<TabItem>(admin, "ResourcesSetupTab").Visibility == Visibility.Collapsed, "Setup did not start with a focused first-plant flow.");
         Control<TextBox>(admin, "StartLibraryPathBox").Text = Path.Combine(root, "plant");
+        Click(Control<Button>(admin, "CreateBlankLibraryButton"));
+        await WaitUntil(() => Control<TabControl>(admin, "SetupTabs").IsEnabled && Control<TextBlock>(admin, "StartGuideStatus").Text.Contains("first plant area"), "Missing area did not produce actionable feedback.");
+        Require(Control<TextBlock>(admin, "StartGuideStatus").IsVisible && !data.IsReady, "Setup error was hidden or created a partial library.");
         Control<TextBox>(admin, "StartAreaBox").Text = "Packaging";
         Click(Control<Button>(admin, "CreateBlankLibraryButton"));
         await WaitUntil(() => Control<TabControl>(admin, "SetupTabs").IsEnabled && data.IsReady, "Blank library creation did not complete.");
