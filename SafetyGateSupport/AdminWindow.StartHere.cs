@@ -10,7 +10,13 @@ namespace SafetyGateSupport;
 
 public partial class AdminWindow
 {
-    private void ReturnStart_Click(object sender, RoutedEventArgs e) { StartSetupTab.IsSelected = true; SetupTaskText.Text = "Choose the saved pilot below, attach a PDF or Common Problem, then try operator view."; }
+    private void ReturnStart_Click(object sender, RoutedEventArgs e)
+    {
+        StartSetupTab.IsSelected = true;
+        SetupTaskText.Text = "Review the selected pilot’s saved content before opening operator view.";
+        StartSetupTab.UpdateLayout();
+        PilotContentStep.BringIntoView();
+    }
     public string? OperatorPreviewUnitId { get; private set; }
     private IEnumerable<TabItem> AdvancedSetupTabs => [ResourcesSetupTab, FlowsSetupTab, ManualsSetupTab, AreasSetupTab, AuditSetupTab];
     private void AdvancedSetup_Click(object sender, RoutedEventArgs e)
@@ -27,12 +33,45 @@ public partial class AdminWindow
     }
     private void RefreshSetupGuide()
     {
-        string? selectedId = (PilotUnitBox.SelectedItem as SafetySystem)?.Id;
+        string? assetId = (PilotAssetBox.SelectedItem as SafetyGate)?.Id;
+        string? selectedId = (PilotUnitBox.SelectedItem as SafetySystem)?.Id ?? InitialPilotUnitId;
+        var assets = _gates.OrderBy(g => g.AssetNumber).ThenBy(g => g.Category).ToList();
         PilotUnitBox.ItemsSource = _units.OrderBy(u => u.AssetNumber).ThenBy(u => u.UnitNumber).ToList();
-        PilotUnitBox.SelectedItem = _units.FirstOrDefault(u => u.Id == selectedId) ?? _units.FirstOrDefault();
+        var pilot = _units.FirstOrDefault(u => u.Id == selectedId) ?? (_units.Count == 1 ? _units[0] : null);
+        PilotUnitBox.SelectedItem = pilot;
+        PilotAssetBox.ItemsSource = assets;
+        PilotAssetBox.SelectedItem = assets.FirstOrDefault(g => g.Id == (assetId ?? pilot?.GateId)) ??
+            (assets.Count == 1 ? assets[0] : null);
         StartLibraryStatus.Text = _data.IsReady ? "Connected: " + _data.SharedRoot : "No library connected. Choose an existing library or create an empty one below.";
-        StartInventoryStatus.Text = $"Saved records: {_areas.Count} areas · {_gates.Count} assets · {_units.Count} units · {_units.Count(u => u.PrimaryPhoto.Length > 0)} photo assignments.";
-        StartContentStatus.Text = $"Saved content: {_manuals.Count} manuals · {_parts.Count} parts · {_help.Count(h => h.Visible && h.Section == "Common Problems")} published Common Problems. Open operator view to confirm the actual files and photos work.";
+        StartInventoryStatus.Text = assets.Count == 0 ? "Add your first asset to get started." : $"{assets.Count} saved assets. Select the box that contains the new unit.";
+        RefreshPilotContent();
+    }
+
+    private void PilotAssetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (StartAddUnitButton is not null) StartAddUnitButton.IsEnabled = PilotAssetBox.SelectedItem is SafetyGate;
+    }
+
+    private void RefreshPilotContent()
+    {
+        if (StartContentStatus is null) return;
+        if (PilotUnitBox.SelectedItem is not SafetySystem pilot)
+        {
+            StartContentStatus.Text = "Save a unit, then select it above to see what operators can use.";
+            return;
+        }
+
+        int pdfs = _manuals.Count(manual =>
+            string.Equals(Path.GetExtension(manual.FilePath), ".pdf", StringComparison.OrdinalIgnoreCase) &&
+            (pilot.ManualIds is { } ids
+                ? ids.Contains(manual.Id, StringComparer.OrdinalIgnoreCase)
+                : manual.AppliesTo(pilot.GateId, pilot.Id)));
+        bool hasProblemPhoto = _help.Any(topic => topic.Visible &&
+            topic.Section.Equals("Common Problems", StringComparison.OrdinalIgnoreCase) && topic.Photos.Count > 0);
+        string photo = string.IsNullOrWhiteSpace(pilot.PrimaryPhoto) ? "photo needed" : "photo assigned";
+        string pdf = pdfs switch { 0 => "PDF needed", 1 => "1 PDF assigned", _ => $"{pdfs} PDFs assigned" };
+        string problem = hasProblemPhoto ? "Common Problem with photo published" : "Common Problem photo needed";
+        StartContentStatus.Text = $"{pilot.AdminDisplay}\n{photo}  ·  {pdf}  ·  {problem}";
     }
     private void StartChooseFolder_Click(object sender, RoutedEventArgs e)
     {
@@ -72,7 +111,11 @@ public partial class AdminWindow
         try
         {
             await Task.Run(() => _data.CreateBlankPlantLibrary(path, area)); await RefreshLibraryGuideAsync();
-            if (!_isClosed) StartGuideStatus.Text = "Blank library created. Next: add one asset or box, then its unit and photo.";
+            if (!_isClosed)
+            {
+                StartGuideStatus.Text = "Blank library created. Add one asset / box to start the pilot.";
+                PilotEquipmentStep.BringIntoView();
+            }
         }
         catch (Exception error) { if (!_isClosed) StartGuideStatus.Text = "Setup could not finish: " + error.Message; }
         finally { if (!_isClosed) SetupTabs.IsEnabled = true; }
@@ -96,15 +139,20 @@ public partial class AdminWindow
     {
         if (NeedLibrary()) return;
         UnitsSetupTab.IsSelected = true; NewGate_Click(sender, e);
-        SetupTaskText.Text = "Add the asset number and location, then Save Gate Information. A unit is added after the asset is saved.";
+        SetupTaskText.Text = "Use the asset number on the physical label and a location the crew will recognize. Then choose Save asset / box.";
     }
     private void StartAddUnit_Click(object sender, RoutedEventArgs e)
     {
         if (NeedLibrary()) return;
-        var gate = _gates.FirstOrDefault(g => g.Id == (PilotUnitBox.SelectedItem as SafetySystem)?.GateId) ?? _gates.FirstOrDefault();
-        if (gate is null) { StartGuideStatus.Text = "Add and save an asset / box before adding its unit."; return; }
-        UnitsSetupTab.IsSelected = true; SelectGateById(gate.Id); NewUnit_Click(sender, e);
-        GateUnitEditorScroll.ScrollToTop(); SetupTaskText.Text = "Enter the unit number, choose a photo, select only equipment it has, then Save Unit.";
+        if (PilotAssetBox.SelectedItem is not SafetyGate gate)
+        {
+            StartGuideStatus.Text = "Choose the saved asset / box that contains the new unit.";
+            return;
+        }
+
+        UnitsSetupTab.IsSelected = true;
+        SelectGateById(gate.Id);
+        NewUnit_Click(sender, e);
     }
     private void StartEditPilot_Click(object sender, RoutedEventArgs e)
     {
@@ -116,7 +164,7 @@ public partial class AdminWindow
     private async void StartAttachPdf_Click(object sender, RoutedEventArgs e)
     {
         if (NeedLibrary() || Pilot() is not { } pilot) return;
-        var picker = new OpenFileDialog { Title = "Attach an approved PDF to " + pilot.UnitDisplay, Filter = "PDF document|*.pdf" };
+        var picker = new OpenFileDialog { Title = "Attach an approved PDF to " + pilot.AdminDisplay, Filter = "PDF document|*.pdf" };
         if (picker.ShowDialog(this) != true) return;
         SetupTabs.IsEnabled = false;
         try
@@ -152,6 +200,7 @@ public partial class AdminWindow
     }
     private void PilotUnitBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        RefreshPilotContent();
         if (PilotQrStatus is null || PilotExportStatus is null) return;
         PilotExportStatus.Text = "";
         if (PilotUnitBox.SelectedItem is not SafetySystem pilot)

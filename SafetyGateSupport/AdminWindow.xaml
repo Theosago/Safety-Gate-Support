@@ -7,36 +7,62 @@
   <StackPanel>
    <TextBlock Text="Plant setup" FontSize="26" FontWeight="Bold"/>
    <TextBlock Text="Start with one useful unit. Add its photo, one approved document and one common fix, then try the operator view before expanding to the rest of the plant." Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
-   <WrapPanel Margin="0,8,0,0"><CheckBox x:Name="AdvancedSetupCheck" Content="Show advanced tools" Click="AdvancedSetup_Click"/><TextBlock x:Name="SetupTaskText" Text="Start here shows the recommended path. Existing data stays available in the editors." TextWrapping="Wrap" Margin="16,0,0,0"/></WrapPanel>
-   <TextBlock x:Name="StartGuideStatus" TextWrapping="Wrap" FontWeight="SemiBold"/>
+   <CheckBox x:Name="AdvancedSetupCheck" Content="Show advanced tools" Click="AdvancedSetup_Click" Margin="0,8,0,0"/>
+   <TextBlock x:Name="SetupTaskText" TextWrapping="Wrap" Margin="0,6,0,0"/>
+   <TextBlock x:Name="StartGuideStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,4,0,0"/>
   </StackPanel>
   <TabControl x:Name="SetupTabs" Grid.Row="1" Margin="0,14,0,10" SelectionChanged="SetupTabs_SelectionChanged">
 
 
-   <TabItem x:Name="StartSetupTab" Header="Start here"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="20" MaxWidth="920" HorizontalAlignment="Left">
-    <TextBlock Text="Make one unit useful first" FontSize="25" FontWeight="SemiBold"/>
-    <TextBlock Text="A pilot succeeds when someone can identify the unit from its photo, find the correct document, and recognize a common broken part without asking you. Hardware programming and live stockroom access can come later." TextWrapping="Wrap" Margin="0,8,0,16"/>
+   <TabItem x:Name="StartSetupTab" Header="Start here"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="20" MaxWidth="920">
+    <Border Background="{DynamicResource ThemeBackgroundF7F9FB}" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}"
+            BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+     <StackPanel>
+      <TextBlock Text="See what operators will use" FontSize="21" FontWeight="SemiBold"/>
+      <TextBlock Text="Try identifying a unit, opening its PDF and finding a common fix. The demo uses fictional data. Close its window to return to setup." TextWrapping="Wrap" Margin="0,6,0,8"/>
+      <Button x:Name="TrySamplePilotButton" Content="Try the operator demo…" Click="TrySamplePilot_Click" HorizontalAlignment="Left"/>
+     </StackPanel>
+    </Border>
     <GroupBox Header="1 · Connect a library, or start a new plant"><StackPanel Margin="12">
      <TextBlock Text="A library is a folder containing this plant’s equipment, photos and guidance. A local folder works for a pilot; use a shared location when other computers need the same content." TextWrapping="Wrap"/>
-     <TextBlock Text="Library folder" Margin="0,10,0,3"/><TextBox x:Name="StartLibraryPathBox" MinHeight="34"/><Button Content="Choose folder…" Click="StartChooseFolder_Click" HorizontalAlignment="Left"/>
+     <TextBlock Text="Library folder" Margin="0,10,0,3"/>
+     <DockPanel LastChildFill="True">
+      <Button Content="Browse…" Click="StartChooseFolder_Click" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+      <TextBox x:Name="StartLibraryPathBox" MinHeight="34" AutomationProperties.Name="Library folder"/>
+     </DockPanel>
      <Button x:Name="ConnectLibraryButton" Content="Use this existing library" Click="ConnectLibrary_Click" HorizontalAlignment="Left"/>
-     <Separator Margin="0,10"/><TextBlock Text="For a new plant: choose an empty folder and name its first area. This creates no Huntingdon equipment or parts." TextWrapping="Wrap"/>
-     <TextBlock Text="First area (for example, Packaging)" Margin="0,8,0,3"/><TextBox x:Name="StartAreaBox" MinHeight="34"/>
+     <Separator Margin="0,10"/><TextBlock Text="For a new plant, use Browse to create an empty folder, then name the first area. At home, you can create a Safety Gate Pilot folder in Documents." TextWrapping="Wrap"/>
+     <TextBlock Text="First area (for example, Packaging)" Margin="0,8,0,3"/><TextBox x:Name="StartAreaBox" MinHeight="34" AutomationProperties.Name="First plant area"/>
      <Button x:Name="CreateBlankLibraryButton" Content="Create blank plant library" Click="CreateBlankLibrary_Click" HorizontalAlignment="Left"/>
      <TextBlock x:Name="StartLibraryStatus" TextWrapping="Wrap" Margin="0,8"/>
     </StackPanel></GroupBox>
-    <GroupBox Header="2 · Add the box and its unit"><StackPanel Margin="12"><TextBlock Text="An asset is the numbered gate or box. A unit is the individual assembly the operator selects. Add the asset number/location first, then a unit and an uncropped identification photo. Choose only equipment this unit actually has." TextWrapping="Wrap"/>
+    <GroupBox x:Name="PilotEquipmentStep" Header="2 · Add the box and its unit"><StackPanel Margin="12"><TextBlock Text="An asset is the numbered gate or box on the floor. A unit is the assembly an operator selects inside that box. For a box with one assembly and no unit number on its label, use Unit 1." TextWrapping="Wrap"/>
      <TextBlock x:Name="StartInventoryStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
-     <WrapPanel><Button x:Name="StartAddAssetButton" Content="Add an asset / box" Click="StartAddAsset_Click"/><Button x:Name="StartAddUnitButton" Content="Add a unit" Click="StartAddUnit_Click"/><Button Content="Manage areas" Click="StartAreas_Click"/></WrapPanel>
-     <TextBlock Text="Pilot unit for the next steps" Margin="0,10,0,3"/><ComboBox x:Name="PilotUnitBox" DisplayMemberPath="AdminDisplay" MinHeight="34" SelectionChanged="PilotUnitBox_SelectionChanged"/>
+     <WrapPanel><Button x:Name="StartAddAssetButton" Content="Add an asset / box" Click="StartAddAsset_Click"/><Button Content="Manage areas" Click="StartAreas_Click"/></WrapPanel>
+     <TextBlock Text="Add the unit under this asset / box" Margin="0,10,0,3"/>
+     <ComboBox x:Name="PilotAssetBox" MinHeight="34" SelectionChanged="PilotAssetBox_SelectionChanged" AutomationProperties.Name="Asset for the new unit">
+      <ComboBox.ItemTemplate>
+       <DataTemplate>
+        <TextBlock TextTrimming="CharacterEllipsis"><Run Text="{Binding AssetDisplay, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Category, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Location, Mode=OneWay}"/></TextBlock>
+       </DataTemplate>
+      </ComboBox.ItemTemplate>
+     </ComboBox>
+     <Button x:Name="StartAddUnitButton" Content="Add unit to selected asset" Click="StartAddUnit_Click" HorizontalAlignment="Left" IsEnabled="False"/>
+     <TextBlock Text="Unit to use for the pilot" Margin="0,10,0,3"/><ComboBox x:Name="PilotUnitBox" DisplayMemberPath="AdminDisplay" MinHeight="34" SelectionChanged="PilotUnitBox_SelectionChanged" AutomationProperties.Name="Unit to use for the pilot"/>
      <Button Content="Edit this unit and photo" Click="StartEditPilot_Click" HorizontalAlignment="Left"/>
     </StackPanel></GroupBox>
-    <GroupBox Header="3 · Give the operator something useful"><StackPanel Margin="12">
-     <TextBlock Text="Add one approved PDF to the pilot unit. Then add a photo of a common failure and clear fix instructions. Parts can be added when you have stockroom access or reviewed details; they are optional for the first pilot." TextWrapping="Wrap"/>
-     <WrapPanel><Button Content="Attach a PDF to the pilot unit…" Click="StartAttachPdf_Click"/><Button x:Name="StartProblemButton" Content="Add a Common Problem" Click="StartProblem_Click"/><Button Content="Add parts" Click="StartParts_Click"/></WrapPanel>
-     <TextBlock x:Name="StartContentStatus" TextWrapping="Wrap" Margin="0,8"/>
+    <GroupBox x:Name="PilotContentStep" Header="3 · Give the operator something useful"><StackPanel Margin="12">
+     <TextBlock Text="Attach one approved PDF you already have, such as a drawing or manual. Setup copies it into the library. Add a photo and fix for one common problem. Published problems are visible across the plant." TextWrapping="Wrap"/>
+     <TextBlock x:Name="StartContentStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
+     <WrapPanel><Button Content="Attach a PDF to the pilot unit…" Click="StartAttachPdf_Click"/><Button x:Name="StartProblemButton" Content="Add a Common Problem" Click="StartProblem_Click"/></WrapPanel>
+     <Expander Header="Optional: replacement parts" Margin="0,8,0,0">
+      <StackPanel>
+       <TextBlock Text="Add part details once the pilot is ready. Stockroom lookup requires a supported plant and network access." TextWrapping="Wrap"/>
+       <Button Content="Add parts" Click="StartParts_Click" HorizontalAlignment="Left"/>
+      </StackPanel>
+     </Expander>
     </StackPanel></GroupBox>
-    <GroupBox Header="4 · Try the operator’s job"><StackPanel Margin="12"><TextBlock Text="Save your edits, then leave Setup and test the pilot: identify it from the photo, open its PDF, find the fix from the problem picture, and return to the same unit. Ask a maintenance colleague to repeat this without coaching. Record what confuses them before adding more units." TextWrapping="Wrap"/>
+    <GroupBox Header="4 · Try the operator’s job"><StackPanel Margin="12"><TextBlock Text="Open the pilot and ask a colleague to identify it by the photo, open Manuals / documents, and find the fix under Common Problems. If they can do those three things without coaching, you have a useful pilot. Use Plant setup in the sidebar to make corrections before adding more units." TextWrapping="Wrap"/>
      <Button x:Name="StartOperatorButton" Content="Open the saved pilot in operator view" Click="StartOperator_Click" HorizontalAlignment="Left" Margin="0,10"/>
     </StackPanel></GroupBox>
     <GroupBox x:Name="PilotPhoneStep" Header="5 · Try the pilot on a phone"><StackPanel Margin="12">
@@ -60,7 +86,7 @@
       <ListBox x:Name="UnitListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="UnitDisplay" SelectionChanged="UnitListAdmin_SelectionChanged"/>
      </Grid>
      <ScrollViewer x:Name="GateUnitEditorScroll" Grid.Column="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
-      <GroupBox Header="Selected unit" Margin="0,14,0,0"><Grid Margin="10">
+      <GroupBox x:Name="UnitEditorGroup" Header="Selected unit" Margin="0,14,0,0"><Grid Margin="10">
        <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
        <TextBlock Text="Unit Number" VerticalAlignment="Center"/><TextBox x:Name="UnitNumberBox" Grid.Column="1" Margin="3"/>
@@ -99,7 +125,7 @@
         <TextBlock Text="PLC notes"/><TextBox x:Name="PlcNotesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" Margin="0,3"/>
        </StackPanel></Expander>
       </Grid></GroupBox>
-      <WrapPanel><Button x:Name="SaveGateButton" Content="Save Gate Information" Click="SaveGate_Click" Padding="18,8"/><Button Content="Next: add a unit to this asset" Click="NewUnit_Click"/></WrapPanel>
+      <WrapPanel><Button x:Name="SaveGateButton" Content="Save asset / box" Click="SaveGate_Click" Padding="18,8"/><Button Content="Next: add a unit to this asset" Click="NewUnit_Click"/></WrapPanel>
 </StackPanel></Expander>
       <Border Background="{DynamicResource ThemeBackgroundF4F7FA}" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}" BorderThickness="1" Padding="10" Margin="0,14,0,0">
        <TextBlock Text="Drawings and other resources are configured on the Buttons / Resources tab. A single resource can be linked to multiple units, so paired units can share the exact same drawing and archive." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground444444}"/>
@@ -197,7 +223,7 @@
       <TextBlock Text="How to recognize it and how to fix it" Margin="0,8,0,3"/><TextBox x:Name="HelpBodyBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="120"/>
       <TextBlock Text="Keywords" Margin="0,8,0,3"/><TextBox x:Name="HelpKeywordsBox" Height="34"/>
       <TextBlock Text="Sort order" Margin="0,8,0,3"/><TextBox x:Name="HelpSortBox" Height="34" Width="100" HorizontalAlignment="Left"/>
-      <Button x:Name="SaveHelpButton" Content="Save Topic" Click="SaveHelp_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+      <WrapPanel Margin="0,10,0,0"><Button x:Name="SaveHelpButton" Content="Save Topic" Click="SaveHelp_Click"/><Button Content="Return to pilot checklist" Click="ReturnStart_Click"/></WrapPanel>
      </StackPanel></ScrollViewer>
     </Grid>
    </TabItem>

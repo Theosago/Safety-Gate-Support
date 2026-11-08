@@ -55,7 +55,15 @@ public partial class MainWindow : Window
         _data = data; _stockroomReader = stockroomReader ?? ((url, token) => { var ids = _parts.Select(p => p.PartNumber).Where(id => id.Length > 0).Distinct().ToArray(); return Task.Run(() => StockroomService.FetchAsync(url, token, requested: ids, interactiveReader: StockroomWebViewReader.FetchAsync), token); });
         InitializeStockroomPlants(); InitializeReplacementParts(); InitializeTheme();
         InitializeUnitGallery(); InitializeDrawingMonitor();
-        if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
+        if (data.IsOnboardingDemo)
+        {
+            Title = "Safety Gate Support — Fictional operator example";
+            HomeHeadingText.Text = "Try the operator workflow";
+            HomeSubtitleText.Visibility = Visibility.Collapsed;
+            PartsNav.Visibility = SupportLibraryNav.Visibility = Visibility.Collapsed;
+            UnitPartsButton.Visibility = Visibility.Collapsed;
+        }
+        else if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
         _notesRefreshTimer.Tick += NotesRefreshTimer_Tick;
         _searchDebounceTimer.Tick += (_, _) => { _searchDebounceTimer.Stop(); RunGlobalSearch(); };
@@ -102,7 +110,7 @@ public partial class MainWindow : Window
             // Network-drive probes, migrations and JSON reads must not hold up the WPF dispatcher.
             var snapshot = await Task.Run(() =>
             {
-                if (_data.IsHomePreview) HomePreviewService.Initialize(_data);
+                if (_data.IsHomePreview && !_data.IsOnboardingDemo) HomePreviewService.Initialize(_data);
                 if (!_data.IsReady) return null;
                 _data.EnsureSharedDefaults();
                 var gates = _data.LoadGates();
@@ -129,7 +137,8 @@ public partial class MainWindow : Window
             _sharedDataReady = true;
             UpdateConnectionStatus();
             AreaBox.ItemsSource = _categories;
-            HomeSubtitleText.Text = _data.IsHomePreview ? "HOME PREVIEW • Local starter photos and units. Select a photo card, or search Asset DEMO to explore the sample light configuration. USB is disabled." : _content.HomeSubtitle;
+            if (_data.IsOnboardingDemo) GalleryIntroText.Text = _content.HomeSubtitle;
+            else if (!_data.IsHomePreview) HomeSubtitleText.Text = _content.HomeSubtitle;
             ManualsIntroText.Text = _content.ManualsIntro;
             PartsIntroText.Text = _content.PartsIntro;
             BuildHomeCategories();
@@ -156,18 +165,23 @@ public partial class MainWindow : Window
 
     private void UpdateConnectionStatus()
     {
+        if (_data.IsOnboardingDemo)
+        {
+            ConnectionText.Text = "Fictional example";
+            SetupButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+        SetupButton.Visibility = _data.IsHomePreview && _systems.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         if (_sharedDataReady)
         {
             ConnectionText.Text = (_data.IsHomePreview ? "● HOME PREVIEW • local data\n" : "● Connected\n") + _data.SharedRoot;
             ConnectionText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(132, 218, 193));
-            SetupButton.Visibility = _systems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            SetupButton.Content = "Set up the first unit";
+            SetupButton.Content = _systems.Count == 0 ? "Set up the first unit" : "Plant setup";
         }
         else
         {
             ConnectionText.Text = "● Shared data unavailable\n" + _data.SharedRoot;
             ConnectionText.Foreground = System.Windows.Media.Brushes.LightSalmon;
-            SetupButton.Visibility = Visibility.Visible;
             SetupButton.Content = "Set up this plant";
         }
     }
@@ -241,14 +255,19 @@ public partial class MainWindow : Window
     }
     private async Task OpenSetupAsync()
     {
-        if (_setupModeOpen || _loadingData || _isClosed || !CloseInlineTool()) return;
+        if (_data.IsOnboardingDemo || _setupModeOpen || _loadingData || _isClosed || !CloseInlineTool()) return;
         SaveSharedNotesNow();
         _setupModeOpen = true;
         CancelSearchIndexRefresh();
         _notesRefreshTimer.Stop();
         _searchIndexRefreshTimer.Stop();
         string? pilotId = null;
-        try { var setup = new AdminWindow(_data) { Owner = this }; setup.ShowDialog(); pilotId = setup.OperatorPreviewUnitId; }
+        try
+        {
+            var setup = new AdminWindow(_data) { Owner = this, InitialPilotUnitId = SelectedUnit?.Id };
+            setup.ShowDialog();
+            pilotId = setup.OperatorPreviewUnitId;
+        }
         finally { _setupModeOpen = false; }
         await ReloadDataAsync();
         if (!_isClosed) { _notesRefreshTimer.Start(); _searchIndexRefreshTimer.Start(); }

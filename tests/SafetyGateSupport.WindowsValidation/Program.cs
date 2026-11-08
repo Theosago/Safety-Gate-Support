@@ -103,7 +103,8 @@ internal static class Program
             ("An invalid resource folder cannot discard indexed shared notes", NotesIndexSurvivesInvalidResource),
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
-            ("A new plant can create a blank library and a pilot unit through guided Setup", GuidedPlantSetup),
+            ("Guided Setup assigns new units to the chosen asset and tracks each pilot's own PDF", GuidedPlantSetup),
+            ("The fictional pilot opens its photo, PDF and problem in operator view without touching the plant library", FictionalPilotDemo),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Common Problems shows shared photos and opens fixes; Setup edits preserve photos", CommonProblemWorkflow),
@@ -1437,6 +1438,39 @@ internal static class Program
         Control<TextBox>(admin, "UnitNumberBox").Text = "1"; Click(Control<Button>(admin, "SaveUnitButton"));
         Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
         Require(data.LoadSystems().Count == 1 && Control<ComboBox>(admin, "PilotUnitBox").Items.Count == 1, "Saved unit did not become available as the pilot.");
+        var first = data.LoadSystems().Single();
+        string reference = Path.Combine(root, "Walkway reference.pdf");
+        File.WriteAllBytes(reference, TestDrawingPdf());
+        data.AddPilotPdf(first.Id, reference);
+
+        admin.Close();
+        admin = Track(new AdminWindow(data));
+        ShowOffscreen(admin);
+        await WaitUntil(() => admin.IsEnabled, "Setup did not reopen after attaching a PDF.");
+        var content = Control<TextBlock>(admin, "StartContentStatus");
+        Require(content.Text.Contains("BOX-01") && content.Text.Contains("1 PDF assigned"), "The first pilot did not show its assigned PDF after reopening Setup.");
+        Click(Control<Button>(admin, "StartAddAssetButton"));
+        Control<TextBox>(admin, "GateAssetBox").Text = "BOX-02";
+        Control<TextBox>(admin, "GateLocationBox").Text = "South walkway";
+        Click(Control<Button>(admin, "SaveGateButton"));
+        var secondGate = data.LoadGates().Single(gate => gate.AssetNumber == "BOX-02");
+        Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
+        var assets = Control<ComboBox>(admin, "PilotAssetBox");
+        var pilots = Control<ComboBox>(admin, "PilotUnitBox");
+        Require(assets.SelectedItem is SafetyGate selectedAsset && selectedAsset.Id == secondGate.Id &&
+                pilots.SelectedItem is SafetySystem stillFirst && stillFirst.Id == first.Id,
+            "Saving a second asset did not select it separately from the existing pilot unit.");
+        Click(Control<Button>(admin, "StartAddUnitButton"));
+        Control<TextBox>(admin, "UnitNumberBox").Text = "1";
+        Click(Control<Button>(admin, "SaveUnitButton"));
+        Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
+        var second = data.LoadSystems().Single(unit => unit.GateId == secondGate.Id);
+        Require(pilots.SelectedItem is SafetySystem selectedUnit && selectedUnit.Id == second.Id,
+            "The new unit was not saved under the chosen asset and selected as the pilot.");
+        Require(content.Text.Contains("BOX-02") && content.Text.Contains("PDF needed"), "The new pilot inherited the first asset's PDF status.");
+        pilots.SelectedItem = pilots.Items.Cast<SafetySystem>().Single(unit => unit.Id == first.Id);
+        Require(content.Text.Contains("BOX-01") && content.Text.Contains("1 PDF assigned"), "Switching pilots did not update the document status.");
+        pilots.SelectedItem = pilots.Items.Cast<SafetySystem>().Single(unit => unit.Id == second.Id);
         Require(Control<TextBlock>(admin, "PilotQrStatus").Text.Contains("no QR configured"), "New pilot did not show its guide-only state.");
         Click(Control<Button>(admin, "EditPilotQrButton"));
         Require(Control<TabItem>(admin, "UnitsSetupTab").IsSelected && Control<Expander>(admin, "MobileSettingsExpander").IsExpanded, "Pilot QR settings did not open directly.");
@@ -1448,7 +1482,83 @@ internal static class Program
         Require(Control<TabItem>(admin, "HelpSetupTab").IsSelected && Control<ComboBox>(admin, "HelpSectionBox").SelectedIndex == 2, "Guided problem action did not open the right editor.");
         Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
         Click(Control<Button>(admin, "StartOperatorButton"));
-        Require(admin.OperatorPreviewUnitId == data.LoadSystems().Single().Id, "Operator preview did not retain the pilot identity.");
+        Require(admin.OperatorPreviewUnitId == second.Id, "Operator preview did not retain the pilot identity.");
+
+        var main = Track(NewMainWindow(data));
+        ShowOffscreen(main);
+        await WaitUntil(() => main.IsEnabled && Control<Button>(main, "SetupButton").IsVisible,
+            "A plant with saved units did not expose a visible way back to Setup.");
+        await SelectGalleryUnit(main, second);
+        var reopened = CheckReopenedSetupAsync();
+        Click(Control<Button>(main, "SetupButton"));
+        await reopened;
+        await WaitUntil(() => main.IsEnabled, "Operator view did not reload after closing Setup.");
+        main.Close();
+
+        async Task CheckReopenedSetupAsync()
+        {
+            AdminWindow? reopenedSetup = null;
+            try
+            {
+                await WaitUntil(() => (reopenedSetup = Application.Current.Windows.OfType<AdminWindow>()
+                        .SingleOrDefault(window => window.Owner == main))?.IsEnabled == true,
+                    "Setup did not reopen for the selected operator unit.");
+                Require(Control<ComboBox>(reopenedSetup!, "PilotUnitBox").SelectedItem is SafetySystem resumed && resumed.Id == second.Id,
+                    "Reopening Setup for the selected operator unit returned to a different pilot.");
+            }
+            finally { reopenedSetup?.Close(); }
+        }
+    }
+
+    private static async Task FictionalPilotDemo()
+    {
+        string root = NewDirectory();
+        string plantSettings = Path.Combine(root, "plant-settings");
+        var plant = new DataService(false, plantSettings);
+        plant.CreateBlankPlantLibrary(Path.Combine(root, "plant"), "Packaging");
+        byte[] originalSettings = File.ReadAllBytes(Path.Combine(plantSettings, "settings.json"));
+        byte[] originalUnits = File.ReadAllBytes(plant.SystemsFile);
+
+        string demoRoot = Path.Combine(root, "fictional-demo");
+        var demo = DataService.CreateOnboardingDemo(demoRoot);
+        Require(demo.IsOnboardingDemo && demo.IsHomePreview && demo.SharedRoot == Path.Combine(demoRoot, "Library"),
+            "The fictional example did not use an isolated preview library.");
+        var unit = demo.LoadSystems().Single();
+        var reference = demo.LoadManualRecords().Single();
+        var problem = demo.LoadHelpItems().Single();
+        Require(unit.ManualIds?.Contains(reference.Id) == true && problem.Visible && problem.Photos.Count == 1 &&
+                !unit.ShowLightConfiguration && !unit.ShowScannerConfiguration && demo.LoadParts().Count == 0,
+            "The fictional example did not assign its PDF and problem or included equipment controls or stockroom data.");
+
+        var main = Track(NewMainWindow(demo));
+        ShowOffscreen(main);
+        var gallery = Control<ItemsControl>(main, "UnitGallery");
+        await WaitUntil(() => main.IsEnabled && gallery.Items.Count == 1 &&
+            gallery.Items.Cast<MainWindow.UnitCard>().Single().Photo is not null, "The fictional operator gallery did not load its identification image.");
+        Require(demo.LoadSystems().Count == 1 && !Control<Button>(main, "SetupButton").IsVisible,
+            "The fictional operator example loaded additional preview data or offered to connect to a plant.");
+        await SelectGalleryUnit(main, unit);
+        await WaitUntil(() => Control<Image>(main, "GateImage").Source is not null, "The fictional unit did not show its identification image.");
+        Click(Control<Button>(main, "PartManualsButton"));
+        Require(Control<Grid>(main, "ManualsView").IsVisible && Control<ListBox>(main, "ManualList").Items.Count == 1,
+            "The fictional unit's PDF was not visible under Manuals / documents.");
+        var page = await DrawingPreviewService.RenderPdfAsync(File.ReadAllBytes(demo.Resolve(reference.FilePath)), 0, CancellationToken.None);
+        Require(page.PageCount == 1 && page.Image.PixelWidth > 0, "The fictional reference PDF could not be rendered.");
+
+        Click(Control<Button>(main, "SystemsNav"));
+        var problems = Control<ItemsControl>(main, "CommonProblemsList");
+        await WaitUntil(() => Descendants<Button>(problems).Any(button => button.Tag is HelpItem topic && topic.Id == problem.Id),
+            "The fictional unit's Common Problem card did not appear.");
+        Click(Descendants<Button>(problems).Single(button => button.Tag is HelpItem topic && topic.Id == problem.Id));
+        Require(Control<Grid>(main, "CommonProblemView").IsVisible &&
+                Control<TextBlock>(main, "CommonProblemInstructions").Text == problem.Body,
+            "The fictional unit's Common Problem did not show its instructions.");
+        await WaitUntil(() => Control<ItemsControl>(main, "CommonProblemGallery").Items.Cast<MainWindow.ProblemPhoto>()
+            .Any(photo => photo.Source is not null), "The fictional Common Problem did not show its image.");
+        main.Close();
+        Require(File.ReadAllBytes(Path.Combine(plantSettings, "settings.json")).SequenceEqual(originalSettings) &&
+                File.ReadAllBytes(plant.SystemsFile).SequenceEqual(originalUnits),
+            "Opening the fictional demo changed the plant's settings or unit records.");
     }
 
     private static async Task AreaRenameRegression()

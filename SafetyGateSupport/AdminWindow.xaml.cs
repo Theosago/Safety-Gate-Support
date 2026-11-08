@@ -41,6 +41,8 @@ public partial class AdminWindow : Window
     private string _pendingPartDocumentSource = "";
     private string _pendingManualSource = "";
 
+    internal string? InitialPilotUnitId { get; init; }
+
     public AdminWindow(DataService data, Func<string, string, CancellationToken, Task<StockroomService.Snapshot>>? importReader = null)
     {
         InitializeComponent();
@@ -138,6 +140,9 @@ public partial class AdminWindow : Window
     private void PopulateUnit()
     {
         CleanupPendingPhotoTemp();
+        UnitEditorGroup.Header = _selectedGate is { } gate
+            ? $"Unit details · {gate.AssetDisplay} · {gate.Category}"
+            : "Unit details";
         UnitHasSignalColumnCheck.IsChecked = _selectedUnit?.ShowLightConfiguration ?? false; UnitHasScannerCheck.IsChecked = _selectedUnit?.ShowScannerConfiguration ?? false;
         UnitNumberBox.Text = _selectedUnit?.UnitNumber ?? "";
         MobileSupportUrlBox.Text = _selectedUnit?.MobileSupportUrl ?? ""; MobileOfflineBox.Text = _selectedUnit?.MobileOfflineInstructions ?? "";
@@ -177,8 +182,8 @@ public partial class AdminWindow : Window
             UnitPhotoPreview.Source = result.Source;
             UnitPhotoPreviewStatus.Text = pending
                 ? (sourceLabel is null
-                    ? "Preview of the selected photo — it will be copied to the shared drive when you click Save Unit."
-                    : $"Preview from {sourceLabel}. It has not been saved yet; click Save Unit to copy it to the shared drive.")
+                    ? "Select Save Unit to copy this photo into the library."
+                    : $"Preview from {sourceLabel}. Select Save Unit to copy it into the library.")
                 : "Current saved identification photo.";
         }
         catch (OperationCanceledException) { }
@@ -201,7 +206,7 @@ public partial class AdminWindow : Window
         new StorageMigrationWindow(_data) { Owner = this }.ShowDialog(); ReloadAll();
     }
 
-    private void NewGate_Click(object sender, RoutedEventArgs e) { _selectedGate = null; _selectedUnit = null; _newGate = true; _newUnit = false; PopulateGate(); PopulateUnit(); GateInformationExpander.IsExpanded = true; GateInformationExpander.UpdateLayout(); GateAssetBox.BringIntoView(); GateAssetBox.Focus(); AdminStatusText.Text = "Enter the gate-level information, then save the gate. Add its units afterward."; }
+    private void NewGate_Click(object sender, RoutedEventArgs e) { _selectedGate = null; _selectedUnit = null; _newGate = true; _newUnit = false; PopulateGate(); PopulateUnit(); GateInformationExpander.IsExpanded = true; GateInformationExpander.UpdateLayout(); GateAssetBox.BringIntoView(); GateAssetBox.Focus(); AdminStatusText.Text = "Enter the asset number and location, then save the box before adding its units."; }
     private void SaveGate_Click(object sender, RoutedEventArgs e)
     {
         try { SaveGateCore(); }
@@ -229,7 +234,11 @@ public partial class AdminWindow : Window
         }
         var savedGateId = _selectedGate.Id;
         _data.SaveGates(_gates); if (creatingGate) _data.WriteAssetFileIndex(_selectedGate); _data.LogAudit("Gate saved", savedGateId, details: _selectedGate.Display);
-        ReloadAll(); SelectGateById(savedGateId); AdminStatusText.Text = "Gate information saved. Every unit under this gate uses this gate-level information."; SetupTaskText.Text = "Asset saved. Next: add a unit to this asset, give it a number and photo, then save.";
+        ReloadAll();
+        SelectGateById(savedGateId);
+        PilotAssetBox.SelectedItem = _gates.FirstOrDefault(g => g.Id == savedGateId);
+        AdminStatusText.Text = "Asset / box saved.";
+        SetupTaskText.Text = "Choose Next: add a unit to this asset, then give the unit a number and photo.";
     }
     private void SelectGateById(string id)
     {
@@ -247,7 +256,24 @@ public partial class AdminWindow : Window
         _data.SaveGates(_gates); _data.SaveSystems(_units); _data.SaveResources(_resources); _data.SaveManualRecords(_manuals); _data.SaveParts(_parts); _data.SaveTroubleshootingFlows(_flows); _data.LogAudit("Gate removed from index", id, details: _selectedGate.Display); _selectedGate = null; ReloadAll();
     }
 
-    private void NewUnit_Click(object sender, RoutedEventArgs e) { if (_selectedGate is null) { MessageBox.Show("Select or create a gate first."); return; } _selectedUnit = null; _newUnit = true; PopulateUnit(); GateUnitEditorScroll.ScrollToTop(); UnitNumberBox.Focus(); SetupTaskText.Text = "Enter the unit number, choose its photo and actual equipment, then Save Unit. Next: pilot checklist returns to the guided steps."; AdminStatusText.Text = "Enter a unit number and save the unit."; }
+    private void NewUnit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedGate is null)
+        {
+            AdminStatusText.Text = "Select or save an asset / box before adding a unit.";
+            return;
+        }
+
+        _selectedUnit = null;
+        _newUnit = true;
+        PopulateUnit();
+        if (!_units.Any(u => u.GateId == _selectedGate.Id)) UnitNumberBox.Text = "1";
+        UnitNumberBox.SelectAll();
+        GateUnitEditorScroll.ScrollToTop();
+        UnitNumberBox.Focus();
+        SetupTaskText.Text = $"Adding a unit to {_selectedGate.AssetDisplay} in {_selectedGate.Category}. Choose its photo and save the unit.";
+        AdminStatusText.Text = "Check the unit number against the physical label before saving.";
+    }
     private void SaveUnit_Click(object sender, RoutedEventArgs e)
     {
         try { SaveUnitCore(); }

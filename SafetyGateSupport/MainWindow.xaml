@@ -28,12 +28,12 @@
      <Button x:Name="SystemsNav" Style="{StaticResource NavButton}" Content="☷   Selected unit" Click="SystemsNav_Click"/>
      <Button x:Name="ManualsNav" Style="{StaticResource NavButton}" Content="▤   Manuals" Click="ManualsNav_Click"/>
      <Button x:Name="PartsNav" Style="{StaticResource NavButton}" Content="⚙   Parts" Click="PartsNav_Click"/>
-     <Button Style="{StaticResource NavButton}" Content="Support library" Click="SupportLibrary_Click"/>
+     <Button x:Name="SupportLibraryNav" Style="{StaticResource NavButton}" Content="Support library" Click="SupportLibrary_Click"/>
     </StackPanel>
     <StackPanel Grid.Row="2" Margin="16,10,12,18"><TextBlock Text="Appearance" Foreground="{DynamicResource ThemeForegroundAEC4D3}"/><ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" Margin="0,6,0,12"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
-     <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.4.2" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <Button x:Name="SetupButton" Content="Plant setup" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.4.3" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -68,7 +68,7 @@
     <StackPanel>
      <DockPanel Margin="0,0,0,14">
       <Image Source="{StaticResource GrangesHorizontal}" Width="140" Height="42" Stretch="Uniform" DockPanel.Dock="Right" Margin="20,0,0,0" AutomationProperties.Name="Gränges"/>
-      <StackPanel><TextBlock Text="Which unit are you working on?" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Find it by asset number, location, or photograph. Select its photo to continue." Foreground="{DynamicResource ThemeForeground536E81}" FontSize="15" TextWrapping="Wrap" Margin="0,7,0,0"/></StackPanel>
+      <StackPanel><TextBlock x:Name="HomeHeadingText" Text="Which unit are you working on?" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="GalleryIntroText" Text="Find it by asset number, location, or photograph. Select its photo to continue." Foreground="{DynamicResource ThemeForeground536E81}" FontSize="15" TextWrapping="Wrap" Margin="0,7,0,0"/></StackPanel>
      </DockPanel>
      <TextBlock Text="Search units" FontWeight="SemiBold" Margin="0,4,0,5"/>
      <TextBox x:Name="UnitSearchBox" MinHeight="46" FontSize="18" TextChanged="UnitSearch_Changed" KeyDown="UnitSearch_KeyDown" ToolTip="Asset number, unit, location, model or description" AutomationProperties.Name="Search units by asset number or location"/>
