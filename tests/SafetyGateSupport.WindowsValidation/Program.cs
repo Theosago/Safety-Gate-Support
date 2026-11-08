@@ -534,7 +534,7 @@ internal static class Program
         var own = units.Single(u => u.Id == fixture.BlueUnit.Id); own.ShowLightConfiguration = false; own.ShowScannerConfiguration = false; fixture.Data.SaveSystems(units);
         var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
         Require(Control<Button>(main, "ScannerButton").Visibility == Visibility.Collapsed && Control<Button>(main, "LightColumnButton").Visibility == Visibility.Collapsed, "Absent equipment actions were left visible.");
-        Require(Control<Button>(main, "PartManualsButton").Content.Equals("Part Manuals") && Control<Button>(main, "UnitPartsButton").Content.Equals("Parts"), "Canonical unit actions are missing.");
+        Require(Control<Button>(main, "PartManualsButton").Content.Equals("Manuals / documents") && Control<Button>(main, "UnitPartsButton").Content.Equals("Parts"), "Canonical unit actions are missing.");
         Require(Control<Panel>(main, "SystemResourcePanel").Visibility == Visibility.Collapsed, "Duplicate legacy resource buttons remain on the unit page.");
         var admin = Track(new AdminWindow(fixture.Data)); ShowOffscreen(admin); await WaitUntil(() => admin.IsEnabled, "Setup did not load.");
         Control<ComboBox>(admin, "GateAreaFilterBox").SelectedItem = fixture.Gate.Category;
