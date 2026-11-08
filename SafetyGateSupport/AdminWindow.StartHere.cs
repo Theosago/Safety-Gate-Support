@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
 using SafetyGateSupport.Models;
+using SafetyGateSupport.Services;
 
 namespace SafetyGateSupport;
 
@@ -133,7 +134,37 @@ public partial class AdminWindow
     private void StartAreas_Click(object sender, RoutedEventArgs e)
     { AdvancedSetupCheck.IsChecked = true; AdvancedSetup_Click(sender, e); AreasSetupTab.IsSelected = true; SetupTaskText.Text = "Area names group equipment for operators. Add a new name or rename a saved area without rebuilding the application."; }
     private void StartPhoneGuides_Click(object sender, RoutedEventArgs e)
-    { LibrarySetupTab.IsSelected = true; ExportPhoneGuidesButton.BringIntoView(); SetupTaskText.Text = "Start with printed photo guides and offline text labels. An approved document link can be added later."; }
+    {
+        if (NeedLibrary() || Pilot() is null) return;
+        StartEditPilot_Click(sender, e);
+        MobileSettingsExpander.IsExpanded = true;
+        UnitsSetupTab.UpdateLayout();
+        MobileSettingsExpander.BringIntoView();
+        MobileOfflineBox.Focus();
+        SetupTaskText.Text = "Edit the QR settings, click Save Unit, then Return to phone pilot to export.";
+    }
+    private void ReturnPhonePilot_Click(object sender, RoutedEventArgs e)
+    {
+        StartSetupTab.IsSelected = true;
+        SetupTaskText.Text = "Export uses the pilot’s saved settings.";
+        StartSetupTab.UpdateLayout();
+        PilotPhoneStep.BringIntoView();
+    }
+    private void PilotUnitBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PilotQrStatus is null || PilotExportStatus is null) return;
+        PilotExportStatus.Text = "";
+        if (PilotUnitBox.SelectedItem is not SafetySystem pilot)
+        {
+            PilotQrStatus.Text = "Choose a saved pilot unit in step 2.";
+            return;
+        }
+
+        string mode = pilot.MobileSupportUrl.Length > 0
+            ? MobileSupportExporter.ValidLink(pilot.MobileSupportUrl) ? "QR opens the document link and needs internet. Offline text stays in the printable guide. Test the link signed out before printing." : "invalid document link. Edit or clear it."
+            : string.IsNullOrWhiteSpace(pilot.MobileOfflineInstructions) ? "no QR configured. Export creates a guide only." : "offline text saved. No internet required to read the text.";
+        PilotQrStatus.Text = $"{pilot.AdminDisplay} — {mode}";
+    }
     private void StartOperator_Click(object sender, RoutedEventArgs e)
     {
         if (NeedLibrary() || Pilot() is not { } pilot) return;

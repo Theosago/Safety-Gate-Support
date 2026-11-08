@@ -28,7 +28,7 @@
     <GroupBox Header="2 · Add the box and its unit"><StackPanel Margin="12"><TextBlock Text="An asset is the numbered gate or box. A unit is the individual assembly the operator selects. Add the asset number/location first, then a unit and an uncropped identification photo. Choose only equipment this unit actually has." TextWrapping="Wrap"/>
      <TextBlock x:Name="StartInventoryStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
      <WrapPanel><Button x:Name="StartAddAssetButton" Content="Add an asset / box" Click="StartAddAsset_Click"/><Button x:Name="StartAddUnitButton" Content="Add a unit" Click="StartAddUnit_Click"/><Button Content="Manage areas" Click="StartAreas_Click"/></WrapPanel>
-     <TextBlock Text="Pilot unit for the next steps" Margin="0,10,0,3"/><ComboBox x:Name="PilotUnitBox" DisplayMemberPath="AdminDisplay" MinHeight="34"/>
+     <TextBlock Text="Pilot unit for the next steps" Margin="0,10,0,3"/><ComboBox x:Name="PilotUnitBox" DisplayMemberPath="AdminDisplay" MinHeight="34" SelectionChanged="PilotUnitBox_SelectionChanged"/>
      <Button Content="Edit this unit and photo" Click="StartEditPilot_Click" HorizontalAlignment="Left"/>
     </StackPanel></GroupBox>
     <GroupBox Header="3 · Give the operator something useful"><StackPanel Margin="12">
@@ -38,8 +38,12 @@
     </StackPanel></GroupBox>
     <GroupBox Header="4 · Try the operator’s job"><StackPanel Margin="12"><TextBlock Text="Save your edits, then leave Setup and test the pilot: identify it from the photo, open its PDF, find the fix from the problem picture, and return to the same unit. Ask a maintenance colleague to repeat this without coaching. Record what confuses them before adding more units." TextWrapping="Wrap"/>
      <Button x:Name="StartOperatorButton" Content="Open the saved pilot in operator view" Click="StartOperator_Click" HorizontalAlignment="Left" Margin="0,10"/>
-     <TextBlock Text="For phone-only crews, start with a printed photo guide and offline text QR label. An approved company-owned document link can be added later; a phone QR cannot grant access to Q:." TextWrapping="Wrap"/>
-     <Button Content="Phone guides and QR labels" Click="StartPhoneGuides_Click" HorizontalAlignment="Left"/>
+    </StackPanel></GroupBox>
+    <GroupBox x:Name="PilotPhoneStep" Header="5 · Try the pilot on a phone"><StackPanel Margin="12">
+     <TextBlock Text="For a home test, use offline QR text and a printed photo guide. A PDF attached above opens in the desktop app. For phone document access, use an approved HTTPS link that works while signed out." TextWrapping="Wrap"/>
+     <TextBlock x:Name="PilotQrStatus" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8"/>
+     <WrapPanel><Button x:Name="EditPilotQrButton" Content="Edit pilot QR settings" Click="StartPhoneGuides_Click"/><Button Content="Export this pilot…" Click="ExportPilotPhoneGuide_Click"/></WrapPanel>
+     <TextBlock x:Name="PilotExportStatus" TextWrapping="Wrap"/>
     </StackPanel></GroupBox>
    </StackPanel></ScrollViewer></TabItem>
 
@@ -73,13 +77,13 @@
         </StackPanel>
        </Border>
       </Grid></GroupBox>
-      <Expander Header="Phone guide / QR label (optional)" Margin="0,10"><StackPanel>
+      <Expander x:Name="MobileSettingsExpander" Header="Phone guide / QR label (optional)" Margin="0,10"><StackPanel>
        <TextBlock Text="Offline text works without accounts or internet. Photos belong in the printable guide. If an approved document link becomes available, paste it below; that link takes priority over offline text in the QR code." TextWrapping="Wrap"/>
        <TextBlock Text="Short offline instructions (700 characters maximum)" Margin="0,8,0,3"/><TextBox x:Name="MobileOfflineBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="85" MaxLength="700"/>
        <TextBlock Text="Approved HTTPS document link (optional)" Margin="0,8,0,3"/><TextBox x:Name="MobileSupportUrlBox" TextWrapping="Wrap"/>
-       <TextBlock Text="Save the unit, then use Export phone guides and QR labels under Shared Data / Software. Test any document link with a worker who has no employee account before fitting labels." TextWrapping="Wrap" Margin="0,6"/>
+       <TextBlock Text="Click Save Unit, then Return to phone pilot. Clear the document link to make the QR use offline text again." TextWrapping="Wrap" Margin="0,6"/>
       </StackPanel></Expander>
-      <WrapPanel><Button x:Name="SaveUnitButton" Content="Save Unit" Click="SaveUnit_Click" Padding="18,8"/><Button Content="Next: pilot checklist" Click="ReturnStart_Click"/></WrapPanel>
+      <WrapPanel><Button x:Name="SaveUnitButton" Content="Save Unit" Click="SaveUnit_Click" Padding="18,8"/><Button Content="Next: pilot checklist" Click="ReturnStart_Click"/><Button x:Name="ReturnPhonePilotButton" Content="Return to phone pilot" Click="ReturnPhonePilot_Click"/></WrapPanel>
       <Expander x:Name="GateInformationExpander" Header="Asset / box information" Margin="0,16,0,0"><StackPanel>      <GroupBox Header="Asset / box information — shared by its units"><Grid Margin="10">
        <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
        <TextBlock Text="Area" VerticalAlignment="Center"/><ComboBox x:Name="GateAreaBox" Grid.Column="1" Margin="3"/>

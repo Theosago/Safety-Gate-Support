@@ -25,9 +25,15 @@ public static class MobileSupportExporter
         for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) if (code.ModuleMatrix[y][x]) svg.Append($"<rect x=\"{x}\" y=\"{y}\" width=\"1\" height=\"1\"/>");
         return svg.Append("</g></svg>").ToString();
     }
-    public static Result Export(DataService data, string destination, bool includeNotes = false, Func<string, byte[]?>? photoEncoder = null)
+    public static Result Export(DataService data, string destination, bool includeNotes = false, Func<string, byte[]?>? photoEncoder = null, string? unitId = null)
     {
-        var units = data.LoadSystems(); var gates = data.LoadGates(); var parts = data.LoadParts();
+        var units = data.LoadSystems();
+        if (unitId is not null)
+        {
+            units = units.Where(unit => unit.Id == unitId).ToList();
+            if (units.Count == 0) throw new InvalidOperationException("The saved pilot unit is no longer in the library.");
+        }
+        var gates = data.LoadGates(); var parts = data.LoadParts();
         var problems = data.LoadHelpItems().Where(p => p.Visible && p.Section.Equals("Common Problems", StringComparison.OrdinalIgnoreCase)).OrderBy(p => p.SortOrder).ThenBy(p => p.Title).ToList();
         if (units.Count == 0) throw new InvalidOperationException("No units are configured.");
         foreach (var unit in units)
@@ -83,11 +89,11 @@ public static class MobileSupportExporter
                 if (Encoding.UTF8.GetByteCount(payload) > 2000) throw new InvalidOperationException(title + ": shorten the QR link or offline text (maximum 2000 UTF-8 bytes).");
                 labelCount++; string qr = QrSvg(payload);
                 pages.Add(("qr-" + FileKey(unit.Id) + ".svg", qr));
-                labels.Append($"<section class=\"label\"><h2>{H(title)}</h2>{qr}<p>{(unit.MobileSupportUrl.Length > 0 ? "Scan to open the approved document link. Phone access must be tested before fitting this label." : "Offline text guidance — no photos, login or internet. Camera support for text codes varies.")}</p><p class=\"instructions\">{H(payload)}</p></section>");
+                labels.Append($"<section class=\"label\"><h2>{H(title)}</h2>{qr}<p>{(unit.MobileSupportUrl.Length > 0 ? "Scan to open the approved document link. Internet required. Test access on a signed-out phone before fitting the label." : "Offline text guidance — no photos, login or internet. Camera support for text codes varies.")}</p><p class=\"instructions\">{H(unit.MobileSupportUrl.Length > 0 ? "Keep the printed guide with the unit for offline reference." : payload)}</p></section>");
             }
         }
         if (pages.All(p => !p.Name.StartsWith("unit-"))) throw new InvalidOperationException("No units have a usable gate record.");
-        pages.Add(("index.html", Page("Unit support guides", $"<h1>Unit support guides</h1><p>Open a guide, then use your browser’s Print → Save as PDF for a portable photo guide, or print a copy for the box. No server is required to read these self-contained guide files. Nothing has been uploaded.</p><ul>{index}</ul><a href=\"qr-labels.html\">Printable QR labels</a>")));
+        pages.Add(("index.html", Page("Unit support guides", $"<h1>Unit support guides</h1><p>Open a guide, then use your browser’s Print → Save as PDF for a portable photo guide, or print a copy for the box. No server is required to read these self-contained guide files. Nothing has been uploaded.</p><ul>{index}</ul>{(labelCount > 0 ? "<a href=\"qr-labels.html\">Open printable QR labels</a>" : "<p>Guide only. Add offline text or an HTTPS link in Setup and export again to create a QR label.</p>")}")));
         pages.Add(("qr-labels.html", Page("Unit QR labels", "<h1>Unit QR labels</h1><p>Print and test at the intended label size before use. Replace offline text labels whenever instructions change.</p>" + (labelCount == 0 ? "<p>No QR labels generated. Set a unit’s offline text or approved HTTPS document link in Setup, then export again.</p>" : labels.ToString()))));
         pages.Add(("READ-ME.txt", "Extract this ZIP. Open index.html and select a unit. Each unit HTML guide embeds its photos and can be printed or saved as PDF in a browser. Put a printed photo guide in the box. QR labels contain either configured offline text, or the exact approved document link supplied in Setup. No URL is invented, no server is started, and nothing is published. Offline QR codes contain no photos. Test scanning on the phones used by your crew. For document links, test with a worker who has no employee account before printing labels. Use only company-approved storage/sharing. This export contains published common problems, unit identification and assigned parts; shared notes are included only when selected. It does not include live inventory, USB controls, drawings or manual attachments. Re-export when guidance changes.\n\nExport warnings:\n" + string.Join("\n", warnings.Distinct())));
         string temp = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";

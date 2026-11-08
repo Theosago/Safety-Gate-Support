@@ -1437,6 +1437,13 @@ internal static class Program
         Control<TextBox>(admin, "UnitNumberBox").Text = "1"; Click(Control<Button>(admin, "SaveUnitButton"));
         Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
         Require(data.LoadSystems().Count == 1 && Control<ComboBox>(admin, "PilotUnitBox").Items.Count == 1, "Saved unit did not become available as the pilot.");
+        Require(Control<TextBlock>(admin, "PilotQrStatus").Text.Contains("no QR configured"), "New pilot did not show its guide-only state.");
+        Click(Control<Button>(admin, "EditPilotQrButton"));
+        Require(Control<TabItem>(admin, "UnitsSetupTab").IsSelected && Control<Expander>(admin, "MobileSettingsExpander").IsExpanded, "Pilot QR settings did not open directly.");
+        Control<TextBox>(admin, "MobileOfflineBox").Text = "Fictional phone test";
+        Click(Control<Button>(admin, "SaveUnitButton"));
+        Click(Control<Button>(admin, "ReturnPhonePilotButton"));
+        Require(Control<TabItem>(admin, "StartSetupTab").IsSelected && Control<TextBlock>(admin, "PilotQrStatus").Text.Contains("offline text saved"), "Returning to the phone pilot did not show the saved QR mode.");
         Click(Control<Button>(admin, "StartProblemButton"));
         Require(Control<TabItem>(admin, "HelpSetupTab").IsSelected && Control<ComboBox>(admin, "HelpSectionBox").SelectedIndex == 2, "Guided problem action did not open the right editor.");
         Control<TabItem>(admin, "StartSetupTab").IsSelected = true;

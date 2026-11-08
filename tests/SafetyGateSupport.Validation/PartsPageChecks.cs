@@ -84,6 +84,18 @@ internal static class PartsPageChecks
             }
             Require(!MobileSupportExporter.ValidLink("file:///Q:/manual.pdf") && !MobileSupportExporter.ValidLink("https://localhost/guide") && !MobileSupportExporter.ValidLink("https://user:pass@example.com"), "Invalid phone links accepted.");
             unit.MobileSupportUrl = "file:///Q:/manual.pdf"; data.SaveSystems(units);
+            var other = units.First(u => u.Id != unit.Id);
+            other.MobileOfflineInstructions = "Pilot-only scan text";
+            data.SaveSystems(units);
+            var pilotResult = MobileSupportExporter.Export(data, output, unitId: other.Id);
+            using (var zip = System.IO.Compression.ZipFile.OpenRead(output))
+            {
+                Require(pilotResult.Guides == 1 && pilotResult.Labels == 1 &&
+                    zip.GetEntry("unit-" + MobileSupportExporter.FileKey(unit.Id) + ".html") is null,
+                    "Pilot export included another unit or failed on its invalid URL.");
+                using var qr = new StreamReader(zip.GetEntry("qr-" + MobileSupportExporter.FileKey(other.Id) + ".svg")!.Open());
+                Require(DecodeQrSvg(qr.ReadToEnd()).Contains(other.MobileOfflineInstructions), "Pilot QR lost its saved text.");
+            }
             var before = File.ReadAllBytes(output); bool refused = false;
             try { MobileSupportExporter.Export(data, output); } catch (InvalidOperationException) { refused = true; }
             Require(refused && File.ReadAllBytes(output).SequenceEqual(before), "Failed export overwrote the previous package.");
