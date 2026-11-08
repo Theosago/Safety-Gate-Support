@@ -36,10 +36,10 @@ public partial class MainWindow
             foreach (var card in cards)
             {
                 cancel.Token.ThrowIfCancellationRequested();
-                if (card.Topic.PhotoPath.Length == 0) { card.PhotoMessage = "No photo supplied — open for instructions"; continue; }
+                if (card.Topic.Photos.Count == 0) { card.PhotoMessage = "No photo supplied — open for instructions"; continue; }
                 try
                 {
-                    var result = await IdentificationPhotoLoader.LoadAsync(_data.Resolve(card.Topic.PhotoPath), 640, cancel.Token);
+                    var result = await IdentificationPhotoLoader.LoadAsync(_data.Resolve(card.Topic.Photos[0]), 640, cancel.Token);
                     if (cancel.IsCancellationRequested || _isClosed) return;
                     card.Photo = result.Source; card.PhotoMessage = "Photo unavailable — open for instructions";
                 }
@@ -52,6 +52,60 @@ public partial class MainWindow
     }
     private void CommonProblem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: HelpItem item }) new HelpWindow(item, _data) { Owner = this }.ShowDialog();
+        if (sender is Button { Tag: HelpItem item }) OpenCommonProblem(item);
     }
+    private bool _commonProblemsExpanded = true, _problemReturnToUnit;
+    private CancellationTokenSource? _problemDetailPhotos;
+    public sealed class ProblemPhoto : INotifyPropertyChanged
+    {
+        private BitmapSource? _source;
+        public BitmapSource? Source { get => _source; set { _source = value; PropertyChanged?.Invoke(this, new(nameof(Source))); } }
+        private string _status = "Loading photo…";
+        public string Status { get => _status; set { _status = value; PropertyChanged?.Invoke(this, new(nameof(Status))); } }
+        public event PropertyChangedEventHandler? PropertyChanged;
+    }
+    private void ToggleCommonProblems_Click(object sender, RoutedEventArgs e)
+    {
+        SetCommonProblemsExpanded(!_commonProblemsExpanded);
+        if (_commonProblemsExpanded) SetPartsRail(false);
+    }
+    private void SetCommonProblemsExpanded(bool expanded)
+    {
+        _commonProblemsExpanded = expanded;
+        CommonProblemsBody.Visibility = _commonProblemsExpanded ? Visibility.Visible : Visibility.Collapsed;
+        CommonProblemsRail.Width = _commonProblemsExpanded ? 300 : 44;
+        CommonProblemsToggle.Content = _commonProblemsExpanded ? "Common Problems ▶" : "◀";
+    }
+    private void OpenCommonProblem(HelpItem item)
+    {
+        if (!CloseInlineTool()) return;
+        _problemReturnToUnit = SystemsView.Visibility == Visibility.Visible;
+        SaveSharedNotesNow(); HideAllViews();
+        CommonProblemView.Visibility = Visibility.Visible; CommonProblemTitle.Text = item.Title; CommonProblemInstructions.Text = item.Body;
+        CommonProblemScroll.ScrollToTop();
+        var photos = item.Photos.Select(_ => new ProblemPhoto()).ToList(); CommonProblemGallery.ItemsSource = photos;
+        var cancel = new CancellationTokenSource(); _problemDetailPhotos = cancel;
+        _ = LoadProblemDetailAsync(item.Photos, photos, cancel);
+    }
+    private async Task LoadProblemDetailAsync(IReadOnlyList<string> paths, List<ProblemPhoto> photos, CancellationTokenSource cancel)
+    {
+        try
+        {
+            for (int i = 0; i < paths.Count; i++)
+            {
+                try
+                {
+                    var result = await IdentificationPhotoLoader.LoadAsync(_data.Resolve(paths[i]), 1200, cancel.Token);
+                    if (cancel.IsCancellationRequested || _isClosed) return;
+                    photos[i].Source = result.Source; photos[i].Status = result.Source is null ? "Photo unavailable. Instructions are below." : "";
+                }
+                catch (OperationCanceledException) { throw; }
+                catch { if (!cancel.IsCancellationRequested) photos[i].Status = "Photo unavailable. Instructions are below."; }
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally { if (ReferenceEquals(_problemDetailPhotos, cancel)) _problemDetailPhotos = null; cancel.Dispose(); }
+    }
+    private void CommonProblemBack_Click(object sender, RoutedEventArgs e)
+    { if (_problemReturnToUnit && SelectedUnit is not null) ShowSystems(); else ShowHome(); }
 }

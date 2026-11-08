@@ -139,6 +139,7 @@ public partial class AdminWindow : Window
         CleanupPendingPhotoTemp();
         UnitHasSignalColumnCheck.IsChecked = _selectedUnit?.ShowLightConfiguration ?? true; UnitHasScannerCheck.IsChecked = _selectedUnit?.ShowScannerConfiguration ?? true;
         UnitNumberBox.Text = _selectedUnit?.UnitNumber ?? "";
+        MobileSupportUrlBox.Text = _selectedUnit?.MobileSupportUrl ?? ""; MobileOfflineBox.Text = _selectedUnit?.MobileOfflineInstructions ?? "";
         UnitPhotoText.Text = _selectedUnit?.PrimaryPhoto ?? "";
         GateUnitEditorScroll.ScrollToTop();
         _pendingPhotoSource = "";
@@ -245,6 +246,8 @@ public partial class AdminWindow : Window
     {
         if (_selectedGate is null) { MessageBox.Show("Select a gate first."); return; }
         var number = UnitNumberBox.Text.Trim();
+        string link = MobileSupportUrlBox.Text.Trim();
+        if (link.Length > 0 && !MobileSupportExporter.ValidLink(link)) { AdminStatusText.Text = "Enter an approved HTTPS document link, or leave it blank for offline labels."; return; }
         if (_units.Any(u => u != _selectedUnit && u.GateId == _selectedGate.Id && string.Equals(u.UnitNumber ?? "", number, StringComparison.OrdinalIgnoreCase))) { MessageBox.Show("That unit already exists under this gate."); return; }
         var wasNew = _newUnit;
         if (_newUnit)
@@ -256,6 +259,7 @@ public partial class AdminWindow : Window
         }
         if (_selectedUnit is null) return;
         _selectedUnit.UnitNumber = string.IsNullOrWhiteSpace(number) ? null : number;
+        _selectedUnit.MobileSupportUrl = link; _selectedUnit.MobileOfflineInstructions = MobileOfflineBox.Text.Trim();
         _selectedUnit.ShowLightConfiguration = UnitHasSignalColumnCheck.IsChecked == true; _selectedUnit.ShowScannerConfiguration = UnitHasScannerCheck.IsChecked == true;
         if (!string.IsNullOrWhiteSpace(_pendingPhotoSource))
         {
@@ -511,11 +515,11 @@ public partial class AdminWindow : Window
     private void HelpList_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedHelp = HelpList.SelectedItem as HelpItem; _newHelp = false; PopulateHelp(); }
     private void PopulateHelp()
     {
-        _pendingHelpPhoto = ""; _removeHelpPhoto = false;
+
         HelpTitleBox.Text = _selectedHelp?.Title ?? ""; HelpBodyBox.Text = _selectedHelp?.Body ?? "";
         HelpKeywordsBox.Text = _selectedHelp?.Keywords ?? ""; HelpSortBox.Text = (_selectedHelp?.SortOrder ?? 10).ToString();
         HelpSectionBox.SelectedIndex = _selectedHelp?.Section == "Common Problems" ? 2 : _selectedHelp?.Section == "Troubleshooting" ? 1 : 0;
-        HelpVisibleCheck.IsChecked = _selectedHelp?.Visible ?? true; RefreshHelpPhoto();
+        HelpVisibleCheck.IsChecked = _selectedHelp?.Visible ?? true; ResetHelpPhotos();
     }
     private void NewHelp_Click(object sender, RoutedEventArgs e) { _selectedHelp = null; _newHelp = true; PopulateHelp(); HelpTitleBox.Focus(); }
     private async void SaveHelp_Click(object sender, RoutedEventArgs e)
@@ -526,12 +530,14 @@ public partial class AdminWindow : Window
         if (!_newHelp && _selectedHelp is null) { AdminStatusText.Text = "Choose a topic or click + Topic first."; return; }
         var item = new HelpItem { Id = _selectedHelp?.Id ?? Guid.NewGuid().ToString("N"), Section = section, Title = title, Body = body,
             Keywords = HelpKeywordsBox.Text.Trim(), Visible = HelpVisibleCheck.IsChecked == true, SortOrder = int.TryParse(HelpSortBox.Text, out var n) ? n : 10 };
-        string photo = _pendingHelpPhoto; bool remove = _removeHelpPhoto;
+        var photos = _helpPhotos.Select(p => p.Path).ToList();
+        var existingPhotos = _selectedHelp?.Photos ?? [];
         SetupTabs.IsEnabled = false;
         try
         {
-            if (photo.Length > 0 && (await IdentificationPhotoLoader.LoadAsync(photo)).Source is null) throw new IOException("Choose a readable photo.");
-            await Task.Run(() => _data.SaveHelpTopic(item, photo, remove));
+            foreach (string photo in photos.Where(p => !existingPhotos.Contains(p)))
+                if ((await IdentificationPhotoLoader.LoadAsync(photo)).Source is null) throw new IOException("Choose readable photos.");
+            await Task.Run(() => _data.SaveHelpTopicPhotos(item, photos));
             if (_isClosed) return;
             _help = _data.LoadHelpItems(); _newHelp = false;
             HelpList.ItemsSource = _help.OrderBy(h => h.Section).ThenBy(h => h.SortOrder).ThenBy(h => h.Title).ToList();

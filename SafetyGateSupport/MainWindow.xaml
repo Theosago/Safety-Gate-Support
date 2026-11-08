@@ -33,13 +33,13 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18"><TextBlock Text="Appearance" Foreground="{DynamicResource ThemeForegroundAEC4D3}"/><ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" Margin="0,6,0,12"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.3.1" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.4.0" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
 
   <Grid Grid.Column="1" Margin="22">
-   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="PartsRailColumn" Width="0"/></Grid.ColumnDefinitions>
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="PartsRailColumn" Width="0"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <Border x:Name="PartsRail" Visibility="Collapsed" Grid.Column="1" Background="{DynamicResource ThemeBackgroundFFFFFF}" CornerRadius="8" Padding="16" Margin="18,0,0,0">
     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
      <StackPanel><TextBlock x:Name="PartsRailTitle" Text="Common replacement parts" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap"/>
@@ -52,8 +52,19 @@
      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="RailPartsList" ItemTemplate="{StaticResource ReplacementPartCard}"/></ScrollViewer>
     </Grid>
    </Border>
+   <Grid x:Name="CommonProblemsRail" Grid.Column="2" Width="300" Margin="12,0,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <Button x:Name="CommonProblemsToggle" Content="Common Problems ▶" Click="ToggleCommonProblems_Click" ToolTip="Collapse or expand Common Problems" AutomationProperties.Name="Toggle Common Problems"/>
+    <Border x:Name="CommonProblemsBody" Grid.Row="1" Background="{DynamicResource ThemeBackgroundFFFFFF}"><Grid Margin="10"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <StackPanel><TextBlock Text="Does this look familiar?" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Select a photo to see the fix." TextWrapping="Wrap" Margin="0,5,0,12"/><TextBlock x:Name="CommonProblemsEmpty" Text="No common problems have been added yet. Add photos and fix instructions in Setup → Home / Help." TextWrapping="Wrap"/></StackPanel>
+     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsControl x:Name="CommonProblemsList"><ItemsControl.ItemTemplate><DataTemplate>
+      <Button Tag="{Binding Topic}" Click="CommonProblem_Click" HorizontalContentAlignment="Stretch" Padding="8" Margin="0,0,0,12" AutomationProperties.Name="{Binding Topic.Title}"><StackPanel>
+       <Border Height="160" Background="{DynamicResource ThemeBackgroundEDF1F4}"><Grid><Image Source="{Binding Photo}" Stretch="Uniform"/><TextBlock Text="{Binding PhotoMessage}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Photo}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid></Border>
+       <TextBlock Text="{Binding Topic.Title}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,5"/><TextBlock Text="See how to fix it →" Foreground="{DynamicResource ThemeForeground176B87}"/>
+      </StackPanel></Button>
+     </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+    </Grid></Border></Grid>
    <!-- HOME -->
-   <Grid x:Name="HomeShell"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Grid x:Name="HomeShell"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <StackPanel>
      <DockPanel Margin="0,0,0,14">
       <Image Source="{StaticResource GrangesHorizontal}" Width="140" Height="42" Stretch="Uniform" DockPanel.Dock="Right" Margin="20,0,0,0" AutomationProperties.Name="Gränges"/>
@@ -111,17 +122,7 @@
      </Grid>
     </StackPanel>
    </ScrollViewer>
-   <TabControl Grid.Column="1" Grid.RowSpan="2" Margin="16,0,0,0">
-    <TabItem Header="Common Problems"><Grid Margin="10"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-     <StackPanel><TextBlock Text="Does this look familiar?" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Select a photo to see the fix." TextWrapping="Wrap" Margin="0,5,0,12"/><TextBlock x:Name="CommonProblemsEmpty" Text="No common problems have been added yet. Add photos and fix instructions in Setup → Home / Help." TextWrapping="Wrap"/></StackPanel>
-     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsControl x:Name="CommonProblemsList"><ItemsControl.ItemTemplate><DataTemplate>
-      <Button Tag="{Binding Topic}" Click="CommonProblem_Click" HorizontalContentAlignment="Stretch" Padding="8" Margin="0,0,0,12" AutomationProperties.Name="{Binding Topic.Title}"><StackPanel>
-       <Border Height="160" Background="{DynamicResource ThemeBackgroundEDF1F4}"><Grid><Image Source="{Binding Photo}" Stretch="Uniform"/><TextBlock Text="{Binding PhotoMessage}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Photo}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid></Border>
-       <TextBlock Text="{Binding Topic.Title}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,5"/><TextBlock Text="See how to fix it →" Foreground="{DynamicResource ThemeForeground176B87}"/>
-      </StackPanel></Button>
-     </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
-    </Grid></TabItem>
-   </TabControl></Grid>
+</Grid>
 
    <!-- The unit workspace keeps the selected identity while tools open. -->
    <Grid x:Name="SystemsView" Visibility="Collapsed">
@@ -130,11 +131,7 @@
     <ScrollViewer x:Name="UnitWorkspaceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <StackPanel x:Name="NoUnitPanel" Margin="24"><TextBlock Text="Select a unit to see its photo, files and troubleshooting." FontSize="21" TextWrapping="Wrap"/><Button Content="Find a unit" Click="HomeNav_Click" HorizontalAlignment="Left" Margin="0,18,0,0"/></StackPanel>
      <StackPanel x:Name="UnitDetailPanel" Visibility="Collapsed">
-      <WrapPanel Margin="0,0,0,12"><Button x:Name="TroubleshootButton" Content="Troubleshoot" Click="TroubleshootSimple_Click" Style="{StaticResource PrimaryButton}" MinHeight="38" HorizontalContentAlignment="Left"/>
-<Button x:Name="FilesButton" Content="Electrical Schematics" Tag="drawing" Click="FindFiles_Click" MinHeight="38" HorizontalContentAlignment="Left"/>
-<Button x:Name="LightColumnButton" Content="Signal Column configuration" Click="LightColumn_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Read, compare or upload this unit’s approved Siemens light configuration"/>
-<Button x:Name="ScannerButton" Content="Safety Scanner configuration" Click="Scanner_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Assigned scanner configuration files and available USB diagnostics"/>
-<Button x:Name="PartManualsButton" Content="Part Manuals" Click="UnitManuals_Click" MinHeight="38"/><Button x:Name="UnitPartsButton" Content="Parts" Click="UnitParts_Click" MinHeight="38"/></WrapPanel>
+
       <Grid x:Name="UnitOverview"><Grid.ColumnDefinitions><ColumnDefinition Width="1.5*" MinWidth="240"/><ColumnDefinition Width="16"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
        <GroupBox Header="Electrical Schematics" Grid.Column="2" Margin="0"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel><ComboBox x:Name="DrawingFileBox" DisplayMemberPath="Name" SelectionChanged="DrawingFile_Changed" Visibility="Collapsed" Margin="0,0,0,6"/><TextBlock x:Name="DrawingFileText" TextWrapping="Wrap" FontWeight="SemiBold"/><TextBlock x:Name="DrawingPairStatusText" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{DynamicResource ThemeForeground965813}" Margin="0,6,0,6"/><TextBlock x:Name="DrawingOrientationText" Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12" TextWrapping="Wrap"/><TextBlock x:Name="DrawingAssignmentText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12" Margin="0,4,0,6"/>        <StackPanel><WrapPanel x:Name="DrawingPageControls" Visibility="Collapsed" Margin="0,8,0,0"><Button x:Name="PreviousDrawingPageButton" Content="← Page" Click="PreviousDrawingPage_Click" IsEnabled="False"/><TextBlock x:Name="DrawingPageText" VerticalAlignment="Center" Margin="8,0"/><Button x:Name="NextDrawingPageButton" Content="Page →" Click="NextDrawingPage_Click" IsEnabled="False"/></WrapPanel><WrapPanel VerticalAlignment="Center"><Button Content="Add / update drawings…" Click="UpdateDrawing_Click"/><TextBlock FontSize="12" Margin="10,8,0,0"><Hyperlink x:Name="DownloadPdfLink" Click="DownloadDrawing_Click" IsEnabled="False">Download PDF</Hyperlink><Run Text="   ·   "/><Hyperlink x:Name="DownloadDwgLink" Click="DownloadDrawing_Click" IsEnabled="False">Download DWG</Hyperlink></TextBlock></WrapPanel></StackPanel></StackPanel>
@@ -145,6 +142,11 @@
          <Border Background="{DynamicResource ThemeBackgroundE9EEF2}" Height="430" CornerRadius="8"><Grid><Image x:Name="GateImage" Stretch="Uniform"/><TextBlock x:Name="UnitPhotoMessage" Text="Loading identification photo…" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource ThemeForeground61788A}" Margin="24" VerticalAlignment="Center" HorizontalAlignment="Center"/></Grid></Border>
         </Button>
 
+      <WrapPanel x:Name="UnitActionsPanel" Margin="0,0,0,12"><Button x:Name="TroubleshootButton" Content="Troubleshoot" Click="TroubleshootSimple_Click" Style="{StaticResource PrimaryButton}" MinHeight="38" HorizontalContentAlignment="Left"/>
+<Button x:Name="FilesButton" Content="Electrical Schematics" Tag="drawing" Click="FindFiles_Click" MinHeight="38" HorizontalContentAlignment="Left"/>
+<Button x:Name="LightColumnButton" Content="Signal Column configuration" Click="LightColumn_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Read, compare or upload this unit’s approved Siemens light configuration"/>
+<Button x:Name="ScannerButton" Content="Safety Scanner configuration" Click="Scanner_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Assigned scanner configuration files and available USB diagnostics"/>
+<Button x:Name="PartManualsButton" Content="Part Manuals" Click="UnitManuals_Click" MinHeight="38"/><Button x:Name="UnitPartsButton" Content="Parts" Click="UnitParts_Click" MinHeight="38"/></WrapPanel>
 <GroupBox x:Name="SharedNotesPanel" Header="Shared notes" Margin="0,10,0,0"><StackPanel><TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/><TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12" Margin="2,6,0,0"/></StackPanel></GroupBox></StackPanel>
       </Grid>
       <Grid x:Name="InlineToolPanel" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Button Content="← Unit overview" Click="UnitOverview_Click" HorizontalAlignment="Left"/><ContentControl x:Name="InlineToolContent" Grid.Row="1"/></Grid>
@@ -159,6 +161,15 @@
       <Grid Margin="0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="AreaBox" SelectionChanged="AreaBox_SelectionChanged"/><TextBox x:Name="SystemSearchBox" Grid.Column="1" TextChanged="SystemSearchBox_TextChanged" Margin="10,0,0,0" ToolTip="Search within this area"/></Grid>
       <Grid Height="230"><Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ListBox x:Name="AssetList" DisplayMemberPath="Display" SelectionChanged="AssetList_SelectionChanged"/><ListBox x:Name="UnitList" Grid.Column="1" DisplayMemberPath="UnitDisplay" Margin="10,0,0,0" SelectionChanged="UnitList_SelectionChanged"/></Grid>
      </StackPanel></Expander>
+    </StackPanel></ScrollViewer>
+   </Grid>
+
+   <Grid x:Name="CommonProblemView" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <StackPanel><Button x:Name="CommonProblemBackButton" Content="← Back" Click="CommonProblemBack_Click" HorizontalAlignment="Left"/><TextBlock x:Name="CommonProblemTitle" FontSize="28" FontWeight="Bold" TextWrapping="Wrap" Margin="0,12"/></StackPanel>
+    <ScrollViewer x:Name="CommonProblemScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
+     <TextBlock Text="How to recognize and fix this problem" FontSize="20" FontWeight="SemiBold" Margin="0,8"/>
+     <TextBlock x:Name="CommonProblemInstructions" TextWrapping="Wrap" FontSize="16" LineHeight="26"/>
+     <ItemsControl x:Name="CommonProblemGallery"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,0,0,16"><Image Source="{Binding Source}" MaxHeight="480" Stretch="Uniform"/><TextBlock Text="{Binding Status}" TextWrapping="Wrap"/></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
     </StackPanel></ScrollViewer>
    </Grid>
 

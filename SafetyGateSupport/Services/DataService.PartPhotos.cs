@@ -7,25 +7,37 @@ public partial class DataService
 {
     public HelpItem SaveHelpTopic(HelpItem item, string photoSource = "", bool removePhoto = false)
     {
-        if (string.IsNullOrWhiteSpace(item.Title) || item.Section == "Common Problems" && string.IsNullOrWhiteSpace(item.Body))
+        using var lease = AcquireAssetWriteLock();
+        var old = LoadHelpItems().SingleOrDefault(h => h.Id == item.Id);
+        var paths = removePhoto ? new List<string>() : photoSource.Length > 0 ? [photoSource] : old?.Photos.ToList() ?? [];
+        return SaveHelpTopicPhotos(item, paths);
+    }
+    public HelpItem SaveHelpTopicPhotos(HelpItem item, IReadOnlyList<string> photoSources)
+    {
+        if (string.IsNullOrWhiteSpace(item.Title) || item.Section.Equals("Common Problems", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(item.Body))
             throw new InvalidOperationException("A common problem needs a title and fix instructions.");
+        if (photoSources.Count > 20) throw new InvalidOperationException("Choose at most 20 photos for one problem.");
         using var lease = AcquireAssetWriteLock();
         var topics = JsonSerializer.Deserialize<List<HelpItem>>(File.ReadAllText(HelpFile), _read) ?? throw new InvalidDataException("Shared help records unavailable.");
         var old = topics.SingleOrDefault(h => h.Id == item.Id);
-        item.PhotoPath = removePhoto ? "" : old?.PhotoPath ?? "";
-        string? target = null;
-        if (photoSource.Length > 0)
+        var copied = new List<string>(); var paths = new List<string>();
+        try
         {
-            string extension = Path.GetExtension(photoSource).ToLowerInvariant();
-            if (!new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff" }.Contains(extension)) throw new InvalidDataException("Choose a supported photo.");
-            if (new FileInfo(photoSource).Length > 64 * 1024 * 1024) throw new InvalidDataException("Choose a photo smaller than 64 MB.");
-            target = Path.Combine(SharedRoot, "HelpPhotos", Guid.NewGuid().ToString("N") + extension);
-            AtomicCopy(photoSource, target); item.PhotoPath = ToRelative(target);
+            foreach (string source in photoSources.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (old?.Photos.Contains(source, StringComparer.OrdinalIgnoreCase) == true) { paths.Add(source); continue; }
+                string extension = Path.GetExtension(source).ToLowerInvariant();
+                if (!Path.IsPathRooted(source) || !new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff" }.Contains(extension)) throw new InvalidDataException("Choose a supported photo file.");
+                if (new FileInfo(source).Length > 64 * 1024 * 1024) throw new InvalidDataException("Choose a photo smaller than 64 MB.");
+                string target = Path.Combine(SharedRoot, "HelpPhotos", Guid.NewGuid().ToString("N") + extension);
+                AtomicCopy(source, target); copied.Add(target); paths.Add(ToRelative(target));
+            }
+            item.PhotoPaths = paths; item.PhotoPath = paths.FirstOrDefault() ?? "";
+            if (old is not null) topics.Remove(old); topics.Add(item);
+            SaveHelpItems(topics);
         }
-        if (old is not null) topics.Remove(old); topics.Add(item);
-        try { SaveHelpItems(topics); }
-        catch { if (target is not null) File.Delete(target); throw; }
-        // Keep previous photo files so backed-up help records remain usable.
+        catch { foreach (string path in copied) File.Delete(path); throw; }
+        // Retain previous files for backed-up help records.
         LogAudit("Help topic saved", details: item.Title); return item;
     }
     public PartRecord ImportStockroomPart(PartRecord imported)

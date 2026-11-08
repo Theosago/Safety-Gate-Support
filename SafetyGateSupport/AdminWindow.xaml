@@ -40,6 +40,12 @@
         </StackPanel>
        </Border>
       </Grid></GroupBox>
+      <Expander Header="Phone guide / QR label (optional)" Margin="0,10"><StackPanel>
+       <TextBlock Text="Offline text works without accounts or internet. Photos belong in the printable guide. If an approved document link becomes available, paste it below; that link takes priority over offline text in the QR code." TextWrapping="Wrap"/>
+       <TextBlock Text="Short offline instructions (700 characters maximum)" Margin="0,8,0,3"/><TextBox x:Name="MobileOfflineBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="85" MaxLength="700"/>
+       <TextBlock Text="Approved HTTPS document link (optional)" Margin="0,8,0,3"/><TextBox x:Name="MobileSupportUrlBox" TextWrapping="Wrap"/>
+       <TextBlock Text="Save the unit, then use Export phone guides and QR labels under Shared Data / Software. Test any document link with a worker who has no employee account before fitting labels." TextWrapping="Wrap" Margin="0,6"/>
+      </StackPanel></Expander>
       <Button Content="Save Unit" Click="SaveUnit_Click" HorizontalAlignment="Left" Padding="18,8"/>
       <Expander x:Name="GateInformationExpander" Header="Asset information and PLC settings" Margin="0,16,0,0"><StackPanel>      <GroupBox Header="Safety gate information — shared by every unit under this gate"><Grid Margin="10">
        <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -144,9 +150,9 @@
       <TextBlock Text="Section"/><ComboBox x:Name="HelpSectionBox" Height="34"><ComboBoxItem Content="Quick Help"/><ComboBoxItem Content="Troubleshooting"/><ComboBoxItem Content="Common Problems"/></ComboBox>
       <TextBlock Text="Title" Margin="0,8,0,3"/><TextBox x:Name="HelpTitleBox" Height="34"/>
       <CheckBox x:Name="HelpVisibleCheck" Content="Show this entry to users" IsChecked="True" Margin="0,10"/>
-      <TextBlock Text="Problem photo (optional)" Margin="0,8,0,3"/>
-      <WrapPanel><Button Content="Choose / replace photo…" Click="ChooseHelpPhoto_Click"/><Button Content="Remove photo" Click="RemoveHelpPhoto_Click"/></WrapPanel>
-      <Image x:Name="HelpPhotoPreview" Height="160" Stretch="Uniform" HorizontalAlignment="Left"/>
+      <TextBlock Text="Problem photos (optional)" Margin="0,8,0,3"/>
+      <WrapPanel><Button Content="Add photos…" Click="ChooseHelpPhoto_Click"/><Button Content="Remove selected photo" Click="RemoveHelpPhoto_Click"/></WrapPanel>
+      <ListBox x:Name="HelpPhotoList" DisplayMemberPath="Label" Height="90" SelectionChanged="HelpPhoto_SelectionChanged"/><Button Content="Use selected as cover" Click="CoverHelpPhoto_Click" HorizontalAlignment="Left"/><Image x:Name="HelpPhotoPreview" Height="160" Stretch="Uniform" HorizontalAlignment="Left"/>
       <TextBlock x:Name="HelpPhotoStatus" TextWrapping="Wrap"/>
       <TextBlock Text="How to recognize it and how to fix it" Margin="0,8,0,3"/><TextBox x:Name="HelpBodyBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="120"/>
       <TextBlock Text="Keywords" Margin="0,8,0,3"/><TextBox x:Name="HelpKeywordsBox" Height="34"/>
@@ -223,6 +229,12 @@
      <Separator Margin="0,16"/>
      <Button x:Name="OrganizeAssetFoldersButton" Content="Organize asset folders…" Click="OrganizeAssetFolders_Click" HorizontalAlignment="Left"/>
      <TextBlock Text="Preview a readable asset folder layout, merge identical copies, and review conflicting revisions before applying. Existing files and metadata are backed up." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}" Margin="0,6,0,14"/>
+     <TextBlock Text="Phone guides and QR labels" FontWeight="SemiBold" FontSize="17"/>
+     <TextBlock Text="Export self-contained photo guides for printing or saving as PDF, plus labels for units with offline text or an approved document link. No server, login or internet is needed for text-only labels. Nothing is uploaded automatically." TextWrapping="Wrap" Margin="0,6"/>
+     <CheckBox x:Name="ExportIncludeNotesCheck" Content="Include shared notes in the exported guides" Margin="0,6"/>
+     <Button x:Name="ExportPhoneGuidesButton" Content="Export phone guides and QR labels…" Click="ExportPhoneGuides_Click" HorizontalAlignment="Left"/>
+     <TextBlock x:Name="PhoneExportStatus" TextWrapping="Wrap"/>
+     <Separator Margin="0,16"/>
      <TextBlock Text="Application distribution" FontWeight="SemiBold" FontSize="17"/>
      <TextBlock Text="Recommended: keep the published SafetyGateSupport.exe in Q:\SafetyGateSupport\Application and give users a shortcut to that master copy. This build does not self-modify or auto-update." Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap" Margin="0,4,0,6"/>
      <Separator Margin="0,16"/>

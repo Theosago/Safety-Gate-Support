@@ -68,7 +68,7 @@ public partial class MainWindow : Window
             _isClosed = true;
             _dataGeneration++;
             CancelSearchIndexRefresh();
-            CancelPhotoLoad(); CancelPartPhotos(); _commonProblemPhotos?.Cancel(); _stockroomRefresh?.Cancel();
+            CancelPhotoLoad(); CancelPartPhotos(); _commonProblemPhotos?.Cancel(); _problemDetailPhotos?.Cancel(); _stockroomRefresh?.Cancel();
             _drawingListing?.Cancel(); _drawingRendering?.Cancel(); _drawingOrientationCancellation?.Cancel(); _drawingPairCheck?.Cancel(); _drawingWatch.Stop();
             _galleryCancellation?.Cancel(); _unitSearchTimer.Stop();
             _notesSaveTimer.Stop();
@@ -201,9 +201,9 @@ public partial class MainWindow : Window
     private void ManualsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; _manualFilterGateId = _manualFilterUnitId = ""; ShowManuals(); RefreshManuals(); }
     private void PartsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; _partFilterGateId = _partFilterUnitId = ""; ShowParts(); RefreshParts(); }
 
-    private void HideAllViews() { SetPartsRail(false); HomeShell.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
-    private void ShowHome() { HideAllViews(); HomeShell.Visibility = Visibility.Visible; SetActiveNavigation(HomeNav); }
-    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
+    private void HideAllViews() { SetPartsRail(false); _problemDetailPhotos?.Cancel(); CommonProblemView.Visibility = CommonProblemsRail.Visibility = Visibility.Collapsed; HomeShell.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
+    private void ShowHome() { HideAllViews(); HomeShell.Visibility = CommonProblemsRail.Visibility = Visibility.Visible; SetActiveNavigation(HomeNav); }
+    private void ShowSystems() { HideAllViews(); SystemsView.Visibility = CommonProblemsRail.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
     private void ShowManuals() { HideAllViews(); ManualsView.Visibility = Visibility.Visible; SetActiveNavigation(ManualsNav); }
     private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; SetActiveNavigation(PartsNav); if (SelectedPart is { } part) LoadPartPhoto(part); }
 
@@ -403,7 +403,7 @@ public partial class MainWindow : Window
             case "System":
                 var u = _systems.FirstOrDefault(x => x.Id == r.SystemId); if (u is not null) NavigateToSystem(u, r.MatchSource == "SharedNotes" ? r.MatchText : null); break;
             case "File": if (File.Exists(r.Target)) FileLauncherService.Open(r.Target); break;
-            case "Help": var h = _help.FirstOrDefault(x => x.Title == r.Title && x.Body == r.Body); if (h is not null) new HelpWindow(h, _data) { Owner = this }.ShowDialog(); break;
+            case "Help": var h = _help.FirstOrDefault(x => x.Title == r.Title && x.Body == r.Body); if (h is not null) { if (h.Section.Equals("Common Problems", StringComparison.OrdinalIgnoreCase)) OpenCommonProblem(h); else new HelpWindow(h, _data) { Owner = this }.ShowDialog(); } break;
             case "Part": var p = _parts.FirstOrDefault(x => x.Id == r.Target); _partFilterGateId = _partFilterUnitId = ""; ShowParts(); PartSearchBox.Text = p?.PartNumber ?? p?.Description ?? ""; PartList.SelectedItem = p; break;
             case "Manual": var m = _manuals.FirstOrDefault(x => x.Id == r.Target); if (m is not null) { var path = _data.Resolve(m.FilePath); if (File.Exists(path)) FileLauncherService.Open(path); } break;
             case "Resource": var resource = _resources.FirstOrDefault(x => x.Id == r.Target); if (resource is not null) NavigateToResource(resource); break;

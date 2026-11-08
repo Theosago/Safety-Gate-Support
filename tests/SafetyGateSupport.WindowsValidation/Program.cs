@@ -638,23 +638,26 @@ internal static class Program
         await WaitUntil(() => main.IsEnabled && list.Items.Count == 2 && list.Items.Cast<MainWindow.CommonProblemCard>().First().Photo is not null, "Common problem cards/photos did not load.");
         Require(list.Items.Cast<MainWindow.CommonProblemCard>().First().Topic.Id == topic.Id, "Common problems ignored order or included hidden entries.");
         await WaitUntil(() => Descendants<Button>(list).Any(b => b.Tag is HelpItem h && h.Id == topic.Id), "Photo card not rendered.");
-        var opened = new TaskCompletionSource<bool>();
-        _ = main.Dispatcher.BeginInvoke(new Action(async () =>
-        {
-            HelpWindow? help = null;
-            try
-            {
-                await WaitUntil(() => Application.Current.Windows.OfType<HelpWindow>().Any(), "Click did not open fix instructions.");
-                help = Application.Current.Windows.OfType<HelpWindow>().Single();
-                await WaitUntil(() => Control<Image>(help, "ProblemPhoto").Source is not null, "Fix detail photo did not load.");
-                Require(Control<TextBlock>(help, "BodyText").Text == topic.Body, "Wrong fix instructions opened.");
-                opened.SetResult(true);
-            }
-            catch (Exception error) { opened.SetException(error); }
-            finally { help?.Close(); }
-        }));
+        var legacy = topic.PhotoPath;
+        topic = fixture.Data.SaveHelpTopicPhotos(topic, [legacy, fixture.Data.Resolve(fixture.BlueUnit.PrimaryPhoto)]);
+        // Reload through a new window to exercise persisted multi-photo records.
+        main.Close(); main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main);
+        list = Control<ItemsControl>(main, "CommonProblemsList");
+        await WaitUntil(() => main.IsEnabled && list.Items.Count == 2, "Common problems did not reload.");
+        Click(Control<Button>(main, "CommonProblemsToggle"));
+        Require(Control<FrameworkElement>(main, "CommonProblemsRail").Width == 44 && Control<Border>(main, "CommonProblemsBody").Visibility == Visibility.Collapsed, "Collapse did not reclaim panel width.");
+        await SelectGalleryUnit(main, fixture.RedUnit);
+        Require(Control<FrameworkElement>(main, "CommonProblemsRail").IsVisible, "Common Problems disappeared on unit selection.");
+        Click(Control<Button>(main, "CommonProblemsToggle")); main.UpdateLayout();
+        var photoButton = Control<Button>(main, "EnlargePhotoButton"); var actions = Control<WrapPanel>(main, "UnitActionsPanel"); var notes = Control<GroupBox>(main, "SharedNotesPanel");
+        Require(actions.TranslatePoint(new Point(), main).Y >= photoButton.TranslatePoint(new Point(0, photoButton.ActualHeight), main).Y && actions.TranslatePoint(new Point(), main).Y < notes.TranslatePoint(new Point(), main).Y, "Unit actions are not between photo and notes.");
+        await WaitUntil(() => Descendants<Button>(list).Any(b => b.Tag is HelpItem h && h.Id == topic.Id), "Problem card unavailable on unit page.");
         Click(Descendants<Button>(list).Single(b => b.Tag is HelpItem h && h.Id == topic.Id));
-        await opened.Task;
+        Require(Control<Grid>(main, "CommonProblemView").Visibility == Visibility.Visible && !Application.Current.Windows.OfType<HelpWindow>().Any(), "Problem did not open as an in-app page.");
+        await WaitUntil(() => Control<ItemsControl>(main, "CommonProblemGallery").Items.Cast<MainWindow.ProblemPhoto>().Count(p => p.Source is not null) == 2, "Multiple problem photos did not load.");
+        Require(Control<TextBlock>(main, "CommonProblemInstructions").Text == topic.Body, "Wrong fix instructions opened.");
+        Click(Control<Button>(main, "CommonProblemBackButton"));
+        Require(Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible && Control<FrameworkElement>(main, "CommonProblemsRail").IsVisible, "Back did not restore the selected unit and Common Problems.");
         var admin = Track(new AdminWindow(fixture.Data)); ShowOffscreen(admin);
         await WaitUntil(() => admin.IsEnabled, "Setup not ready.");
         Control<ListBox>(admin, "HelpList").SelectedItem = Control<ListBox>(admin, "HelpList").Items.Cast<HelpItem>().Single(h => h.Id == topic.Id);
@@ -662,7 +665,7 @@ internal static class Program
         Control<TextBox>(admin, "HelpTitleBox").Text = "Broken sensor housing";
         Click(Control<Button>(admin, "SaveHelpButton"));
         await WaitUntil(() => Control<TabControl>(admin, "SetupTabs").IsEnabled, "Help save did not finish.");
-        Require(fixture.Data.LoadHelpItems().Single(h => h.Id == topic.Id).PhotoPath == topic.PhotoPath && fixture.Data.LoadHelpItems().Single(h => h.Id == topic.Id).Title == "Broken sensor housing", "Setup edit lost photo or title.");
+        Require(fixture.Data.LoadHelpItems().Single(h => h.Id == topic.Id).Photos.Count == 2 && fixture.Data.LoadHelpItems().Single(h => h.Id == topic.Id).PhotoPath == topic.PhotoPath && fixture.Data.LoadHelpItems().Single(h => h.Id == topic.Id).Title == "Broken sensor housing", "Setup edit lost photo or title.");
         Click(Control<Button>(admin, "NewCommonProblemButton"));
         Require((Control<ComboBox>(admin, "HelpSectionBox").SelectedItem as ComboBoxItem)?.Content?.ToString() == "Common Problems", "Common problem shortcut did not select its section.");
         admin.Close(); main.Close();

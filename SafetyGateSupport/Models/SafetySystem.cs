@@ -11,6 +11,8 @@ public class SafetySystem
     public string? UnitNumber { get; set; }
     public string DisplayName { get; set; } = "";
     public int? SelectedPhotoSourcePage { get; set; }
+    public string MobileSupportUrl { get; set; } = "";
+    public string MobileOfflineInstructions { get; set; } = "";
     public string PrimaryPhoto { get; set; } = "";
     public string SystemFolder { get; set; } = "";
     public string PhotosFolder { get; set; } = "";

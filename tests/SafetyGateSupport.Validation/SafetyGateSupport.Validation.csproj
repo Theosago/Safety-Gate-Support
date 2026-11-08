@@ -8,6 +8,8 @@
   <ItemGroup>
     <Compile Include="../Fixtures/DrawingPdfFixture.cs" Link="Fixtures/DrawingPdfFixture.cs" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11"/>
+    <PackageReference Include="QRCoder" Version="1.8.1"/>
     <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <Compile Include="../../SafetyGateSupport/Models/*.cs" Link="Models/%(Filename)%(Extension)" />
     <Compile Include="../../SafetyGateSupport/Services/HomePreviewService.cs" Link="Services/HomePreviewService.cs" />
@@ -22,6 +24,7 @@
     <Compile Include="../../SafetyGateSupport/Services/AssignedDrawings.cs" Link="Services/AssignedDrawings.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.Areas.cs" Link="Services/DataService.Areas.cs" />
     <Compile Include="../../SafetyGateSupport/Services/StockroomBrowserReader.cs" Link="Services/StockroomBrowserReader.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/MobileSupportExporter.cs" Link="Services/MobileSupportExporter.cs"/>
     <Compile Include="../../SafetyGateSupport/Services/StockroomService.cs" Link="Services/StockroomService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.PartPhotos.cs" Link="Services/DataService.PartPhotos.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.DrawingViews.cs" Link="Services/DataService.DrawingViews.cs" />

@@ -8,6 +8,7 @@ internal static class PartsPageChecks
 {
     public static IEnumerable<(string Name, Action Check)> Cases =>
     [
+        ("Phone guide exports are self-contained and QR labels decode to offline text or exact approved links", PhoneGuides),
         ("Common problem topics persist shared photos, visibility and edits without losing other topics", CommonProblems),
         ("Unconfirmed Blazor inventory stays diagnostic even when every requested Item ID matches", UnconfirmedInventory),
         ("Item ID import maps stockroom fields and preserves existing photos, documents and assignments", ItemImport),
@@ -20,6 +21,61 @@ internal static class PartsPageChecks
         ("Stockroom reader submits the Safe2Cross search form with its hidden fields", SearchForms),
         ("Stockroom HTTP fetch stays bounded, rejects failures and honors cancellation", StockroomFetch)
     ];
+    private static void PhoneGuides()
+    {
+        string root = Directory.CreateTempSubdirectory("phone-guides-").FullName;
+        try
+        {
+            var data = new DataService(false, Path.Combine(root, "local")); data.SetSharedRoot(Path.Combine(root, "share")); data.InitializeSharedData();
+            var units = data.LoadSystems(); var gates = data.LoadGates(); var unit = units.First();
+            unit.MobileOfflineInstructions = "Check for a damaged bracket. Follow the approved replacement procedure.";
+            unit.MobileSupportUrl = ""; data.SaveSystems(units);
+            string picture = Path.Combine(root, "broken.png"); File.WriteAllBytes(picture, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg=="));
+            data.SaveHelpTopic(new HelpItem { Section = "Common Problems", Title = "Broken <bracket>", Body = "Replace safely. <script>alert(1)</script>" }, picture);
+            data.SaveHelpTopic(new HelpItem { Section = "Common Problems", Title = "DRAFT-NOT-FOR-PHONES", Body = "Draft", Visible = false });
+            string notesText = "NOTE-PRIVATE-EXCLUDED"; data.SaveSystemNotes(unit, notesText);
+            string output = Path.Combine(root, "guides.zip"); var result = MobileSupportExporter.Export(data, output);
+            using (var zip = System.IO.Compression.ZipFile.OpenRead(output))
+            {
+                string Read(string name) { using var r = new StreamReader(zip.GetEntry(name)!.Open()); return r.ReadToEnd(); }
+                string page = Read("unit-" + MobileSupportExporter.FileKey(unit.Id) + ".html");
+                Require(result.Guides > 0 && result.Labels == 1 && page.Contains("data:image/png;base64,") && page.Contains("&lt;script&gt;") && !page.Contains("<script>") && !page.Contains(notesText) && !page.Contains("DRAFT-NOT-FOR-PHONES"), "Phone guide leaked notes/drafts, lost photo, or allowed HTML injection.");
+                string qr = Read("qr-" + MobileSupportExporter.FileKey(unit.Id) + ".svg");
+                string decoded = DecodeQrSvg(qr);
+                Require(decoded.Contains(unit.MobileOfflineInstructions) && decoded.Contains(gates.Single(g => g.Id == unit.GateId).AssetDisplay), "Offline QR did not decode to the unit guidance.");
+            }
+            unit.MobileSupportUrl = "https://company.example/docs/unit.pdf?view=1&lang=en"; data.SaveSystems(units);
+            MobileSupportExporter.Export(data, output, includeNotes: true);
+            using (var zip = System.IO.Compression.ZipFile.OpenRead(output))
+            {
+                using var qr = new StreamReader(zip.GetEntry("qr-" + MobileSupportExporter.FileKey(unit.Id) + ".svg")!.Open());
+                Require(DecodeQrSvg(qr.ReadToEnd()) == unit.MobileSupportUrl, "Document QR changed the approved link.");
+                using var page = new StreamReader(zip.GetEntry("unit-" + MobileSupportExporter.FileKey(unit.Id) + ".html")!.Open());
+                string guide = page.ReadToEnd();
+                Require(guide.Contains(notesText), "Explicit notes export was ignored.");
+                if (Environment.GetEnvironmentVariable("SAFETYGATE_PHONE_FIXTURE") is { Length: > 0 } fixture) File.WriteAllText(fixture, guide);
+            }
+            Require(!MobileSupportExporter.ValidLink("file:///Q:/manual.pdf") && !MobileSupportExporter.ValidLink("https://localhost/guide") && !MobileSupportExporter.ValidLink("https://user:pass@example.com"), "Invalid phone links accepted.");
+            unit.MobileSupportUrl = "file:///Q:/manual.pdf"; data.SaveSystems(units);
+            var before = File.ReadAllBytes(output); bool refused = false;
+            try { MobileSupportExporter.Export(data, output); } catch (InvalidOperationException) { refused = true; }
+            Require(refused && File.ReadAllBytes(output).SequenceEqual(before), "Failed export overwrote the previous package.");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+    private static string DecodeQrSvg(string svg)
+    {
+        var doc = System.Xml.Linq.XDocument.Parse(svg); var ns = doc.Root!.Name.Namespace;
+        int n = int.Parse(doc.Root.Attribute("viewBox")!.Value.Split(' ')[2]); const int scale = 4;
+        int size = n * scale; var pixels = Enumerable.Repeat((byte)255, size * size * 3).ToArray();
+        foreach (var rect in doc.Root.Element(ns + "g")!.Elements(ns + "rect"))
+        {
+            int x = int.Parse(rect.Attribute("x")!.Value), y = int.Parse(rect.Attribute("y")!.Value);
+            for (int yy = y * scale; yy < (y + 1) * scale; yy++) for (int xx = x * scale; xx < (x + 1) * scale; xx++)
+                for (int c = 0; c < 3; c++) pixels[(yy * size + xx) * 3 + c] = 0;
+        }
+        return new ZXing.BarcodeReaderGeneric().Decode(pixels, size, size, ZXing.RGBLuminanceSource.BitmapFormat.RGB24)?.Text ?? throw new InvalidOperationException("Exported QR could not be decoded.");
+    }
     private static void CommonProblems()
     {
         string root = Directory.CreateTempSubdirectory("common-problems-").FullName;
@@ -35,6 +91,16 @@ internal static class PartsPageChecks
             var updated = data.SaveHelpTopic(new HelpItem { Id = topic.Id, Section = "Common Problems", Title = "Updated bracket", Body = "Updated instructions", Visible = false });
             Require(updated.PhotoPath == firstPhoto && data.LoadHelpItems().Count == original + 1, "Editing lost the photo or unrelated help.");
             Require(!data.LoadHelpItems().Single(h => h.Id == topic.Id).Visible, "Hidden state was not saved.");
+            string another = Path.Combine(root, "another.png"); File.WriteAllBytes(another, [4, 5, 6]);
+            data.SaveHelpTopicPhotos(updated, [firstPhoto, another]);
+            var multiple = data.LoadHelpItems().Single(h => h.Id == topic.Id);
+            Require(multiple.Photos.Count == 2 && multiple.PhotoPath == firstPhoto, "Multiple photos or legacy cover were lost.");
+            data.SaveHelpTopicPhotos(multiple, multiple.Photos.Reverse().ToList());
+            Require(data.LoadHelpItems().Single(h => h.Id == topic.Id).Photos.Last() == firstPhoto, "Cover reorder did not persist.");
+            int photoFiles = Directory.GetFiles(Path.Combine(data.SharedRoot, "HelpPhotos")).Length;
+            bool rolledBack = false;
+            try { data.SaveHelpTopicPhotos(multiple, [another, Path.Combine(root, "unsupported.exe")]); } catch (InvalidDataException) { rolledBack = true; }
+            Require(rolledBack && Directory.GetFiles(Path.Combine(data.SharedRoot, "HelpPhotos")).Length == photoFiles && data.LoadHelpItems().Single(h => h.Id == topic.Id).Photos.Count == 2, "Failed multi-photo save left partial files or metadata.");
             data.SaveHelpTopic(updated, removePhoto: true);
             Require(data.LoadHelpItems().Single(h => h.Id == topic.Id).PhotoPath.Length == 0 && File.Exists(data.Resolve(firstPhoto)), "Photo removal broke backed-up records.");
             bool refused = false; try { data.SaveHelpTopic(new HelpItem { Section = "Common Problems", Title = "No instructions" }); } catch (InvalidOperationException) { refused = true; }

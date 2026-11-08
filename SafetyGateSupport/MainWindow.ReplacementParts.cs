@@ -37,6 +37,7 @@ public partial class MainWindow
     }
     private void SetPartsRail(bool visible)
     {
+        if (visible) SetCommonProblemsExpanded(false);
         PartsRail.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         PartsRailColumn.Width = visible ? new GridLength(330) : new GridLength(0);
         if (visible) RefreshReplacementParts();
