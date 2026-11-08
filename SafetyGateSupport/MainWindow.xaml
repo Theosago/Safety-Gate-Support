@@ -33,7 +33,7 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18"><TextBlock Text="Appearance" Foreground="{DynamicResource ThemeForegroundAEC4D3}"/><ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" Margin="0,6,0,12"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Set Up Shared Data" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.4.0" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.4.1" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -146,7 +146,7 @@
 <Button x:Name="FilesButton" Content="Electrical Schematics" Tag="drawing" Click="FindFiles_Click" MinHeight="38" HorizontalContentAlignment="Left"/>
 <Button x:Name="LightColumnButton" Content="Signal Column configuration" Click="LightColumn_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Read, compare or upload this unit’s approved Siemens light configuration"/>
 <Button x:Name="ScannerButton" Content="Safety Scanner configuration" Click="Scanner_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Assigned scanner configuration files and available USB diagnostics"/>
-<Button x:Name="PartManualsButton" Content="Part Manuals" Click="UnitManuals_Click" MinHeight="38"/><Button x:Name="UnitPartsButton" Content="Parts" Click="UnitParts_Click" MinHeight="38"/></WrapPanel>
+<Button x:Name="PartManualsButton" Content="Manuals / documents" Click="UnitManuals_Click" MinHeight="38"/><Button x:Name="UnitPartsButton" Content="Parts" Click="UnitParts_Click" MinHeight="38"/></WrapPanel>
 <GroupBox x:Name="SharedNotesPanel" Header="Shared notes" Margin="0,10,0,0"><StackPanel><TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/><TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12" Margin="2,6,0,0"/></StackPanel></GroupBox></StackPanel>
       </Grid>
       <Grid x:Name="InlineToolPanel" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Button Content="← Unit overview" Click="UnitOverview_Click" HorizontalAlignment="Left"/><ContentControl x:Name="InlineToolContent" Grid.Row="1"/></Grid>

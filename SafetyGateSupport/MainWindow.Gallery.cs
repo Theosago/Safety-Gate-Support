@@ -69,7 +69,7 @@ public partial class MainWindow
         var page = cards.Skip(_galleryPage * UnitsPerPage).Take(UnitsPerPage).ToList();
         UnitGallery.ItemsSource = page;
         GalleryEmptyText.Visibility = cards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        GalleryEmptyText.Text = _sharedDataReady ? "No matching units. Try another asset number or select All areas." : "Reconnect the shared folder to browse units. Your existing assignments have not been changed.";
+        GalleryEmptyText.Text = _sharedDataReady && _systems.Count == 0 ? "This plant library has no units yet. Choose Set up the first unit, then follow Start here." : _sharedDataReady ? "No matching units. Try another asset number or select All areas." : "Reconnect the shared folder to browse units. Your existing assignments have not been changed.";
         GalleryStatusText.Text = !_sharedDataReady ? "Shared data is unavailable. Reconnect the shared folder to see your units." : $"{cards.Count} unit(s) • {(_galleryArea.Length == 0 ? "All areas" : _galleryArea)} • Select the matching photo and unit number.";
         GalleryPageText.Text = $"Page {_galleryPage + 1} of {pages}";
         PreviousUnitsButton.IsEnabled = _galleryPage > 0; NextUnitsButton.IsEnabled = _galleryPage + 1 < pages;

@@ -45,6 +45,7 @@ public partial class AdminWindow : Window
     {
         InitializeComponent();
         _data = data;
+        StartLibraryPathBox.Text = _data.IsReady ? _data.SharedRoot : "";
         _importReader = importReader ?? StockroomWebViewReader.SearchAsync;
         ImportPlantBox.ItemsSource = StockroomPlant.All;
         ImportPlantBox.SelectedItem = StockroomPlant.Find(_data.Settings.StockroomPlantId);
@@ -93,7 +94,7 @@ public partial class AdminWindow : Window
         FlowListAdmin.ItemsSource = _flows.OrderBy(f => f.Title).ToList();
         HomeSubtitleBox.Text = content.HomeSubtitle; ManualsIntroBox.Text = content.ManualsIntro; PartsIntroBox.Text = content.PartsIntro; StoreroomUrlBox.Text = content.StoreroomUrl;
         if (_areas.Count > 0 && GateAreaFilterBox.SelectedItem is null) GateAreaFilterBox.SelectedIndex = 0;
-        RefreshGateList(); RefreshResourceList(); AuditList.ItemsSource = snapshot.Audit;
+        RefreshGateList(); RefreshResourceList(); AuditList.ItemsSource = snapshot.Audit; RefreshSetupGuide();
     }
 
     private void BindInventoryLists()
@@ -130,14 +131,14 @@ public partial class AdminWindow : Window
 
     private void PopulateGate()
     {
-        if (_selectedGate is null) { PlcAddressBox.Text = PlcModelBox.Text = PlcNotesBox.Text = ""; GateAreaBox.SelectedItem = GateAreaFilterBox.SelectedItem; GateAssetBox.Text = ""; GateManufacturerBox.Text = "Safe2Cross"; GateModelBox.Text = GateLocationBox.Text = GateTypeBox.Text = GateKeywordsBox.Text = ""; return; }
+        if (_selectedGate is null) { PlcAddressBox.Text = PlcModelBox.Text = PlcNotesBox.Text = ""; GateAreaBox.SelectedItem = GateAreaFilterBox.SelectedItem; GateAssetBox.Text = ""; GateManufacturerBox.Text = ""; GateModelBox.Text = GateLocationBox.Text = GateTypeBox.Text = GateKeywordsBox.Text = ""; return; }
         PlcAddressBox.Text = _selectedGate.PlcAddress; PlcModelBox.Text = _selectedGate.PlcModel; PlcNotesBox.Text = _selectedGate.PlcNotes;
         GateAreaBox.SelectedItem = _selectedGate.Category; GateAssetBox.Text = _selectedGate.AssetNumber; GateManufacturerBox.Text = _selectedGate.Manufacturer; GateModelBox.Text = _selectedGate.Model; GateLocationBox.Text = _selectedGate.Location; GateTypeBox.Text = _selectedGate.EquipmentType; GateKeywordsBox.Text = _selectedGate.Keywords;
     }
     private void PopulateUnit()
     {
         CleanupPendingPhotoTemp();
-        UnitHasSignalColumnCheck.IsChecked = _selectedUnit?.ShowLightConfiguration ?? true; UnitHasScannerCheck.IsChecked = _selectedUnit?.ShowScannerConfiguration ?? true;
+        UnitHasSignalColumnCheck.IsChecked = _selectedUnit?.ShowLightConfiguration ?? false; UnitHasScannerCheck.IsChecked = _selectedUnit?.ShowScannerConfiguration ?? false;
         UnitNumberBox.Text = _selectedUnit?.UnitNumber ?? "";
         MobileSupportUrlBox.Text = _selectedUnit?.MobileSupportUrl ?? ""; MobileOfflineBox.Text = _selectedUnit?.MobileOfflineInstructions ?? "";
         UnitPhotoText.Text = _selectedUnit?.PrimaryPhoto ?? "";
@@ -203,6 +204,11 @@ public partial class AdminWindow : Window
     private void NewGate_Click(object sender, RoutedEventArgs e) { _selectedGate = null; _selectedUnit = null; _newGate = true; _newUnit = false; PopulateGate(); PopulateUnit(); GateInformationExpander.IsExpanded = true; GateInformationExpander.UpdateLayout(); GateAssetBox.BringIntoView(); GateAssetBox.Focus(); AdminStatusText.Text = "Enter the gate-level information, then save the gate. Add its units afterward."; }
     private void SaveGate_Click(object sender, RoutedEventArgs e)
     {
+        try { SaveGateCore(); }
+        catch (Exception error) { AdminStatusText.Text = "Could not finish saving this asset: " + error.Message + " Check library access, then retry."; }
+    }
+    private void SaveGateCore()
+    {
         if (!_data.IsReady) { MessageBox.Show("Initialize shared data first."); return; }
         var area = GateAreaBox.SelectedItem as string; if (string.IsNullOrWhiteSpace(area)) { MessageBox.Show("Choose an area."); return; }
         var asset = GateAssetBox.Text.Trim(); var manufacturer = GateManufacturerBox.Text.Trim(); if (string.IsNullOrWhiteSpace(manufacturer)) manufacturer = "Unspecified";
@@ -223,7 +229,7 @@ public partial class AdminWindow : Window
         }
         var savedGateId = _selectedGate.Id;
         _data.SaveGates(_gates); if (creatingGate) _data.WriteAssetFileIndex(_selectedGate); _data.LogAudit("Gate saved", savedGateId, details: _selectedGate.Display);
-        ReloadAll(); SelectGateById(savedGateId); AdminStatusText.Text = "Gate information saved. Every unit under this gate uses this gate-level information.";
+        ReloadAll(); SelectGateById(savedGateId); AdminStatusText.Text = "Gate information saved. Every unit under this gate uses this gate-level information."; SetupTaskText.Text = "Asset saved. Next: add a unit to this asset, give it a number and photo, then save.";
     }
     private void SelectGateById(string id)
     {
@@ -241,15 +247,20 @@ public partial class AdminWindow : Window
         _data.SaveGates(_gates); _data.SaveSystems(_units); _data.SaveResources(_resources); _data.SaveManualRecords(_manuals); _data.SaveParts(_parts); _data.SaveTroubleshootingFlows(_flows); _data.LogAudit("Gate removed from index", id, details: _selectedGate.Display); _selectedGate = null; ReloadAll();
     }
 
-    private void NewUnit_Click(object sender, RoutedEventArgs e) { if (_selectedGate is null) { MessageBox.Show("Select or create a gate first."); return; } _selectedUnit = null; _newUnit = true; PopulateUnit(); UnitNumberBox.Focus(); AdminStatusText.Text = "Enter a unit number and save the unit."; }
+    private void NewUnit_Click(object sender, RoutedEventArgs e) { if (_selectedGate is null) { MessageBox.Show("Select or create a gate first."); return; } _selectedUnit = null; _newUnit = true; PopulateUnit(); GateUnitEditorScroll.ScrollToTop(); UnitNumberBox.Focus(); SetupTaskText.Text = "Enter the unit number, choose its photo and actual equipment, then Save Unit. Next: pilot checklist returns to the guided steps."; AdminStatusText.Text = "Enter a unit number and save the unit."; }
     private void SaveUnit_Click(object sender, RoutedEventArgs e)
+    {
+        try { SaveUnitCore(); }
+        catch (Exception error) { AdminStatusText.Text = "Could not finish saving this unit: " + error.Message + " Check library access, then retry."; }
+    }
+    private void SaveUnitCore()
     {
         if (_selectedGate is null) { MessageBox.Show("Select a gate first."); return; }
         var number = UnitNumberBox.Text.Trim();
         string link = MobileSupportUrlBox.Text.Trim();
         if (link.Length > 0 && !MobileSupportExporter.ValidLink(link)) { AdminStatusText.Text = "Enter an approved HTTPS document link, or leave it blank for offline labels."; return; }
         if (_units.Any(u => u != _selectedUnit && u.GateId == _selectedGate.Id && string.Equals(u.UnitNumber ?? "", number, StringComparison.OrdinalIgnoreCase))) { MessageBox.Show("That unit already exists under this gate."); return; }
-        var wasNew = _newUnit;
+        var wasNew = _newUnit || _selectedUnit is not null && !_data.LoadSystems().Any(u => u.Id == _selectedUnit.Id);
         if (_newUnit)
         {
             var id = Guid.NewGuid().ToString("N"); var root = string.IsNullOrWhiteSpace(_selectedGate.AssetFolder) ? $"Gates/{_selectedGate.Id}/Units/{id}" : _selectedGate.AssetFolder;
@@ -271,7 +282,7 @@ public partial class AdminWindow : Window
         if (wasNew) CreateDefaultResources(_selectedGate, _selectedUnit);
         var savedGateId = _selectedGate.Id;
         _data.LogAudit(wasNew ? "Unit created" : "Unit saved", savedGateId, _selectedUnit.Id, details: _selectedUnit.UnitDisplay);
-        var uid = _selectedUnit.Id; ReloadAll(); SelectGateById(savedGateId); UnitListAdmin.SelectedItem = (UnitListAdmin.ItemsSource as IEnumerable<SafetySystem>)?.FirstOrDefault(u => u.Id == uid); AdminStatusText.Text = "Unit saved.";
+        var uid = _selectedUnit.Id; ReloadAll(); SelectGateById(savedGateId); UnitListAdmin.SelectedItem = (UnitListAdmin.ItemsSource as IEnumerable<SafetySystem>)?.FirstOrDefault(u => u.Id == uid); PilotUnitBox.SelectedItem = _units.FirstOrDefault(u => u.Id == uid); AdminStatusText.Text = "Unit saved."; SetupTaskText.Text = "Unit saved. Use Next: pilot checklist to attach a PDF or Common Problem and test operator view.";
     }
     private void CreateDefaultResources(SafetyGate gate, SafetySystem unit)
     {

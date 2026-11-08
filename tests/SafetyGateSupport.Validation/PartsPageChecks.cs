@@ -8,6 +8,7 @@ internal static class PartsPageChecks
 {
     public static IEnumerable<(string Name, Action Check)> Cases =>
     [
+        ("Blank plant libraries stay empty across restarts and pilot PDFs preserve other assignments", BlankPlantSetup),
         ("Phone guide exports are self-contained and QR labels decode to offline text or exact approved links", PhoneGuides),
         ("Common problem topics persist shared photos, visibility and edits without losing other topics", CommonProblems),
         ("Unconfirmed Blazor inventory stays diagnostic even when every requested Item ID matches", UnconfirmedInventory),
@@ -21,6 +22,32 @@ internal static class PartsPageChecks
         ("Stockroom reader submits the Safe2Cross search form with its hidden fields", SearchForms),
         ("Stockroom HTTP fetch stays bounded, rejects failures and honors cancellation", StockroomFetch)
     ];
+    private static void BlankPlantSetup()
+    {
+        string root = Directory.CreateTempSubdirectory("blank-plant-").FullName;
+        try
+        {
+            string local = Path.Combine(root, "local"), share = Path.Combine(root, "new-plant");
+            var data = new DataService(false, local); data.CreateBlankPlantLibrary(share, "Packaging");
+            Require(data.IsReady && data.LoadCategories().SequenceEqual(["Packaging"]) && data.LoadGates().Count == 0 && data.LoadSystems().Count == 0 && data.LoadParts().Count == 0 && data.LoadHelpItems().Count == 0, "Blank plant contains sample inventory or is not ready.");
+            data = new DataService(true, local);
+            Require(data.SharedRoot == share && data.LoadParts().Count == 0, "Reopen imported Huntingdon parts into a blank plant.");
+            string protectedFile = Path.Combine(share, "keep.txt"); File.WriteAllText(protectedFile, "Keep existing plant data");
+            bool refused = false; try { data.CreateBlankPlantLibrary(share, "Overwrite"); } catch (IOException) { refused = true; }
+            Require(refused && File.ReadAllText(protectedFile) == "Keep existing plant data" && data.LoadCategories().SequenceEqual(["Packaging"]), "Blank creation overwrote an existing folder.");
+            var gate = new SafetyGate { Id = "new-gate", Category = "Packaging", AssetNumber = "BOX-01", Manufacturer = "Other" }; data.SaveGates([gate]);
+            var unit = new SafetySystem { Id = "pilot", GateId = gate.Id, UnitNumber = "1", ManualIds = [] };
+            var other = new SafetySystem { Id = "other", GateId = gate.Id, UnitNumber = "2", ManualIds = [] }; data.SaveSystems([unit, other]);
+            string pdf = Path.Combine(root, "Approved drawing.pdf"); File.WriteAllBytes(pdf, SafetyGateSupport.TestFixtures.DrawingPdfFixture.TextPage(0));
+            var manual = data.AddPilotPdf(unit.Id, pdf); File.Delete(pdf);
+            Require(File.Exists(data.Resolve(manual.FilePath)) && manual.Title == "Approved drawing" && data.LoadSystems().Single(u => u.Id == unit.Id).ManualIds!.Contains(manual.Id), "Pilot PDF was not copied and assigned.");
+            Require(data.LoadSystems().Single(u => u.Id == other.Id).ManualIds!.Count == 0 && !manual.AppliesTo(gate.Id, other.Id), "Pilot PDF changed another unit's assignment.");
+            var before = File.ReadAllBytes(data.ManualsIndexFile); string bad = Path.Combine(root, "wrong.pdf"); File.WriteAllText(bad, "This is not a PDF");
+            refused = false; try { data.AddPilotPdf(unit.Id, bad); } catch (InvalidDataException) { refused = true; }
+            Require(refused && File.ReadAllBytes(data.ManualsIndexFile).SequenceEqual(before), "Invalid PDF changed shared records.");
+        }
+        finally { Directory.Delete(root, true); }
+    }
     private static void PhoneGuides()
     {
         string root = Directory.CreateTempSubdirectory("phone-guides-").FullName;

@@ -1,11 +1,13 @@
 # Safety Gate Support
 
-Windows WPF support console, version **8.4.0**, based on the supplied
+Windows WPF support console, version **8.4.1**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,
 drawings/configuration resources, manuals, parts, global search, and guided
 troubleshooting. **Version 7.1 opens directly to a searchable photo gallery of units.** Select the unit to see a large, uncropped identification photo beside its troubleshooting and current-file actions. Gränges branding and a maximized photo viewer are included. The redesigned Siemens tool uses six input switches and visual segment previews in place of the 64-state dropdown. Electrical drawings now display automatically inside the selected-unit page, with permanently visible shared notes alongside. PDF page controls, image drawings and full-size viewing are supported. The direct scanner/PLC tools remain available. Version 8.2.3 waits for [server-confirmed inventory filtering](docs/V8_2_3.md). Version 8.2.2 replaces the failed background Edge launch with [embedded stockroom search](docs/V8_2_2.md). Version 8.2.1 adds [stockroom matching corrections and a lookup report](docs/V8_2_1.md). Version 8.2 adds [the replacement-parts panel, unit-specific choices and live availability](docs/V8_2.md). Version 8.1.3 adds [per-computer stockroom plant selection](docs/V8_1_3.md). Version 8.1.2 adds [all 19 parts, interactive stockroom search and conditional pagination](docs/V8_1_2.md). Version 8.1.1 adds [automatic reading-direction detection and click-to-zoom drawings](docs/V8_1_1.md). Version 8.1 adds [part photos, a resizable parts page and background stockroom quantity checks](docs/V8_1.md). Version 8 adds readable asset folders and paired PDF/DWG drawing updates; see [the v8 update and migration guide](docs/V8.md). Version 6.5.0 integrates Siemens USB backup, configuration comparison and upload, adds expected-output previews and documented troubleshooting, and imports local support libraries. Startup, photo loading and search retain the earlier performance improvements.
+
+Version 8.4.1 starts with a [guided first-plant pilot](docs/V8_4_1.md), blank-library creation and direct PDF assignment.
 
 Version 8.4.0 adds [collapsible Common Problems, multiple photos and offline QR guide exports](docs/V8_4.md).
 
@@ -32,10 +34,12 @@ Windows desktop checks succeed. Artifacts are retained for 30 days; use **Run
 workflow** to create a fresh build when needed. The executable is not stored in Git.
 
 An existing installation keeps using its local settings and configured shared
-folder. For a first-time test, press **Ctrl+Shift+Alt+A**, open **Shared Data /
-Software**, choose an empty local folder, and click **Initialize Starter Data**.
-The default production path is `Q:\SafetyGateSupport`. Settings live in
-`%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
+folder. For a new plant, choose **Set up this plant** or press **Ctrl+Shift+Alt+A**.
+The **Start here** page connects an existing library or creates a blank plant in
+an empty folder, then guides one pilot unit through photo, PDF and Common Problem
+setup. A local folder works for the pilot. Huntingdon sample data is an explicit
+training option under Shared Data / Software.
+Local settings live in `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
 
 Production use requires access to the configured shared folder. Built-in Siemens USB configuration needs no vendor configurator. Optional Siemens/UAM/BusLink launch actions require their Windows applications; each PC saves its own executable paths.
 The storeroom lookup requires the configured plant-network service. Those live

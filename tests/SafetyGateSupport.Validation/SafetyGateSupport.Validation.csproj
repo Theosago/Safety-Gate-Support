@@ -22,6 +22,7 @@
     <Compile Include="../../SafetyGateSupport/Services/AssetFileLayout.cs" Link="Services/AssetFileLayout.cs" />
     <Compile Include="../../SafetyGateSupport/Services/AssetStorageMigration.cs" Link="Services/AssetStorageMigration.cs" />
     <Compile Include="../../SafetyGateSupport/Services/AssignedDrawings.cs" Link="Services/AssignedDrawings.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/DataService.PlantSetup.cs" Link="Services/DataService.PlantSetup.cs"/>
     <Compile Include="../../SafetyGateSupport/Services/DataService.Areas.cs" Link="Services/DataService.Areas.cs" />
     <Compile Include="../../SafetyGateSupport/Services/StockroomBrowserReader.cs" Link="Services/StockroomBrowserReader.cs" />
     <Compile Include="../../SafetyGateSupport/Services/MobileSupportExporter.cs" Link="Services/MobileSupportExporter.cs"/>

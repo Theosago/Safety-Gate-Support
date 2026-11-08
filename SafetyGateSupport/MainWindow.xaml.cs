@@ -160,13 +160,15 @@ public partial class MainWindow : Window
         {
             ConnectionText.Text = (_data.IsHomePreview ? "● HOME PREVIEW • local data\n" : "● Connected\n") + _data.SharedRoot;
             ConnectionText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(132, 218, 193));
-            SetupButton.Visibility = Visibility.Collapsed;
+            SetupButton.Visibility = _systems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            SetupButton.Content = "Set up the first unit";
         }
         else
         {
             ConnectionText.Text = "● Shared data unavailable\n" + _data.SharedRoot;
             ConnectionText.Foreground = System.Windows.Media.Brushes.LightSalmon;
             SetupButton.Visibility = Visibility.Visible;
+            SetupButton.Content = "Set up this plant";
         }
     }
 
@@ -235,32 +237,26 @@ public partial class MainWindow : Window
         if (e.Key != Key.A || (Keyboard.Modifiers & needed) != needed) return;
         e.Handled = true;
         if (_loadingData) return;
-        if (MessageBox.Show("Open setup mode?\n\nThis area changes shared application data and configuration.", "Setup Mode", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        await OpenSetupAsync();
+    }
+    private async Task OpenSetupAsync()
+    {
+        if (_setupModeOpen || _loadingData || _isClosed || !CloseInlineTool()) return;
         SaveSharedNotesNow();
         _setupModeOpen = true;
         CancelSearchIndexRefresh();
         _notesRefreshTimer.Stop();
         _searchIndexRefreshTimer.Stop();
-        try { new AdminWindow(_data) { Owner = this }.ShowDialog(); }
+        string? pilotId = null;
+        try { var setup = new AdminWindow(_data) { Owner = this }; setup.ShowDialog(); pilotId = setup.OperatorPreviewUnitId; }
         finally { _setupModeOpen = false; }
         await ReloadDataAsync();
         if (!_isClosed) { _notesRefreshTimer.Start(); _searchIndexRefreshTimer.Start(); }
         if (_sharedDataReady) RefreshGates(true);
+        if (pilotId is not null && _systems.FirstOrDefault(u => u.Id == pilotId) is { } pilot) NavigateToSystem(pilot);
     }
 
-    private async void SetupSharedData_Click(object sender, RoutedEventArgs e)
-    {
-        if (MessageBox.Show($"Create the shared Safety Gate Support data at:\n\n{_data.SharedRoot}\n\nThis seeds the gate inventory and identification photos.", "Initialize shared data", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        IsEnabled = false;
-        try
-        {
-            await Task.Run(() => _data.InitializeSharedData());
-            await ReloadDataAsync();
-            if (!_isClosed) MessageBox.Show("Shared data initialized.", "Ready", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        catch (Exception ex) { if (!_isClosed) MessageBox.Show(ex.Message, "Setup failed", MessageBoxButton.OK, MessageBoxImage.Error); }
-        finally { if (!_isClosed) IsEnabled = true; }
-    }
+    private async void SetupSharedData_Click(object sender, RoutedEventArgs e) => await OpenSetupAsync();
 
     private void GlobalSearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {

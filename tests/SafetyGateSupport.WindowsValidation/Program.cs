@@ -103,6 +103,7 @@ internal static class Program
             ("An invalid resource folder cannot discard indexed shared notes", NotesIndexSurvivesInvalidResource),
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
+            ("A new plant can create a blank library and a pilot unit through guided Setup", GuidedPlantSetup),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Common Problems shows shared photos and opens fixes; Setup edits preserve photos", CommonProblemWorkflow),
@@ -1412,11 +1413,40 @@ internal static class Program
         Require(photo.Source is null && !Control<Button>(window, "StartButton").IsEnabled, "Clearing the gate allowed an obsolete picker preview or start button.");
     }
 
+    private static async Task GuidedPlantSetup()
+    {
+        string root = NewDirectory(); var data = new DataService(false, Path.Combine(root, "local"));
+        var admin = Track(new AdminWindow(data)); ShowOffscreen(admin);
+        await WaitUntil(() => admin.IsEnabled, "Guided Setup did not load.");
+        Require(Control<TabItem>(admin, "StartSetupTab").IsSelected && Control<TabItem>(admin, "ResourcesSetupTab").Visibility == Visibility.Collapsed, "Setup did not start with a focused first-plant flow.");
+        Control<TextBox>(admin, "StartLibraryPathBox").Text = Path.Combine(root, "plant");
+        Control<TextBox>(admin, "StartAreaBox").Text = "Packaging";
+        Click(Control<Button>(admin, "CreateBlankLibraryButton"));
+        await WaitUntil(() => Control<TabControl>(admin, "SetupTabs").IsEnabled && data.IsReady, "Blank library creation did not complete.");
+        Require(data.LoadParts().Count == 0 && data.LoadSystems().Count == 0, "Guided blank setup imported sample data.");
+        Click(Control<Button>(admin, "StartAddAssetButton"));
+        Require(Control<TabItem>(admin, "UnitsSetupTab").IsSelected && Control<TextBox>(admin, "GateManufacturerBox").Text.Length == 0, "Add asset did not open a neutral editor.");
+        Control<TextBox>(admin, "GateAssetBox").Text = "BOX-01"; Control<TextBox>(admin, "GateLocationBox").Text = "North walkway";
+        Click(Control<Button>(admin, "SaveGateButton"));
+        Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
+        Click(Control<Button>(admin, "StartAddUnitButton"));
+        Require(Control<CheckBox>(admin, "UnitHasSignalColumnCheck").IsChecked == false && Control<CheckBox>(admin, "UnitHasScannerCheck").IsChecked == false, "A new plant unit assumed specific equipment.");
+        Control<TextBox>(admin, "UnitNumberBox").Text = "1"; Click(Control<Button>(admin, "SaveUnitButton"));
+        Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
+        Require(data.LoadSystems().Count == 1 && Control<ComboBox>(admin, "PilotUnitBox").Items.Count == 1, "Saved unit did not become available as the pilot.");
+        Click(Control<Button>(admin, "StartProblemButton"));
+        Require(Control<TabItem>(admin, "HelpSetupTab").IsSelected && Control<ComboBox>(admin, "HelpSectionBox").SelectedIndex == 2, "Guided problem action did not open the right editor.");
+        Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
+        Click(Control<Button>(admin, "StartOperatorButton"));
+        Require(admin.OperatorPreviewUnitId == data.LoadSystems().Single().Id, "Operator preview did not retain the pilot identity.");
+    }
+
     private static async Task AreaRenameRegression()
     {
         var fixture = NewFixture();
         var window = Track(new AdminWindow(fixture.Data)); ShowOffscreen(window);
         await WaitUntil(() => window.IsEnabled, "Setup did not finish loading.");
+        var advanced = Control<CheckBox>(window, "AdvancedSetupCheck"); advanced.IsChecked = true; advanced.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
         var tabs = Descendants<TabControl>(window).First();
         tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(tab => Equals(tab.Header, "Areas"));
         var areas = Control<ListBox>(window, "AreaList"); var name = Control<TextBox>(window, "AreaNameBox");
@@ -1448,6 +1478,7 @@ internal static class Program
         var window = Track(new AdminWindow(fixture.Data));
         ShowOffscreen(window);
         await WaitUntil(() => window.IsEnabled, "Setup did not finish loading.");
+        Control<TabItem>(window, "UnitsSetupTab").IsSelected = true;
         Control<ComboBox>(window, "GateAreaFilterBox").SelectedItem = fixture.Gate.Category;
         var gates = Control<ListBox>(window, "GateList");
         gates.SelectedItem = gates.Items.Cast<SafetyGate>().Single(gate => gate.Id == fixture.Gate.Id);
