@@ -42,15 +42,22 @@ public partial class MainWindow
         PartsRailColumn.Width = visible ? new GridLength(330) : new GridLength(0);
         if (visible) RefreshReplacementParts();
     }
+    private void ClosePartsRail_Click(object sender, RoutedEventArgs e) => SetPartsRail(false);
     private List<PartRecord> ReplacementPartsFor(SafetySystem unit) => _parts.Where(p => unit.ReplacementPartIds is { } ids ? ids.Contains(p.Id, StringComparer.OrdinalIgnoreCase) : p.AppliesTo(unit.GateId, unit.Id)).OrderBy(p => p.Description).ToList();
     private void RefreshReplacementParts()
     {
-        bool unitView = SystemsView.Visibility == Visibility.Visible && SelectedUnit is not null;
-        PartsRailTitle.Text = unitView ? "Replacement parts · " + SelectedUnit!.UnitDisplay : "Common replacement parts";
+        var unit = SelectedUnit;
+        var unitParts = unit is null ? [] : ReplacementPartsFor(unit);
+        UnitPartsButton.Content = unit is null ? "Replacement parts" : $"Replacement parts ({unitParts.Count})";
+        bool unitView = SystemsView.Visibility == Visibility.Visible && unit is not null;
+        PartsRailTitle.Text = unitView ? $"Replacement parts\n{GateFor(unit!)?.AssetDisplay} · {unit!.UnitDisplay}" : "Replacement parts";
         ConfigureUnitPartsButton.Visibility = unitView ? Visibility.Visible : Visibility.Collapsed;
-        var parts = unitView ? ReplacementPartsFor(SelectedUnit!) : _parts.OrderBy(p => p.Description).ToList();
+        ConfigureUnitPartsButton.IsEnabled = _parts.Count > 0;
+        var parts = unitView ? unitParts : _parts.OrderBy(p => p.Description).ToList();
         RailPartsList.ItemsSource = parts;
-        RailPartsEmpty.Text = parts.Count == 0 ? unitView ? "No parts chosen for this unit. Use Choose unit parts to add them." : "No parts in the shared library." : "";
+        RailPartsEmpty.Text = parts.Count > 0 ? "" : _parts.Count == 0
+            ? "Add the first part in Plant setup → Parts."
+            : "No parts assigned to this unit. Choose from the catalog.";
     }
     private async void ChooseUnitManuals_Click(object sender, RoutedEventArgs e)
     {

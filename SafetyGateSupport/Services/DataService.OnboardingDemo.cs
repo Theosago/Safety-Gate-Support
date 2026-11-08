@@ -19,9 +19,9 @@ public partial class DataService
         data.CreateBlankPlantLibrary(Path.Combine(workspace, "Library"), area);
         data.SaveSharedContent(new SharedContent
         {
-            HomeSubtitle = "Open DEMO-01 from its photo. Try the reference PDF and Common Problems, or explore PLC files, the light column and the safety scanner. Hardware operations are disabled in this example.",
+            HomeSubtitle = "Open DEMO-01 from its photo. Find its replacement label kit, open the reference PDF, or explore the saved equipment files. Hardware operations are disabled in this example.",
             ManualsIntro = "Open the fictional reference PDF for DEMO-01.",
-            PartsIntro = "The fictional example does not use live inventory.",
+            PartsIntro = "Use the item ID and image to identify the fictional replacement label kit for DEMO-01.",
             StoreroomUrl = "",
         });
 
@@ -37,6 +37,7 @@ public partial class DataService
         };
         gate.AssetFolder = AssetFileLayout.SuggestedRoot(gate);
         data.SaveGates([gate]);
+        const string partId = "demo-label-kit";
         var unit = new SafetySystem
         {
             Id = "demo-unit",
@@ -46,7 +47,7 @@ public partial class DataService
             ShowElectricalDrawings = false,
             ShowLightConfiguration = true,
             ShowScannerConfiguration = true,
-            ShowPartsBom = false,
+            ReplacementPartIds = [partId],
             ManualIds = [],
         };
 
@@ -55,6 +56,15 @@ public partial class DataService
         data.SetIdentificationPhoto(unit, ExtractDemoFile("Identification.png", sources, "DEMO-01.png"));
         data.SynchronizeLegacyFields([gate], [unit]);
         data.SaveSystems([unit]);
+        data.SaveParts([new PartRecord
+        {
+            Id = partId,
+            PartNumber = "DEMO-LABEL-01",
+            Description = "Identification label kit (demo)",
+            Notes = "Fictional replacement label and mounting clips for the DEMO-01 test bench.",
+            AppliesToUnitIds = [unit.Id],
+        }]);
+        data.SavePartPhoto(partId, ExtractDemoFile("LabelKit.png", sources, "DEMO-01 label kit.png"));
         data.AddPilotPdf(unit.Id, ExtractDemoFile("DemoReference.pdf", sources, "DEMO-01 Reference.pdf"));
         var plc = AssetFileLayout.Create(gate, "PLC");
         var column = AssetFileLayout.Create(gate, "Light Configurations");

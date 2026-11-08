@@ -24,8 +24,6 @@ public partial class MainWindow : Window
     private string _currentArea = "";
     private string _manualFilterGateId = "";
     private string _manualFilterUnitId = "";
-    private string _partFilterGateId = "";
-    private string _partFilterUnitId = "";
 
     private readonly DispatcherTimer _notesSaveTimer = new() { Interval = TimeSpan.FromMilliseconds(900) };
     private readonly DispatcherTimer _notesRefreshTimer = new() { Interval = TimeSpan.FromSeconds(4) };
@@ -60,8 +58,8 @@ public partial class MainWindow : Window
             Title = "Safety Gate Support — Fictional operator example";
             HomeHeadingText.Text = "Try the operator workflow";
             HomeSubtitleText.Visibility = Visibility.Collapsed;
-            PartsNav.Visibility = SupportLibraryNav.Visibility = Visibility.Collapsed;
-            UnitPartsButton.Visibility = Visibility.Collapsed;
+            SupportLibraryNav.Visibility = Visibility.Collapsed;
+            CloseDemoButton.Visibility = Visibility.Visible;
         }
         else if (data.IsHomePreview) Title = "Safety Gate Support — Home Preview (local data)";
         _notesSaveTimer.Tick += (_, _) => { _notesSaveTimer.Stop(); SaveSharedNotesNow(); };
@@ -171,18 +169,16 @@ public partial class MainWindow : Window
             SetupButton.Visibility = Visibility.Collapsed;
             return;
         }
-        SetupButton.Visibility = _data.IsHomePreview && _systems.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        SetupButton.Visibility = Visibility.Visible;
         if (_sharedDataReady)
         {
             ConnectionText.Text = (_data.IsHomePreview ? "● HOME PREVIEW • local data\n" : "● Connected\n") + _data.SharedRoot;
             ConnectionText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(132, 218, 193));
-            SetupButton.Content = _systems.Count == 0 ? "Set up the first unit" : "Plant setup";
         }
         else
         {
             ConnectionText.Text = "● Shared data unavailable\n" + _data.SharedRoot;
             ConnectionText.Foreground = System.Windows.Media.Brushes.LightSalmon;
-            SetupButton.Content = "Set up this plant";
         }
     }
 
@@ -214,25 +210,22 @@ public partial class MainWindow : Window
 
     private void HomeNav_Click(object sender, RoutedEventArgs e) => ShowHome();
     private void SystemsNav_Click(object sender, RoutedEventArgs e) { if (SelectedUnit is null) ShowHome(); else ShowSystems(); }
+    private void TroubleshootNav_Click(object sender, RoutedEventArgs e) { if (CloseInlineTool()) ShowTroubleshoot(); }
     private void ManualsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; _manualFilterGateId = _manualFilterUnitId = ""; ShowManuals(); RefreshManuals(); }
-    private void PartsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; _partFilterGateId = _partFilterUnitId = ""; ShowParts(); RefreshParts(); }
+    private void PartsNav_Click(object sender, RoutedEventArgs e) { if (!CloseInlineTool()) return; ShowParts(); RefreshParts(); }
 
-    private void HideAllViews() { SetPartsRail(false); _problemDetailPhotos?.Cancel(); CommonProblemView.Visibility = CommonProblemsRail.Visibility = Visibility.Collapsed; HomeShell.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = Visibility.Collapsed; }
+    private void HideAllViews() { SetPartsRail(false); _problemDetailPhotos?.Cancel(); CommonProblemView.Visibility = CommonProblemsRail.Visibility = Visibility.Collapsed; HomeShell.Visibility = SystemsView.Visibility = ManualsView.Visibility = PartsView.Visibility = TroubleshootView.Visibility = Visibility.Collapsed; }
     private void ShowHome() { HideAllViews(); HomeShell.Visibility = CommonProblemsRail.Visibility = Visibility.Visible; SetActiveNavigation(HomeNav); }
     private void ShowSystems() { HideAllViews(); SystemsView.Visibility = CommonProblemsRail.Visibility = Visibility.Visible; SetActiveNavigation(SystemsNav); if (SelectedUnit is null) EnsureSystemAreaSelected(); }
+    private void ShowTroubleshoot() { HideAllViews(); TroubleshootView.Visibility = CommonProblemsRail.Visibility = Visibility.Visible; SetActiveNavigation(TroubleshootNav); }
     private void ShowManuals() { HideAllViews(); ManualsView.Visibility = Visibility.Visible; SetActiveNavigation(ManualsNav); }
     private void ShowParts() { HideAllViews(); PartsView.Visibility = Visibility.Visible; SetActiveNavigation(PartsNav); if (SelectedPart is { } part) LoadPartPhoto(part); }
 
     private void SetActiveNavigation(Button active)
     {
-        foreach (var button in new[] { HomeNav, SystemsNav, ManualsNav, PartsNav })
+        foreach (var button in new[] { HomeNav, SystemsNav, TroubleshootNav, ManualsNav, PartsNav })
             button.Background = ReferenceEquals(button, active) ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 69, 88)) : System.Windows.Media.Brushes.Transparent;
     }
-    private void UnitFiles_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedGate is { } gate && SelectedUnit is { } unit) new UnitFilesWindow(_data, gate, unit, _resources) { Owner = this }.ShowDialog();
-    }
-
     private void EnsureSystemAreaSelected()
     {
         if (_categories.Count == 0) return;
@@ -248,7 +241,8 @@ public partial class MainWindow : Window
     private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var needed = ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt;
-        if (e.Key != Key.A || (Keyboard.Modifiers & needed) != needed) return;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key != Key.A || (Keyboard.Modifiers & needed) != needed) return;
         e.Handled = true;
         if (_loadingData) return;
         await OpenSetupAsync();
@@ -276,6 +270,7 @@ public partial class MainWindow : Window
     }
 
     private async void SetupSharedData_Click(object sender, RoutedEventArgs e) => await OpenSetupAsync();
+    private void CloseDemo_Click(object sender, RoutedEventArgs e) => Close();
 
     private void GlobalSearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
@@ -419,7 +414,7 @@ public partial class MainWindow : Window
                 var u = _systems.FirstOrDefault(x => x.Id == r.SystemId); if (u is not null) NavigateToSystem(u, r.MatchSource == "SharedNotes" ? r.MatchText : null); break;
             case "File": if (File.Exists(r.Target)) FileLauncherService.Open(r.Target); break;
             case "Help": var h = _help.FirstOrDefault(x => x.Title == r.Title && x.Body == r.Body); if (h is not null) { if (h.Section.Equals("Common Problems", StringComparison.OrdinalIgnoreCase)) OpenCommonProblem(h); else new HelpWindow(h, _data) { Owner = this }.ShowDialog(); } break;
-            case "Part": var p = _parts.FirstOrDefault(x => x.Id == r.Target); _partFilterGateId = _partFilterUnitId = ""; ShowParts(); PartSearchBox.Text = p?.PartNumber ?? p?.Description ?? ""; PartList.SelectedItem = p; break;
+            case "Part": var p = _parts.FirstOrDefault(x => x.Id == r.Target); ShowParts(); PartSearchBox.Text = p?.PartNumber ?? p?.Description ?? ""; PartList.SelectedItem = p; break;
             case "Manual": var m = _manuals.FirstOrDefault(x => x.Id == r.Target); if (m is not null) { var path = _data.Resolve(m.FilePath); if (File.Exists(path)) FileLauncherService.Open(path); } break;
             case "Resource": var resource = _resources.FirstOrDefault(x => x.Id == r.Target); if (resource is not null) NavigateToResource(resource); break;
         }
@@ -486,14 +481,11 @@ public partial class MainWindow : Window
         SaveSharedNotesNow();
         var gate = GateFor(unit); if (gate is null) { ClearUnit(); return; }
         NoUnitPanel.Visibility = Visibility.Collapsed; UnitDetailPanel.Visibility = Visibility.Visible;
-        UnitTitleText.Text = $"{gate.Display} — {unit.UnitDisplay}";
+        string asset = gate.AssetKey == "Unassigned" ? gate.Display : gate.AssetDisplay;
+        UnitTitleText.Text = $"{asset} · {unit.UnitDisplay}";
         UnitAreaText.Text = string.Join(" • ", new[] { gate.Category, gate.Location }.Where(s => !string.IsNullOrWhiteSpace(s)));
-        AssetInfoText.Text = gate.AssetKey == "Unassigned" ? $"Safety Gate: {gate.ManufacturerDisplay}" : $"Asset: {gate.AssetKey}  •  {gate.ManufacturerDisplay}";
-        UnitInfoText.Text = unit.UnitDisplay;
-        TypeInfoText.Text = string.IsNullOrWhiteSpace(gate.EquipmentType) ? "" : "Type: " + gate.EquipmentType;
-        ModelInfoText.Text = string.IsNullOrWhiteSpace(gate.Model) ? "" : "Model: " + gate.Model;
-        LocationInfoText.Text = string.IsNullOrWhiteSpace(gate.Location) ? "" : "Location: " + gate.Location;
-        RefreshReplacementParts(); LoadPhoto(unit); LoadSharedNotes(unit); BuildResourceButtons(gate, unit); LoadDrawings(gate, unit);
+        UnitPartsButton.IsEnabled = true;
+        RefreshReplacementParts(); LoadPhoto(unit); LoadSharedNotes(unit); UpdateEquipmentActions(unit); LoadDrawings(gate, unit);
     }
 
     private void ClearUnit()
@@ -502,12 +494,23 @@ public partial class MainWindow : Window
         ClearDrawings();
         UnitTitleText.Text = "Select a unit"; UnitAreaText.Text = "";
         SaveSharedNotesNow(); _notesSystem = null; _sharedNotesDirty = false; _loadingSharedNotes = true; SharedNotesBox.Text = ""; _loadingSharedNotes = false;
-        NoUnitPanel.Visibility = Visibility.Visible; UnitDetailPanel.Visibility = Visibility.Collapsed; GateImage.Source = null; SystemResourcePanel.Children.Clear();
+        NoUnitPanel.Visibility = Visibility.Visible; UnitDetailPanel.Visibility = Visibility.Collapsed; GateImage.Source = null;
+        UnitPartsButton.IsEnabled = false;
+        UnitPartsButton.Content = "Replacement parts";
     }
 
-    private void BuildResourceButtons(SafetyGate gate, SafetySystem unit)
+    private void UnitOverview_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        SystemResourcePanel.Children.Clear();
+        if (!e.WidthChanged) return;
+        bool stack = e.NewSize.Width < 620;
+        UnitCardGap.Width = new GridLength(stack ? 0 : 16);
+        UnitDrawingColumn.Width = stack ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        Grid.SetRow(UnitDrawingCard, stack ? 1 : 0);
+        Grid.SetColumn(UnitDrawingCard, stack ? 0 : 2);
+        UnitDrawingCard.Margin = stack ? new Thickness(0, 12, 0, 0) : new Thickness(0);
+    }
+    private void UpdateEquipmentActions(SafetySystem unit)
+    {
         LightColumnButton.Visibility = unit.ShowLightConfiguration ? Visibility.Visible : Visibility.Collapsed;
         ScannerButton.Visibility = unit.ShowScannerConfiguration ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -612,37 +615,25 @@ public partial class MainWindow : Window
         }
     }
 
-    private void HomeTroubleshoot_Click(object sender, RoutedEventArgs e) => BeginTask("unknown");
-    private void Symptom_Click(object sender, RoutedEventArgs e) => BeginTask((string)((Button)sender).Tag);
     private void FindFiles_Click(object sender, RoutedEventArgs e) => ShowInlineResource("Electrical Drawings");
 
-    private void BeginTask(string task, bool files = false)
+    private void StartGuidedTroubleshooting_Click(object sender, RoutedEventArgs e)
     {
-        if (!_sharedDataReady) { MessageBox.Show("Set up or reconnect the shared data first.", "Shared data unavailable", MessageBoxButton.OK, MessageBoxImage.Information); return; }
-        if (SelectedUnit is not { } unit || SelectedGate is not { } gate) { ShowHome(); UnitSearchBox.Focus(); return; }
-        if (files)
+        if (_systems.Count == 0)
         {
-            new UnitFilesWindow(_data, gate, unit, _resources, task) { Owner = this }.ShowDialog();
-            if (!_isClosed && SelectedUnit?.Id == unit.Id) LoadDrawings(gate, unit);
+            MessageBox.Show(this, "Connect a plant library with units or add one in Plant setup.", "No units available", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
         }
-        else
-        {
-            string flow = task switch { "light" => "builtin-light-v1", "actuator" => "builtin-actuator-v1", _ => "builtin-triage-v7" };
-            string? node = task is "gate-open" or "gate-close" or "scanner" ? task : null;
-            new TroubleshootWindow(_data, gate, unit, _resources, _flows, flow, node) { Owner = this }.ShowDialog();
-        }
+
+        var picker = new TroubleshootPickerWindow(_data, _gates, _systems, _categories) { Owner = this };
+        if (picker.ShowDialog() == true && picker.ChosenSystem is { } unit && GateFor(unit) is { } gate)
+            new TroubleshootWindow(_data, gate, unit, _resources, _flows, "builtin-triage-v7") { Owner = this }.ShowDialog();
     }
-    private void TroubleshootSimple_Click(object sender, RoutedEventArgs e) => BeginTask("unknown");
     private void LightColumn_Click(object sender, RoutedEventArgs e) => ShowInlineResource("Light Configurations");
     private void Scanner_Click(object sender, RoutedEventArgs e) => ShowInlineResource("Scanner Configurations");
     private void Plc_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedGate is { } gate && SelectedUnit is { } unit) new PlcWindow(_data, gate, unit) { Owner = this }.ShowDialog();
-    }
-
-    private void TroubleshootSystem_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedGate is { } gate && SelectedUnit is { } unit) new TroubleshootWindow(_data, gate, unit, _resources, _flows) { Owner = this }.ShowDialog();
     }
 
     private void RefreshManuals()
@@ -664,11 +655,13 @@ public partial class MainWindow : Window
     private void RefreshParts()
     {
         if (PartList is null) return;
-        string? selected = SelectedPart?.Id; var q = PartSearchBox?.Text.Trim() ?? ""; IEnumerable<PartRecord> source = _parts;
-        if (!string.IsNullOrWhiteSpace(_partFilterGateId) && !string.IsNullOrWhiteSpace(_partFilterUnitId)) source = source.Where(p => p.AppliesTo(_partFilterGateId, _partFilterUnitId));
-        var items = source.Where(p => string.IsNullOrWhiteSpace(q) || Contains($"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} {p.LocationValue} {p.SiteValue}", q)).OrderBy(p => p.Description).ThenBy(p => p.LocationValue).ThenBy(p => p.PartNumber).ToList();
+        string? selected = SelectedPart?.Id; var q = PartSearchBox?.Text.Trim() ?? "";
+        var items = _parts.Where(p => string.IsNullOrWhiteSpace(q) || Contains($"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} {p.LocationValue} {p.SiteValue}", q)).OrderBy(p => p.Description).ThenBy(p => p.LocationValue).ThenBy(p => p.PartNumber).ToList();
         PartList.ItemsSource = items; PartList.SelectedItem = items.FirstOrDefault(p => p.Id == selected) ?? items.FirstOrDefault();
-        PartsIntroText.Text = string.IsNullOrWhiteSpace(_partFilterGateId) ? _content.PartsIntro : "Parts linked to this unit. Choose Parts in the sidebar to see all parts.";
+        PartCatalogEmpty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        PartCatalogEmpty.Text = !_sharedDataReady ? "Connect a plant library in Plant setup to see its parts."
+            : _parts.Count == 0 ? "No parts saved. Add a part in Plant setup → Parts."
+            : "No matching parts. Try a shorter name or search by Item ID.";
     }
     private void PartSearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshParts();
     private void PartList_SelectionChanged(object sender, SelectionChangedEventArgs e)

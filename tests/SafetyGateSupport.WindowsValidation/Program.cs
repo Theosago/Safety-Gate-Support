@@ -104,7 +104,7 @@ internal static class Program
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Guided Setup assigns new units to the chosen asset and tracks each pilot's own PDF", GuidedPlantSetup),
-            ("The fictional pilot shows documentation and equipment examples with USB disabled", FictionalPilotDemo),
+            ("The fictional pilot shows a linked part, documents and equipment examples without live stockroom or USB", FictionalPilotDemo),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Common Problems shows shared photos and opens fixes; Setup edits preserve photos", CommonProblemWorkflow),
@@ -126,7 +126,7 @@ internal static class Program
             ("Scanned drawings use bundled local OCR to detect upside-down and sideways reading direction", ScannedDrawingOrientation),
             ("Bundled PDF engine renders landscape and portrait pages without editing the source", NativePdfRendering),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
-            ("Unit-first home opens the selected unit’s tools without a second picker", V7HomeTasks),
+            ("Sidebar troubleshooting starts from the picker and opens triage for the confirmed unit", V7HomeTasks),
             ("Unit photo gallery filters, bounds decodes and rejects stale completions", GalleryFilteringAndPhotos),
             ("Large photo viewer preserves landscape and portrait images and original files", WholePhotoViewer),
             ("V7 symptom routes start the selected guide and retain site edits", V7TroubleshootingRoutes),
@@ -287,7 +287,7 @@ internal static class Program
         await WaitUntil(() => window.IsEnabled && Control<ComboBox>(window, "AreaBox").Items.Count == 4, "Home preview failed to initialize local data.");
         Require(window.Title.Contains("Home Preview") && Control<TextBlock>(window, "ConnectionText").Text.Contains("HOME PREVIEW"), "Preview profile is not visibly identified.");
         Require(Control<TextBlock>(window, "HomeSubtitleText").Text.Contains("Asset DEMO"), "Home preview lacks a starting point.");
-        Require(!Control<Button>(window, "SetupButton").IsVisible, "Preview still requires shared-drive setup.");
+        Require(Control<Button>(window, "SetupButton").IsVisible, "Home preview does not offer the Plant setup entry point.");
         Require(data.LoadSystems().Any(u => u.Id == "home-preview-unit"), "Demo unit missing after actual window startup.");
     }
 
@@ -370,51 +370,56 @@ internal static class Program
         Control<ScrollViewer>(main, "HomeView").ScrollToBottom(); await DispatcherSettled();
         Require(search.TranslatePoint(new Point(0, 0), main) == before && search.IsVisible, "Gallery scrolling moved or hid search.");
         Control<ScrollViewer>(main, "HomeView").ScrollToTop();
-        Require(!Control<Button>(main, "TroubleshootButton").IsVisible, "Troubleshooting must follow unit selection.");
+        var troubleshoot = Control<Button>(main, "TroubleshootNav");
+        Require(troubleshoot.IsVisible, "Troubleshooting is unavailable from the main sidebar.");
         await SelectGalleryUnit(main, fixture.BlueUnit);
         await WaitUntil(() => HasColor(Control<Image>(main, "GateImage").Source, Colors.Blue), "Selected unit photo failed to load.");
         main.Width = 1000; main.Height = 680; main.UpdateLayout();
         var hero = Control<Image>(main, "GateImage");
         Require(Control<Button>(main, "EnlargePhotoButton").ActualWidth > 200 && Math.Max(hero.ActualWidth, hero.ActualHeight) >= 240 && hero.Stretch == Stretch.Uniform, "Workspace photo is cropped or cannot be enlarged.");
-        foreach (string task in new[] { "TroubleshootButton" })
-        {
-            Exception? failure = null;
-            bool completed = false;
-            var deadline = Stopwatch.StartNew();
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
-            timer.Tick += (_, _) =>
-            {
-                try
-                {
-                    if (deadline.Elapsed > TimeSpan.FromSeconds(12)) throw new InvalidOperationException("Unit task did not open its destination.");
-                    Require(!Application.Current.Windows.OfType<TroubleshootPickerWindow>().Any(), "The selected unit was requested again.");
-                    if (task == "TroubleshootButton" && Application.Current.Windows.OfType<TroubleshootWindow>().SingleOrDefault() is { } guide)
-                    {
-                        Track(guide);
-                        Equal("What can you observe?", Control<TextBlock>(guide, "StepPromptText").Text, "Troubleshoot did not open the problem chooser");
-                        completed = true; timer.Stop(); guide.Close();
-                    }
-                    else if (task == "FilesButton" && Application.Current.Windows.OfType<UnitFilesWindow>().SingleOrDefault() is { } files)
-                    {
-                        Track(files);
-                        Require(Control<TextBlock>(files, "UnitText").Text.Contains(fixture.BlueUnit.UnitDisplay), "File shortcut lost the selected unit.");
-                        completed = true; timer.Stop(); files.Close();
-                    }
-                }
-                catch (Exception error)
-                {
-                    failure = error; timer.Stop();
-                    foreach (var window in Application.Current.Windows.Cast<Window>().Where(w => !ReferenceEquals(w, main)).ToArray()) window.Close();
-                }
-            };
-            timer.Start(); try { Click(Control<Button>(main, task)); } finally { timer.Stop(); }
-            if (failure is not null) throw failure;
-            Require(completed, "Unit task ended without opening its destination.");
-        }
+        Click(troubleshoot);
+        Require(Control<ScrollViewer>(main, "TroubleshootView").IsVisible &&
+                Control<FrameworkElement>(main, "SystemsView").Visibility == Visibility.Collapsed,
+            "The sidebar did not open the troubleshooting starting point.");
+        var guided = CheckGuidedRouteAsync();
+        Click(Control<Button>(main, "StartGuidedTroubleshootingButton"));
+        await guided;
         Click(Control<Button>(main, "HomeNav"));
         Click(Control<Button>(main, "SystemsNav"));
         Require(Control<TextBlock>(main, "UnitTitleText").Text.Contains(fixture.BlueUnit.UnitDisplay) && Control<Panel>(main, "UnitDetailPanel").IsVisible,
             "Returning to Selected unit discarded its context.");
+
+        async Task CheckGuidedRouteAsync()
+        {
+            TroubleshootPickerWindow? picker = null;
+            TroubleshootWindow? guide = null;
+            try
+            {
+                await WaitUntil(() => (picker = Application.Current.Windows.OfType<TroubleshootPickerWindow>()
+                        .SingleOrDefault(window => window.Owner == main))?.IsVisible == true,
+                    "The guided troubleshooting action did not open the unit picker.");
+                var assets = Control<ListBox>(picker!, "AssetList");
+                assets.SelectedItem = assets.Items.Cast<SafetyGate>().Single(gate => gate.Id == fixture.Gate.Id);
+                var units = Control<ListBox>(picker!, "UnitList");
+                units.SelectedItem = units.Items.Cast<SafetySystem>().Single(unit => unit.Id == fixture.RedUnit.Id);
+                var start = Control<Button>(picker!, "StartButton");
+                await WaitUntil(() => start.IsEnabled && HasColor(Control<Image>(picker!, "PreviewImage").Source, Colors.Red),
+                    "The picker did not show the selected unit's identification photo.");
+                Click(start);
+                await WaitUntil(() => (guide = Application.Current.Windows.OfType<TroubleshootWindow>()
+                        .SingleOrDefault(window => window.Owner == main))?.IsVisible == true,
+                    "The picker did not open the guided troubleshooting window.");
+                Equal("What can you observe?", Control<TextBlock>(guide!, "StepPromptText").Text, "Troubleshooting did not open triage");
+                string context = Control<TextBlock>(guide!, "SystemText").Text;
+                Require(context.Contains(fixture.Gate.AssetDisplay) && context.Contains(fixture.RedUnit.UnitDisplay),
+                    "The guided flow did not use the unit confirmed in the picker.");
+            }
+            finally
+            {
+                guide?.Close();
+                if (picker?.IsVisible == true) picker.Close();
+            }
+        }
     }
 
     private static async Task SelectGalleryUnit(MainWindow window, SafetySystem unit)
@@ -535,8 +540,11 @@ internal static class Program
         var own = units.Single(u => u.Id == fixture.BlueUnit.Id); own.ShowLightConfiguration = false; own.ShowScannerConfiguration = false; fixture.Data.SaveSystems(units);
         var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
         Require(Control<Button>(main, "ScannerButton").Visibility == Visibility.Collapsed && Control<Button>(main, "LightColumnButton").Visibility == Visibility.Collapsed, "Absent equipment actions were left visible.");
-        Require(Control<Button>(main, "PartManualsButton").Content.Equals("Manuals / documents") && Control<Button>(main, "UnitPartsButton").Content.Equals("Parts"), "Canonical unit actions are missing.");
-        Require(Control<Panel>(main, "SystemResourcePanel").Visibility == Visibility.Collapsed, "Duplicate legacy resource buttons remain on the unit page.");
+        var parts = Control<Button>(main, "UnitPartsButton");
+        Require(Control<Button>(main, "PartManualsButton").Content.Equals("Manuals / documents") &&
+                parts.IsEnabled && parts.Content is string label && label.StartsWith("Replacement parts (", StringComparison.Ordinal),
+            "The unit did not show Manuals and a replacement parts count.");
+        Require(main.FindName("SystemResourcePanel") is null, "Duplicate legacy resource buttons remain on the unit page.");
         var admin = Track(new AdminWindow(fixture.Data)); ShowOffscreen(admin); await WaitUntil(() => admin.IsEnabled, "Setup did not load.");
         Control<ComboBox>(admin, "GateAreaFilterBox").SelectedItem = fixture.Gate.Category;
         var gates = Control<ListBox>(admin, "GateList"); gates.SelectedItem = gates.Items.Cast<SafetyGate>().Single(g => g.Id == fixture.Gate.Id);
@@ -650,7 +658,7 @@ internal static class Program
         Require(Control<FrameworkElement>(main, "CommonProblemsRail").Width == 44 && Control<Border>(main, "CommonProblemsBody").Visibility == Visibility.Collapsed, "Collapse did not reclaim panel width.");
         await SelectGalleryUnit(main, fixture.RedUnit);
         Require(Control<FrameworkElement>(main, "CommonProblemsRail").IsVisible, "Common Problems disappeared on unit selection.");
-        Click(Control<Button>(main, "CommonProblemsToggle")); main.UpdateLayout();
+        Click(Control<Button>(main, "CommonProblemsToggle")); await DispatcherSettled(); main.UpdateLayout();
         var photoButton = Control<Button>(main, "EnlargePhotoButton"); var actions = Control<WrapPanel>(main, "UnitActionsPanel"); var notes = Control<GroupBox>(main, "SharedNotesPanel");
         Require(actions.TranslatePoint(new Point(), main).Y >= photoButton.TranslatePoint(new Point(0, photoButton.ActualHeight), main).Y && actions.TranslatePoint(new Point(), main).Y < notes.TranslatePoint(new Point(), main).Y, "Unit actions are not between photo and notes.");
         await WaitUntil(() => Descendants<Button>(list).Any(b => b.Tag is HelpItem h && h.Id == topic.Id), "Problem card unavailable on unit page.");
@@ -819,7 +827,7 @@ internal static class Program
         Require(((SolidColorBrush)main.Background).Color != original, "Dark mode did not change window surfaces.");
         Require(new DataService(false, Path.GetDirectoryName(fixture.Data.DrawingOrientationCache)!).Settings.ThemeMode == "Dark", "Theme choice did not persist.");
         Control<ComboBox>(main, "ThemeBox").SelectedIndex = 0;
-        Require(Control<Button>(main, "ChangeUnitButton").Content.Equals("← Back to units"), "Return action remains unclear.");
+        Require(Control<Button>(main, "ChangeUnitButton").Content.Equals("← All units"), "Return action remains unclear.");
         foreach (string action in new[] { "FilesButton", "ScannerButton", "LightColumnButton" })
         {
             Click(Control<Button>(main, action));
@@ -913,7 +921,7 @@ internal static class Program
         var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main window did not load.");
         await SelectGalleryUnit(main, fixture.BlueUnit); main.UpdateLayout();
         var action = Control<Button>(main, "PlcButton");
-        Require(!Control<Expander>(main, "UnitDetailsExpander").IsExpanded && action.IsVisible &&
+        Require(main.FindName("UnitDetailsExpander") is null && action.IsVisible &&
                 Control<WrapPanel>(main, "UnitActionsPanel").Children.Contains(action), "The PLC action is not available in the unit's primary actions.");
         Exception? failure = null; bool visited = false;
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
@@ -1337,7 +1345,8 @@ internal static class Program
         var photo = Control<Image>(window, "GateImage");
         await WaitUntil(() => HasColor(photo.Source, Colors.Blue), "Main window did not keep the final selected unit's blue photo.");
         Require(Control<TextBlock>(window, "UnitTitleText").Text.Contains(fixture.BlueUnit.UnitDisplay, StringComparison.Ordinal), "Unit title does not match the final selection.");
-        Require(Control<Button>(window, "FilesButton").Content.Equals("Electrical Schematics"), "Selected unit drawing action was not populated.");
+        var drawings = Control<Button>(window, "FilesButton");
+        Require(drawings.IsVisible && drawings.Content.Equals("Drawing files"), "The selected unit did not show its drawing files action.");
         units.SelectedIndex = 0;
         units.SelectedItem = null;
         await DispatcherSettled();
@@ -1521,8 +1530,12 @@ internal static class Program
         var reference = demo.LoadManualRecords().Single();
         var problem = demo.LoadHelpItems().Single();
         Require(unit.ManualIds?.Contains(reference.Id) == true && problem.Visible && problem.Photos.Count == 1 &&
-                unit.ShowLightConfiguration && unit.ShowScannerConfiguration && demo.LoadParts().Count == 0,
-            "The fictional example did not assign its PDF, problem and equipment examples, or included stockroom data.");
+                unit.ShowLightConfiguration && unit.ShowScannerConfiguration,
+            "The fictional example did not assign its PDF, problem and equipment examples.");
+        var kit = demo.LoadParts().Single();
+        Require(kit.PartNumber == "DEMO-LABEL-01" && unit.ReplacementPartIds?.Contains(kit.Id) == true &&
+                kit.QuantityValue is null && string.IsNullOrEmpty(kit.LocationValue) && File.Exists(demo.Resolve(kit.PhotoPath)),
+            "The demo did not assign the pictured identification label kit without inventory data.");
         var plc = demo.LoadResources().Single(resource => resource.Id == PlcWindow.FilesFor(gate).Id);
         var plcFiles = demo.GetResourceFiles(plc.ForUnit(unit.Id), gate);
         Require(plcFiles.Select(Path.GetFileName).SequenceEqual(new[] { "DEMO ONLY - PLC code listing.txt" }),
@@ -1543,6 +1556,25 @@ internal static class Program
             var button = Control<Button>(main, name);
             return button.IsVisible && actions.Children.Contains(button);
         }), "The fictional unit did not show PLC, light column and scanner in its primary actions.");
+        var partsNav = Control<Button>(main, "PartsNav");
+        var partsButton = Control<Button>(main, "UnitPartsButton");
+        Require(partsNav.IsVisible && partsButton.IsVisible && partsButton.Content.Equals("Replacement parts (1)"),
+            "The fictional unit did not show its replacement parts count and catalog link.");
+        Click(partsButton);
+        var rail = Control<ItemsControl>(main, "RailPartsList");
+        Require(Control<Border>(main, "PartsRail").IsVisible && rail.Items.Cast<PartRecord>().Single().Id == kit.Id &&
+                Control<FrameworkElement>(main, "RailStockroomControls").Visibility == Visibility.Collapsed &&
+                Control<TextBlock>(main, "RailStockStatus").Text.Contains("unavailable"),
+            "The fictional parts rail did not show the assigned label kit without live stockroom controls.");
+        await WaitUntil(() => Descendants<Image>(rail).Any(image => image.Source is not null),
+            "The fictional label kit did not show its picture in the unit rail.");
+        Click(partsNav);
+        Require(Control<Grid>(main, "PartsView").IsVisible && Control<ListBox>(main, "PartList").Items.Cast<PartRecord>().Single().Id == kit.Id &&
+                Control<FrameworkElement>(main, "CatalogStockroomSelector").Visibility == Visibility.Collapsed &&
+                Control<FrameworkElement>(main, "CatalogStockroomActions").Visibility == Visibility.Collapsed &&
+                Control<TextBlock>(main, "PartStockroomStatusText").Text.Contains("unavailable"),
+            "The fictional parts catalog did not show the label kit without live stockroom controls.");
+        Click(Control<Button>(main, "SystemsNav"));
         Click(Control<Button>(main, "PartManualsButton"));
         Require(Control<Grid>(main, "ManualsView").IsVisible && Control<ListBox>(main, "ManualList").Items.Count == 1,
             "The fictional unit's PDF was not visible under Manuals / documents.");

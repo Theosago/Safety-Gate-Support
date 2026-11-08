@@ -54,7 +54,8 @@ public partial class MainWindow
     {
         if (sender is Button { Tag: HelpItem item }) OpenCommonProblem(item);
     }
-    private bool _commonProblemsExpanded = true, _problemReturnToUnit;
+    private bool _commonProblemsExpanded = true;
+    private FrameworkElement? _problemOrigin;
     private CancellationTokenSource? _problemDetailPhotos;
     public sealed class ProblemPhoto : INotifyPropertyChanged
     {
@@ -79,7 +80,7 @@ public partial class MainWindow
     private void OpenCommonProblem(HelpItem item)
     {
         if (!CloseInlineTool()) return;
-        _problemReturnToUnit = SystemsView.Visibility == Visibility.Visible;
+        _problemOrigin = SystemsView.IsVisible ? SystemsView : TroubleshootView.IsVisible ? TroubleshootView : HomeShell;
         SaveSharedNotesNow(); HideAllViews();
         CommonProblemView.Visibility = Visibility.Visible; CommonProblemTitle.Text = item.Title; CommonProblemInstructions.Text = item.Body;
         CommonProblemScroll.ScrollToTop();
@@ -107,5 +108,9 @@ public partial class MainWindow
         finally { if (ReferenceEquals(_problemDetailPhotos, cancel)) _problemDetailPhotos = null; cancel.Dispose(); }
     }
     private void CommonProblemBack_Click(object sender, RoutedEventArgs e)
-    { if (_problemReturnToUnit && SelectedUnit is not null) ShowSystems(); else ShowHome(); }
+    {
+        if (_problemOrigin == SystemsView && SelectedUnit is not null) ShowSystems();
+        else if (_problemOrigin == TroubleshootView) ShowTroubleshoot();
+        else ShowHome();
+    }
 }

@@ -9,6 +9,7 @@ namespace SafetyGateSupport;
 
 public partial class MainWindow
 {
+    private const string DemoStockroomMessage = "Live stockroom access is unavailable in the fictional example.";
     private readonly Func<string, CancellationToken, Task<StockroomService.Snapshot>> _stockroomReader;
     private StockroomService.Snapshot? _stockroomSnapshot;
     private CancellationTokenSource? _stockroomRefresh, _partPhotoLoad;
@@ -18,6 +19,15 @@ public partial class MainWindow
     private StockroomPlant? SelectedStockroomPlant => StockroomPlantBox.SelectedItem as StockroomPlant;
     private void InitializeStockroomPlants()
     {
+        if (_data.IsOnboardingDemo)
+        {
+            RailStockroomControls.Visibility = Visibility.Collapsed;
+            CatalogStockroomSelector.Visibility = Visibility.Collapsed;
+            CatalogStockroomActions.Visibility = Visibility.Collapsed;
+            UpdatePartQuantity();
+            return;
+        }
+
         RailPlantBox.ItemsSource = StockroomPlant.All;
         StockroomPlantBox.ItemsSource = StockroomPlant.All;
         StockroomPlantBox.SelectedItem = StockroomPlant.Find(_data.Settings.StockroomPlantId);
@@ -25,7 +35,7 @@ public partial class MainWindow
     }
     private async void StockroomPlant_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_data is null) return;
+        if (_data is null || _data.IsOnboardingDemo) return;
         _stockroomRefresh?.Cancel(); _stockroomRefresh = null;
         _stockroomSnapshot = null; _stockroomRequestedUrl = "";
         var plant = SelectedStockroomPlant;
@@ -72,10 +82,16 @@ public partial class MainWindow
         var plant = SelectedStockroomPlant;
         var p = SelectedPart; var row = p is null || _stockroomSnapshot is null ? null : StockroomService.Find(_stockroomSnapshot, p, plantScoped: true);
         PartCurrentQuantityText.Text = row is null ? "Current quantity unavailable" : "Current quantity: " + PartRecord.FormatQuantity(row.Quantity);
-        PartStockroomStatusText.Text = row is not null ? $"{plant?.Name} • {row.QuantityLabel} • bin: {(row.Location.Length > 0 ? row.Location : "not provided")} • checked {_stockroomSnapshot!.CheckedUtc.LocalDateTime:g}" : _stockroomSnapshot is { QuantitiesConfirmed: true, Rows.Count: > 0 } && p is not null ? $"{plant?.Name}: no unique stockroom quantity matched this stock number." : plant is null ? "Choose a plant above. Reported quantities and locations are the original supplied snapshot, not current inventory for this plant." : _stockroomMessage;
-        StockroomPlantHint.Text = plant is null ? "Choose a plant for current stock levels" : plant.Url + " • saved on this PC";
         foreach (var part in _parts) { var live = _stockroomSnapshot is null ? null : StockroomService.Find(_stockroomSnapshot, part, plantScoped: true); part.SetInventory(live?.Quantity, live?.Location ?? ""); }
         PartAvailableText.Text = p?.AvailableDisplay ?? "Available: unknown"; PartAvailableText.Foreground = (Brush)new BrushConverter().ConvertFromString(p?.AvailableColor ?? "#617585")!;
+        if (_data.IsOnboardingDemo)
+        {
+            PartStockroomStatusText.Text = RailStockStatus.Text = DemoStockroomMessage;
+            StoreroomResultText.Text = "";
+            return;
+        }
+        PartStockroomStatusText.Text = row is not null ? $"{plant?.Name} • {row.QuantityLabel} • bin: {(row.Location.Length > 0 ? row.Location : "not provided")} • checked {_stockroomSnapshot!.CheckedUtc.LocalDateTime:g}" : _stockroomSnapshot is { QuantitiesConfirmed: true, Rows.Count: > 0 } && p is not null ? $"{plant?.Name}: no unique stockroom quantity matched this stock number." : plant is null ? "Choose a plant above. Reported quantities and locations are the original supplied snapshot, not current inventory for this plant." : _stockroomMessage;
+        StockroomPlantHint.Text = plant is null ? "Choose a plant for current stock levels" : plant.Url + " • saved on this PC";
         RailStockStatus.Text = plant is null ? "Select your plant to check live availability. Supplied quantities are snapshots only." : _stockroomMessage + " Updates every 2 minutes while open.";
         StoreroomResultText.Text = plant is null ? "Choose a stockroom plant. No plant has been checked." : _stockroomMessage;
     }
