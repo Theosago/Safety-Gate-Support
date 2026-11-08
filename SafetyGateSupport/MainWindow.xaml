@@ -33,7 +33,7 @@
     <StackPanel Grid.Row="2" Margin="16,10,12,18"><TextBlock Text="Appearance" Foreground="{DynamicResource ThemeForegroundAEC4D3}"/><ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" Margin="0,6,0,12"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Plant setup" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.4.3" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.4.4" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -144,8 +144,9 @@
 
       <WrapPanel x:Name="UnitActionsPanel" Margin="0,0,0,12"><Button x:Name="TroubleshootButton" Content="Troubleshoot" Click="TroubleshootSimple_Click" Style="{StaticResource PrimaryButton}" MinHeight="38" HorizontalContentAlignment="Left"/>
 <Button x:Name="FilesButton" Content="Electrical Schematics" Tag="drawing" Click="FindFiles_Click" MinHeight="38" HorizontalContentAlignment="Left"/>
-<Button x:Name="LightColumnButton" Content="Signal Column configuration" Click="LightColumn_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Read, compare or upload this unit’s approved Siemens light configuration"/>
-<Button x:Name="ScannerButton" Content="Safety Scanner configuration" Click="Scanner_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Assigned scanner configuration files and available USB diagnostics"/>
+<Button x:Name="LightColumnButton" Content="Light / signal column" Click="LightColumn_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Open this unit’s assigned Siemens configurations and column tools"/>
+<Button x:Name="ScannerButton" Content="Safety scanner" Click="Scanner_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Open this unit’s assigned scanner files and read-only USB diagnostics"/>
+<Button x:Name="PlcButton" Content="PLC files" Click="Plc_Click" MinHeight="38" HorizontalContentAlignment="Left" ToolTip="Open saved PLC code, backups and connection details for this asset"/>
 <Button x:Name="PartManualsButton" Content="Manuals / documents" Click="UnitManuals_Click" MinHeight="38"/><Button x:Name="UnitPartsButton" Content="Parts" Click="UnitParts_Click" MinHeight="38"/></WrapPanel>
 <GroupBox x:Name="SharedNotesPanel" Header="Shared notes" Margin="0,10,0,0"><StackPanel><TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/><TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12" Margin="2,6,0,0"/></StackPanel></GroupBox></StackPanel>
       </Grid>
@@ -155,7 +156,7 @@
         <TextBlock x:Name="TypeInfoText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground536E81}"/>
         <TextBlock x:Name="ModelInfoText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground536E81}" Margin="0,4"/>
         <TextBlock x:Name="LocationInfoText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground536E81}"/>
-<Button x:Name="PlcButton" Content="PLC files and connection details" Click="Plc_Click" HorizontalAlignment="Left" Margin="0,10"/><WrapPanel x:Name="SystemResourcePanel" Visibility="Collapsed"/></StackPanel></Expander>
+<WrapPanel x:Name="SystemResourcePanel" Visibility="Collapsed"/></StackPanel></Expander>
      </StackPanel>
      <Expander Visibility="Collapsed" Header="Browse by asset and unit list" Margin="0,20,0,8"><StackPanel>
       <Grid Margin="0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="AreaBox" SelectionChanged="AreaBox_SelectionChanged"/><TextBox x:Name="SystemSearchBox" Grid.Column="1" TextChanged="SystemSearchBox_TextChanged" Margin="10,0,0,0" ToolTip="Search within this area"/></Grid>

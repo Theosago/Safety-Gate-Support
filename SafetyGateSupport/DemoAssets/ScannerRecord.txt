@@ -1,0 +1,9 @@
+DEMO-01 | Safety scanner configuration record
+Fictional example for file browsing and diagnostics practice.
+
+Device family: Hokuyo UAM
+Asset: DEMO-01 / Unit 1
+Document type: Configuration record
+
+This record contains no field geometry and cannot be loaded onto a scanner.
+Open USB diagnostics in the demo to try the display-code lookup.

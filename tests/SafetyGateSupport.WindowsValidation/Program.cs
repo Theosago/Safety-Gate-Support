@@ -104,7 +104,7 @@ internal static class Program
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
             ("Troubleshooting picker rapid selection and missing-photo states stay correct", PickerPhotoSelection),
             ("Guided Setup assigns new units to the chosen asset and tracks each pilot's own PDF", GuidedPlantSetup),
-            ("The fictional pilot opens its photo, PDF and problem in operator view without touching the plant library", FictionalPilotDemo),
+            ("The fictional pilot shows documentation and equipment examples with USB disabled", FictionalPilotDemo),
             ("Setup preview is visible without scrolling and rapid selection stays correct", AdminPhotoSelection),
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Common Problems shows shared photos and opens fixes; Setup edits preserve photos", CommonProblemWorkflow),
@@ -118,7 +118,7 @@ internal static class Program
             ("Inline unit files, scanner and column tools retain context and theme selection persists", InlineWorkspace),
             ("Unit parts stay beside the unit and live availability changes without snapshots", ReplacementPartsRail),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
-            ("Direct scanner and PLC buttons preserve unit and asset context", DirectDeviceActions),
+            ("The primary PLC button opens the selected asset's files and connection details", DirectDeviceActions),
             ("Electrical PDFs detect reading direction automatically and open click-to-zoom without manual controls", AutomaticDrawingOrientation),
             ("Unit equipment choices hide optional configuration actions without removing files", UnitEquipmentActions),
             ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
@@ -912,34 +912,27 @@ internal static class Program
         Require(first.AppliesTo(fixture.BlueUnit.Id) && first.AppliesTo(fixture.RedUnit.Id), "Asset PLC files were restricted to one unit.");
         var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main window did not load.");
         await SelectGalleryUnit(main, fixture.BlueUnit); main.UpdateLayout();
-        Control<Expander>(main, "UnitDetailsExpander").IsExpanded = true; main.UpdateLayout();
-        foreach (string action in new[] { "PlcButton" })
+        var action = Control<Button>(main, "PlcButton");
+        Require(!Control<Expander>(main, "UnitDetailsExpander").IsExpanded && action.IsVisible &&
+                Control<WrapPanel>(main, "UnitActionsPanel").Children.Contains(action), "The PLC action is not available in the unit's primary actions.");
+        Exception? failure = null; bool visited = false;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+        timer.Tick += (_, _) =>
         {
-            Require(Control<Button>(main, action).IsVisible, "Device action is hidden.");
-            Exception? failure = null; bool visited = false;
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
-            timer.Tick += (_, _) =>
+            if (Application.Current.Windows.OfType<PlcWindow>().SingleOrDefault() is not { } plc) return;
+            timer.Stop();
+            try
             {
-                try
-                {
-                    if (action == "ScannerButton" && Application.Current.Windows.OfType<ResourceWindow>().SingleOrDefault() is { } scanner)
-                    {
-                        Track(scanner); Require(Control<TextBlock>(scanner, "SystemText").Text.Contains(fixture.BlueUnit.UnitDisplay), "Scanner configuration lost the selected unit.");
-                        Require(Control<Button>(scanner, "UamDiagnosticsButton").IsVisible, "Scanner configuration removed the USB diagnostics action.");
-                        visited = true; timer.Stop(); scanner.Close();
-                    }
-                    else if (action == "PlcButton" && Application.Current.Windows.OfType<PlcWindow>().SingleOrDefault() is { } plc)
-                    {
-                        Track(plc); Equal("192.0.2.15", Control<TextBox>(plc, "AddressText").Text, "PLC showed the wrong asset address");
-                        visited = true; timer.Stop(); plc.Close();
-                    }
-                }
-                catch (Exception error) { failure = error; timer.Stop(); foreach (var w in Application.Current.Windows.Cast<Window>().Where(w => w != main).ToArray()) w.Close(); }
-            };
-            timer.Start(); try { Click(Control<Button>(main, action)); } finally { timer.Stop(); }
-            if (failure is not null) throw failure;
-            Require(visited, "Direct device action did not open.");
-        }
+                Equal("192.0.2.15", Control<TextBox>(plc, "AddressText").Text, "PLC showed the wrong asset address");
+                visited = true;
+            }
+            catch (Exception error) { failure = error; }
+            finally { plc.Close(); }
+        };
+        timer.Start();
+        try { Click(action); } finally { timer.Stop(); }
+        if (failure is not null) throw failure;
+        Require(visited, "Direct PLC action did not open.");
     }
 
     private static async Task GalleryFilteringAndPhotos()
@@ -1524,11 +1517,16 @@ internal static class Program
         Require(demo.IsOnboardingDemo && demo.IsHomePreview && demo.SharedRoot == Path.Combine(demoRoot, "Library"),
             "The fictional example did not use an isolated preview library.");
         var unit = demo.LoadSystems().Single();
+        var gate = demo.LoadGates().Single();
         var reference = demo.LoadManualRecords().Single();
         var problem = demo.LoadHelpItems().Single();
         Require(unit.ManualIds?.Contains(reference.Id) == true && problem.Visible && problem.Photos.Count == 1 &&
-                !unit.ShowLightConfiguration && !unit.ShowScannerConfiguration && demo.LoadParts().Count == 0,
-            "The fictional example did not assign its PDF and problem or included equipment controls or stockroom data.");
+                unit.ShowLightConfiguration && unit.ShowScannerConfiguration && demo.LoadParts().Count == 0,
+            "The fictional example did not assign its PDF, problem and equipment examples, or included stockroom data.");
+        var plc = demo.LoadResources().Single(resource => resource.Id == PlcWindow.FilesFor(gate).Id);
+        var plcFiles = demo.GetResourceFiles(plc.ForUnit(unit.Id), gate);
+        Require(plcFiles.Select(Path.GetFileName).SequenceEqual(new[] { "DEMO ONLY - PLC code listing.txt" }),
+            "The demo PLC files did not expose the fictional text listing.");
 
         var main = Track(NewMainWindow(demo));
         ShowOffscreen(main);
@@ -1539,6 +1537,12 @@ internal static class Program
             "The fictional operator example loaded additional preview data or offered to connect to a plant.");
         await SelectGalleryUnit(main, unit);
         await WaitUntil(() => Control<Image>(main, "GateImage").Source is not null, "The fictional unit did not show its identification image.");
+        var actions = Control<WrapPanel>(main, "UnitActionsPanel");
+        Require(new[] { "PlcButton", "LightColumnButton", "ScannerButton" }.All(name =>
+        {
+            var button = Control<Button>(main, name);
+            return button.IsVisible && actions.Children.Contains(button);
+        }), "The fictional unit did not show PLC, light column and scanner in its primary actions.");
         Click(Control<Button>(main, "PartManualsButton"));
         Require(Control<Grid>(main, "ManualsView").IsVisible && Control<ListBox>(main, "ManualList").Items.Count == 1,
             "The fictional unit's PDF was not visible under Manuals / documents.");
@@ -1546,6 +1550,7 @@ internal static class Program
         Require(page.PageCount == 1 && page.Image.PixelWidth > 0, "The fictional reference PDF could not be rendered.");
 
         Click(Control<Button>(main, "SystemsNav"));
+        await CheckFictionalEquipmentAsync(main);
         var problems = Control<ItemsControl>(main, "CommonProblemsList");
         await WaitUntil(() => Descendants<Button>(problems).Any(button => button.Tag is HelpItem topic && topic.Id == problem.Id),
             "The fictional unit's Common Problem card did not appear.");
@@ -1559,6 +1564,45 @@ internal static class Program
         Require(File.ReadAllBytes(Path.Combine(plantSettings, "settings.json")).SequenceEqual(originalSettings) &&
                 File.ReadAllBytes(plant.SystemsFile).SequenceEqual(originalUnits),
             "Opening the fictional demo changed the plant's settings or unit records.");
+    }
+
+    private static async Task CheckFictionalEquipmentAsync(MainWindow main)
+    {
+        var inlineWindow = typeof(MainWindow).GetField("_inlineWindow", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        Click(Control<Button>(main, "LightColumnButton"));
+        await WaitUntil(() => inlineWindow.GetValue(main) is global::SiemensUsbCheck.MainWindow,
+            "The fictional light column tool did not load inline.");
+        var column = (global::SiemensUsbCheck.MainWindow)inlineWindow.GetValue(main)!;
+        var assigned = Control<ComboBox>(column, "AssignedFilesCombo");
+        Require(assigned.Items.Count == 1, "The fictional light column did not offer its assigned sample.");
+        assigned.SelectedIndex = 0;
+        await WaitUntil(() => Control<Panel>(column, "SegmentPreviewPanel").Children.Count == 9,
+            "The assigned fictional light configuration did not render.");
+        SetPreviewInputs(column, 2);
+        Require(Control<TextBox>(column, "PreviewText").Text.Contains("RGB 255, 180, 0"),
+            "The fictional light configuration did not render its amber input.");
+        var columnDevices = Control<ComboBox>(column, "DeviceCombo");
+        columnDevices.ItemsSource = new[] { TestColumnPort() }; columnDevices.SelectedIndex = 0;
+        Require(!columnDevices.IsEnabled && !Control<Button>(column, "RefreshButton").IsEnabled &&
+                !Control<Button>(column, "ReadButton").IsEnabled && !Control<Button>(column, "UploadButton").IsEnabled,
+            "Fictional light column preview enabled USB after a file and port were selected.");
+
+        Click(Descendants<Button>(Control<Grid>(main, "InlineToolPanel")).Single(button => Equals(button.Content, "← Unit overview")));
+        Click(Control<Button>(main, "ScannerButton"));
+        await WaitUntil(() => inlineWindow.GetValue(main) is ResourceWindow, "The fictional scanner configuration list did not load.");
+        var scannerFiles = (ResourceWindow)inlineWindow.GetValue(main)!;
+        var files = Control<ListBox>(scannerFiles, "FileList");
+        await WaitUntil(() => Descendants<TextBlock>(files).Any(text => text.Text == "DEMO ONLY - scanner configuration record.txt"),
+            "The fictional scanner did not display its assigned reference file.");
+        Click(Control<Button>(scannerFiles, "UamDiagnosticsButton"));
+        await WaitUntil(() => inlineWindow.GetValue(main) is UamDiagnosticsWindow, "The fictional scanner diagnostics did not load inline.");
+        var scanner = (UamDiagnosticsWindow)inlineWindow.GetValue(main)!;
+        var scannerDevices = Control<ComboBox>(scanner, "DeviceCombo");
+        scannerDevices.ItemsSource = new[] { new SafetyGateSupport.Hokuyo.UamUsbPort("COM1", "test", "test") };
+        scannerDevices.SelectedIndex = 0;
+        Require(!scannerDevices.IsEnabled && !Control<Button>(scanner, "RefreshButton").IsEnabled && !Control<Button>(scanner, "ReadButton").IsEnabled,
+            "Fictional scanner preview enabled USB after a port was selected.");
+        Click(Descendants<Button>(Control<Grid>(main, "InlineToolPanel")).Single(button => Equals(button.Content, "← Unit overview")));
     }
 
     private static async Task AreaRenameRegression()

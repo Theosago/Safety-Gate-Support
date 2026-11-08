@@ -1,0 +1,10 @@
+DEMO-01 | PLC code listing
+Fictional example for file browsing. No machine outputs or safety logic.
+
+Illustrative Structured Text
+
+IF DemoScreenActive THEN
+    DemoDisplayText := 'DEMO-01 reference loaded';
+END_IF;
+
+This is a plain-text listing, not a controller project or a deployment file.
