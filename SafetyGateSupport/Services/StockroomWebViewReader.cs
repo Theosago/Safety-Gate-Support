@@ -88,7 +88,7 @@ public static class StockroomWebViewReader
                 stable = html == previous ? stable + 1 : 0; previous = html;
                 // Item badges need not be highlighted. Require a changed, stable result table
                 // and the server acknowledgement instead; the import layer enforces a unique exact ID.
-                bool ready = serverSearch ? serverConfirmed && (itemLookup ? changed : highlighted || parsed.Rows.Count == 0 && changed) : changed;
+                bool ready = serverSearch ? serverConfirmed && (itemLookup ? changed && exactMatches > 0 : highlighted || parsed.Rows.Count == 0 && changed) : changed;
                 if (searched && stable >= 3 && ready && (serverSearch || DateTime.UtcNow - activity > TimeSpan.FromMilliseconds(750)))
                     return parsed with { Reader = "WebView2: " + term + " search" };
             }
