@@ -9,7 +9,7 @@ public partial class App : Application
 {
     protected override async void OnStartup(StartupEventArgs e)
     {
-        if (e.Args.Length == 0 || e.Args[0] is not ("--validate-pdf-preview" or "--validate-drawing-orientation" or "--validate-stockroom-webview")) { base.OnStartup(e); return; }
+        if (e.Args.Length == 0 || e.Args[0] is not ("--validate-pdf-preview" or "--validate-drawing-orientation" or "--validate-stockroom-webview" or "--validate-stockroom-item")) { base.OnStartup(e); return; }
         // Package verification is explicit and isolated: never create the normal
         // window or read its shared-root settings when validating the bundled engine.
         Navigating += (_, navigation) => navigation.Cancel = true;
@@ -18,10 +18,11 @@ public partial class App : Application
         int exitCode = 1;
         try
         {
-            if (e.Args.Length != 3) throw new ArgumentException("Supply an input PDF and a new verification-result path.");
-            if (e.Args[0] == "--validate-stockroom-webview")
+            if (e.Args.Length != (e.Args[0] == "--validate-stockroom-item" ? 4 : 3)) throw new ArgumentException("Supply an input PDF and a new verification-result path.");
+            if (e.Args[0] is "--validate-stockroom-webview" or "--validate-stockroom-item")
             {
-                var result = await StockroomWebViewReader.FetchAsync(new Uri(Path.GetFullPath(e.Args[1])).AbsoluteUri, CancellationToken.None);
+                var address = new Uri(Path.GetFullPath(e.Args[1])).AbsoluteUri;
+                var result = e.Args[0] == "--validate-stockroom-item" ? await StockroomWebViewReader.SearchAsync(address, e.Args[3], CancellationToken.None) : await StockroomWebViewReader.FetchAsync(address, CancellationToken.None);
                 using var output = new FileStream(e.Args[2], FileMode.CreateNew, FileAccess.Write, FileShare.None); JsonSerializer.Serialize(output, result);
             }
             else if (e.Args[0] == "--validate-drawing-orientation")

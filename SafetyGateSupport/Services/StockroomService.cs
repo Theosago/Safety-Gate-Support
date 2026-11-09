@@ -24,7 +24,13 @@ public static class StockroomService
         // Diagnostic rows must remain exportable without becoming current quantities.
         public bool QuantitiesConfirmed { get; init; } = true;
     }
-    public static string StockKey(string? text) => (text ?? "").Trim().TrimStart('0');
+    public static bool IsItemId(string? text) => text is { Length: > 0 and <= 64 } && char.IsAsciiLetterOrDigit(text[0]) && text.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' or '/');
+    public static string StockKey(string? text)
+    {
+        string value = (text ?? "").Trim();
+        if (value.Length > 0 && value.All(char.IsAsciiDigit)) { string key = value.TrimStart('0'); return key.Length == 0 ? "0" : key; }
+        return value.ToUpperInvariant();
+    }
     private static string Text(HtmlNode node) => WebUtility.HtmlDecode(node.InnerText).Replace('\u00a0', ' ').Trim();
     private static string Header(string text) => new(text.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
     public static Snapshot Parse(string html)
@@ -55,7 +61,7 @@ public static class StockroomService
                 }
                 if (stock < 0 || quantity < 0 || cells.Length <= Math.Max(stock, quantity) || cells.Any(c => c.GetAttributeValue("colspan", "1") != "1" || c.GetAttributeValue("rowspan", "1") != "1")) continue;
                 string number = Text(cells[stock]);
-                if (number.Length is < 5 or > 12 || !number.All(char.IsAsciiDigit)) continue;
+                if (!IsItemId(number)) continue;
                 string amount = Text(cells[quantity]);
                 if (!Regex.IsMatch(amount, @"^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$", RegexOptions.None, TimeSpan.FromMilliseconds(100))) continue;
                 if (!decimal.TryParse(amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var count) || count < 0) continue;
@@ -88,14 +94,55 @@ public static class StockroomService
     }
     public static PartRecord ImportItem(Snapshot snapshot, string itemId)
     {
-        if (!Regex.IsMatch(itemId, @"^[0-9]{5,12}$")) throw new InvalidOperationException("Enter a numeric Item ID (5–12 digits).");
+        if (!IsItemId(itemId)) throw new InvalidOperationException("Enter an Item ID using letters, digits or - _ . / (up to 64 characters).");
         var row = Find(snapshot, new PartRecord { PartNumber = itemId }, true)
             ?? throw new InvalidOperationException("No unique, confirmed stockroom match for Item ID " + itemId + ". Nothing was imported.");
         string title = row.Name.Length > 0 ? row.Name : row.Description;
         if (title.Length == 0) throw new InvalidOperationException("The stockroom did not return an item name or description. Nothing was imported.");
         return new PartRecord { PartNumber = row.Stock, Description = title, Manufacturer = row.Manufacturer,
-            BinLocation = row.Location, ReportedQuantity = row.Quantity, Site = row.Site,
+            StockroomDescription = row.Description, BinLocation = row.Location, ReportedQuantity = row.Quantity, Site = row.Site,
             Notes = row.Name.Length > 0 && row.Description != row.Name ? row.Description : "" };
+    }
+    public static IReadOnlyList<string> ParseItemIds(string text)
+    {
+        var ids = text.Split(['\r', '\n', '\t', ' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (ids.Length == 0) throw new InvalidOperationException("Enter at least one Item ID.");
+        var invalid = ids.FirstOrDefault(id => !IsItemId(id));
+        if (invalid is not null) throw new InvalidOperationException("Invalid Item ID: " + invalid);
+        var unique = ids.DistinctBy(StockKey).ToArray();
+        if (unique.Length > 100) throw new InvalidOperationException("Import at most 100 unique Item IDs at a time.");
+        return unique;
+    }
+    public static async Task<Snapshot> FetchCatalogAsync(IReadOnlyCollection<string> ids, Func<CancellationToken, Task<Snapshot>> commonSearch,
+        Func<string, CancellationToken, Task<Snapshot>> itemSearch, CancellationToken token)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(TimeSpan.FromSeconds(120));
+        var initial = await commonSearch(deadline.Token);
+        var rows = initial.QuantitiesConfirmed ? initial.Rows.ToList() : new List<Row>();
+        var samples = initial.TableSample.ToList(); var failures = new List<string>(); bool confirmed = initial.QuantitiesConfirmed;
+        foreach (string id in ids.Where(IsItemId).DistinctBy(StockKey))
+        {
+            token.ThrowIfCancellationRequested();
+            // An ambiguous returned item stays ambiguous. A targeted query must never hide a second bin/lot.
+            if (rows.Any(r => StockKey(r.Stock) == StockKey(id))) continue;
+            try
+            {
+                var result = await itemSearch(id, deadline.Token);
+                if (!result.QuantitiesConfirmed) { failures.Add(id + ": unconfirmed search"); continue; }
+                confirmed = true;
+                var matches = result.Rows.Where(r => StockKey(r.Stock) == StockKey(id)).ToList();
+                rows.AddRange(matches); samples.AddRange(result.TableSample);
+                if (matches.Count != 1) failures.Add(id + (matches.Count == 0 ? ": not found" : ": ambiguous"));
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested && deadline.IsCancellationRequested)
+            { failures.Add("Catalog check reached its two-minute limit; remaining IDs were not checked."); break; }
+            catch (Exception error) when (!token.IsCancellationRequested && error is IOException or TimeoutException or InvalidOperationException or HttpRequestException)
+            { failures.Add(id + ": " + error.Message); }
+        }
+        token.ThrowIfCancellationRequested();
+        if (!confirmed) return initial;
+        return new(rows, initial.CheckedUtc) { QuantitiesConfirmed = true, TableSample = samples.Take(250).ToArray(),
+            Reader = initial.Reader + "; targeted Item ID checks" + (failures.Count > 0 ? "; " + string.Join("; ", failures) : "") };
     }
     private sealed record SearchForm(Uri Action, HttpMethod Method, List<KeyValuePair<string, string>> Values);
     private static SearchForm? FindSearchForm(string html, Uri page)

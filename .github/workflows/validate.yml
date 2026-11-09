@@ -17,7 +17,16 @@ jobs:
         with:
           global-json-file: global.json
       - name: Compile WPF and validate isolated data workflows
+        env:
+          SAFETYGATE_QR_TEST_OUTPUT: ${{ runner.temp }}/qr-offline-test
         run: bash scripts/validate.sh
+
+      - name: Upload offline QR test label
+        uses: actions/upload-artifact@v4
+        with:
+          name: QR-offline-test
+          path: ${{ runner.temp }}/qr-offline-test/
+          if-no-files-found: error
 
   windows-build:
     needs: linux-validation
@@ -36,6 +45,7 @@ jobs:
         run: dotnet run --project tests/SafetyGateSupport.HokuyoValidation/SafetyGateSupport.HokuyoValidation.csproj -c Release
       - name: Run Windows desktop regression checks
         env:
+          SAFETYGATE_ITEM_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/item-smoke.html
           SAFETYGATE_WEBVIEW_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/webview-smoke.html
           SAFETYGATE_OCR_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/ocr-smoke.png
           SAFETYGATE_PDF_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/pdf-smoke.pdf
@@ -106,6 +116,16 @@ jobs:
           if ($check.ExitCode -ne 0 -or !(Test-Path $resultPath)) { throw "Packaged WebView stockroom failed: $($check.ExitCode)" }
           $result = Get-Content $resultPath -Raw | ConvertFrom-Json
           if ($result.Rows.Count -ne 1 -or $result.Rows[0].Stock -ne '0117719' -or $result.Rows[0].Quantity -ne 0) { throw 'Packaged WebView did not search past the unrelated initial inventory' }
+      - name: Smoke-test direct Item ID import in the published executable
+        shell: pwsh
+        run: |
+          $resultPath = Join-Path $env:RUNNER_TEMP ('item-' + [guid]::NewGuid().ToString('N') + '.json')
+          $inputPath = (Resolve-Path artifacts/item-smoke.html).Path
+          $check = Start-Process -FilePath (Resolve-Path artifacts/win-x64/SafetyGateSupport.exe) -ArgumentList @('--validate-stockroom-item', "`"$inputPath`"", "`"$resultPath`"", '0273012250428') -PassThru
+          if (!$check.WaitForExit(45000)) { $check.Kill(); throw 'Packaged direct ID check timed out' }
+          if ($check.ExitCode -ne 0 -or !(Test-Path $resultPath)) { throw "Packaged direct ID failed: $($check.ExitCode)" }
+          $result = Get-Content $resultPath -Raw | ConvertFrom-Json
+          if ($result.Rows.Count -ne 1 -or $result.Rows[0].Stock -ne '0273012250428' -or $result.Rows[0].Quantity -ne 51071.52 -or $result.Rows[0].Location -ne 'TRUCK SHOP') { throw 'Packaged direct ID returned stale or incomplete inventory' }
       - name: Smoke-test the normal published app with isolated settings
         shell: pwsh
         run: |

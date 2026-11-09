@@ -10,15 +10,21 @@ public static class StockroomWebViewReader
 {
     public static string LastSearchDiagnostics { get; private set; } = "";
     private static readonly SemaphoreSlim Slot = new(1);
-    public static Task<StockroomService.Snapshot> FetchAsync(string url, CancellationToken token) => SearchAsync(url, "Safe2Cross", token);
-    public static async Task<StockroomService.Snapshot> SearchAsync(string url, string term, CancellationToken token)
+    public static Task<StockroomService.Snapshot> FetchAsync(string url, CancellationToken token) => ReadSearchAsync(url, "Safe2Cross", false, token);
+    public static Task<StockroomService.Snapshot> SearchAsync(string url, string term, CancellationToken token)
+    {
+        if (!StockroomService.IsItemId(term)) throw new InvalidOperationException("Enter a valid Item ID.");
+        return ReadSearchAsync(url, term, true, token);
+    }
+    private static async Task<StockroomService.Snapshot> ReadSearchAsync(string url, string term, bool itemLookup, CancellationToken token)
     {
         await Slot.WaitAsync(token);
-        try { return await Application.Current.Dispatcher.InvokeAsync(() => ReadAsync(url, term, token)).Task.Unwrap(); }
+        try { return await Application.Current.Dispatcher.InvokeAsync(() => ReadAsync(url, term, itemLookup, token)).Task.Unwrap(); }
         finally { Slot.Release(); }
     }
-    private static async Task<StockroomService.Snapshot> ReadAsync(string url, string term, CancellationToken token)
+    private static async Task<StockroomService.Snapshot> ReadAsync(string url, string term, bool itemLookup, CancellationToken token)
     {
+        LastSearchDiagnostics = "";
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(TimeSpan.FromSeconds(35));
         var origin = new Uri(url); var view = new WebView2();
         var window = new Window { Content = view, Width = 1200, Height = 900, Left = -32000, Top = -32000, WindowStartupLocation = WindowStartupLocation.Manual, ShowActivated = false, ShowInTaskbar = false, Opacity = 0, Title = "Stockroom background reader" };
@@ -50,7 +56,7 @@ public static class StockroomWebViewReader
                 if (!loaded) continue;
                 using var state = JsonDocument.Parse(await Evaluate("(()=>JSON.stringify({specific:!!document.querySelector('.inventory-container input.search-input'),applied:document.querySelector('.search-info .search-terms')?.textContent.trim()||'',value:document.querySelector('input.search-input')?.value||'',error:globalThis.__safetyGateScriptError||''}))()"));
                 LastSearchDiagnostics = state.RootElement.ToString();
-                serverSearch = state.RootElement.GetProperty("specific").GetBoolean();
+                serverSearch |= state.RootElement.GetProperty("specific").GetBoolean();
                 serverConfirmed = state.RootElement.GetProperty("applied").GetString()?.Equals(term, StringComparison.OrdinalIgnoreCase) == true;
                 if (!searched || serverSearch && !serverConfirmed && DateTime.UtcNow - lastAttempt > TimeSpan.FromMilliseconds(1500))
                 {
@@ -73,21 +79,22 @@ public static class StockroomWebViewReader
                     }
                 }
                 string html = await Evaluate(StockroomBrowserReader.ReadTables);
-                LastSearchDiagnostics += "; highlighted=" + html.Contains("<mark>" + System.Net.WebUtility.HtmlEncode(term) + "</mark>", StringComparison.OrdinalIgnoreCase) + "; rows=" + StockroomService.Parse(html).Rows.Count;
+                var parsed = StockroomService.Parse(html);
+                var doc = new HtmlAgilityPack.HtmlDocument(); doc.LoadHtml(html);
+                bool highlighted = doc.DocumentNode.Descendants("mark").Any(n => System.Net.WebUtility.HtmlDecode(n.InnerText).Trim().Equals(term, StringComparison.OrdinalIgnoreCase));
+                bool changed = baseline is not null && html != baseline;
+                int exactMatches = parsed.Rows.Count(r => StockroomService.StockKey(r.Stock) == StockroomService.StockKey(term));
+                LastSearchDiagnostics += $"; rows={parsed.Rows.Count}; exactMatches={exactMatches}; tableChanged={changed}; highlighted={highlighted}; itemLookup={itemLookup}";
                 stable = html == previous ? stable + 1 : 0; previous = html;
-                if (stable >= 3 && (serverSearch ? serverConfirmed : html != baseline) && DateTime.UtcNow - activity > TimeSpan.FromMilliseconds(750))
-                {
-                    if (!searched) throw new IOException("Inventory loaded, but its search field was not found. The initial unfiltered page is not a completed lookup.");
-                    var snapshot = StockroomService.Parse(html);
-                    // This inventory highlights the applied term in result cells. A changed
-                    // search caption alone may precede the server's table update.
-                    if (serverSearch && snapshot.Rows.Count > 0 && !html.Contains("<mark>" + System.Net.WebUtility.HtmlEncode(term) + "</mark>", StringComparison.OrdinalIgnoreCase)) continue;
-                    return snapshot with { Reader = "WebView2: " + term + " search" };
-                }
+                // Item badges need not be highlighted. Require a changed, stable result table
+                // and the server acknowledgement instead; the import layer enforces a unique exact ID.
+                bool ready = serverSearch ? serverConfirmed && (itemLookup ? changed : highlighted || parsed.Rows.Count == 0 && changed) : changed;
+                if (searched && stable >= 3 && ready && (serverSearch || DateTime.UtcNow - activity > TimeSpan.FromMilliseconds(750)))
+                    return parsed with { Reader = "WebView2: " + term + " search" };
             }
         }
         catch (WebView2RuntimeNotFoundException error) { throw new InvalidOperationException("Microsoft Edge WebView2 Runtime is missing on this PC. Install Microsoft's Evergreen WebView2 Runtime to enable stockroom search.", error); }
-        catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException(serverSearch && !serverConfirmed ? "The stockroom server did not confirm Searching: " + term + " within 35 seconds. Unfiltered inventory was rejected." : "The embedded stockroom search did not finish within 35 seconds."); }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException(serverSearch && !serverConfirmed ? "The stockroom server did not confirm Searching: " + term + " within 35 seconds. Unfiltered inventory was rejected." : "The embedded stockroom search did not finish within 35 seconds. " + LastSearchDiagnostics); }
         finally { view.Dispose(); window.Content = null; window.Close(); }
     }
 }

@@ -50,7 +50,9 @@ public partial class MainWindow : Window
     public MainWindow(DataService data, Func<string, CancellationToken, Task<StockroomService.Snapshot>>? stockroomReader = null)
     {
         InitializeComponent();
-        _data = data; _stockroomReader = stockroomReader ?? ((url, token) => { var ids = _parts.Select(p => p.PartNumber).Where(id => id.Length > 0).Distinct().ToArray(); return Task.Run(() => StockroomService.FetchAsync(url, token, requested: ids, interactiveReader: StockroomWebViewReader.FetchAsync), token); });
+        _data = data; _stockroomReader = stockroomReader ?? ((url, token) => { var ids = _parts.Select(p => p.PartNumber).Where(id => id.Length > 0).Distinct().ToArray(); return Task.Run(() => StockroomService.FetchCatalogAsync(ids,
+            ct => StockroomService.FetchAsync(url, ct, requested: ids, interactiveReader: StockroomWebViewReader.FetchAsync),
+            (id, ct) => StockroomWebViewReader.SearchAsync(url, id, ct), token), token); });
         InitializeStockroomPlants(); InitializeReplacementParts(); InitializeTheme();
         InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsOnboardingDemo)
@@ -677,7 +679,7 @@ public partial class MainWindow : Window
         PartManufacturerText.Text = string.IsNullOrWhiteSpace(p.Manufacturer) ? "" : "Manufacturer: " + p.Manufacturer;
         var related = new List<string>(); related.AddRange(_gates.Where(g => p.AppliesToGateIds.Contains(g.Id)).Select(g => g.Display)); related.AddRange(_systems.Where(u => p.AppliesToUnitIds.Contains(u.Id)).Select(u => $"{GateFor(u)?.Display} / {u.UnitDisplay}"));
         PartRelatedText.Text = related.Count == 0 ? (string.IsNullOrWhiteSpace(p.RelatedAssets) ? "" : "Related: " + p.RelatedAssets) : "Applies to: " + string.Join(", ", related);
-        PartNotesText.Text = p.NotesDisplay; PartReportedQuantityText.Text = "Reported quantity (snapshot): " + p.QuantityDisplay + (p.SiteValue.Length > 0 ? " • Site: " + p.SiteValue : "");
+        PartNotesText.Text = string.Join(Environment.NewLine + Environment.NewLine, new[] { p.StockroomDescription, p.NotesDisplay }.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct()); PartReportedQuantityText.Text = "Reported quantity (snapshot): " + p.QuantityDisplay + (p.SiteValue.Length > 0 ? " • Site: " + p.SiteValue : "");
         PartDetailScroll.ScrollToTop(); if (PartsView.IsVisible) LoadPartPhoto(p); UpdatePartQuantity();
     }
     private void OpenPartDocument_Click(object sender, RoutedEventArgs e) { var p = SelectedPart; if (p is null || string.IsNullOrWhiteSpace(p.DocumentPath)) { MessageBox.Show("No document is attached to this part."); return; } var path = _data.Resolve(p.DocumentPath); if (File.Exists(path)) FileLauncherService.Open(path); else MessageBox.Show("The attached part document could not be found."); }

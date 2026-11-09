@@ -50,6 +50,7 @@ public partial class DataService
         if (part is null) { part = imported; parts.Add(part); }
         else
         {
+            part.StockroomDescription = imported.StockroomDescription;
             part.Description = imported.Description; part.BinLocation = imported.BinLocation;
             part.Site = imported.Site; part.ReportedQuantity = imported.ReportedQuantity;
             if (imported.Manufacturer.Length > 0) part.Manufacturer = imported.Manufacturer;

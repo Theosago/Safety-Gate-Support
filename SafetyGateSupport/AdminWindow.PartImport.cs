@@ -15,57 +15,75 @@ public partial class AdminWindow
     {
         if (e.Key == Key.Enter) { e.Handled = true; ImportItem_Click(sender, e); }
     }
+    public sealed record ItemImportResult(string ItemId, string Status);
+    private void SetImportStatus(string text) { ImportItemStatus.Text = text; AdminStatusText.Text = text; }
     private async void ImportItem_Click(object sender, RoutedEventArgs e)
     {
-        if (_importCancellation is not null) return;
         string id = PartNumberBox.Text.Trim();
-        if (!System.Text.RegularExpressions.Regex.IsMatch(id, @"^[0-9]{5,12}$")) { ImportItemStatus.Text = "Enter a numeric Item ID (5–12 digits)."; return; }
-        if (ImportPlantBox.SelectedItem is not StockroomPlant plant) { ImportItemStatus.Text = "Choose your stockroom plant first."; return; }
-        if (!_data.IsReady) { ImportItemStatus.Text = "Initialize shared data first."; return; }
+        if (!StockroomService.IsItemId(id)) { SetImportStatus("Enter a valid Item ID (up to 64 letters, digits or - _ . /)."); return; }
+        await RunItemImportsAsync([id]);
+    }
+    private async void BulkImport_Click(object sender, RoutedEventArgs e)
+    {
+        try { await RunItemImportsAsync(StockroomService.ParseItemIds(BulkItemIdsBox.Text)); }
+        catch (InvalidOperationException error) { SetImportStatus(error.Message); }
+    }
+    private void CancelPartImport_Click(object sender, RoutedEventArgs e) => _importCancellation?.Cancel();
+    private async Task RunItemImportsAsync(IReadOnlyList<string> ids)
+    {
+        if (_importCancellation is not null) return;
+        if (ImportPlantBox.SelectedItem is not StockroomPlant plant) { SetImportStatus("Choose your stockroom plant once, then import by Item ID."); return; }
+        if (!_data.IsReady) { SetImportStatus("Connect to a plant library first."); return; }
         using var cancel = new CancellationTokenSource(); _importCancellation = cancel;
-        SetupTabs.IsEnabled = false; ImportItemStatus.Text = "Looking up " + id + " at " + plant.Name + "…";
-        string? temporaryPhoto = null;
-        bool saved = false;
+        SetupTabs.IsEnabled = false; CancelPartImportButton.Visibility = Visibility.Visible;
+        var results = new List<ItemImportResult>(); string? lastSavedId = null; int importedCount = 0;
+        void ShowResults() { ImportResultsList.ItemsSource = null; ImportResultsList.ItemsSource = results.ToArray(); }
         try
         {
             _data.Settings.StockroomPlantId = plant.Id; _data.SaveLocalSettings();
-            var snapshot = await _importReader(plant.Url, id, cancel.Token);
-            var item = StockroomService.ImportItem(snapshot, id);
-            var row = StockroomService.Find(snapshot, item, true)!;
-            string photoStatus = "Stockroom supplied no photo. You can add one on the Parts page.";
-            if (row.Photo.Length > 0)
+            foreach (string id in ids)
             {
+                if (cancel.IsCancellationRequested || _isClosed) break;
+                SetImportStatus($"Looking up {id} at {plant.Name} ({results.Count + 1}/{ids.Count})…");
+                string? photo = null;
                 try
                 {
-                    temporaryPhoto = await DownloadPartPhotoAsync(new Uri(plant.Url), row.Photo, cancel.Token);
-                    photoStatus = "Photo imported.";
+                    var snapshot = await _importReader(plant.Url, id, cancel.Token);
+                    var item = StockroomService.ImportItem(snapshot, id);
+                    var row = StockroomService.Find(snapshot, item, true)!;
+                    string photoStatus = "No photo supplied by the stockroom.";
+                    if (row.Photo.Length > 0)
+                    {
+                        try { photo = await DownloadPartPhotoAsync(new Uri(plant.Url), row.Photo, cancel.Token); photoStatus = "Photo imported."; }
+                        catch (Exception error) when (error is not OperationCanceledException) { photoStatus = "Photo unavailable: " + error.Message; }
+                    }
+                    cancel.Token.ThrowIfCancellationRequested();
+                    var saved = await Task.Run(() => _data.ImportStockroomPart(item));
+                    importedCount++; lastSavedId = saved.Id;
+                    if (photo is not null)
+                    {
+                        try { await Task.Run(() => _data.SavePartPhoto(saved.Id, photo)); }
+                        catch (Exception error) { photoStatus = "Item saved; photo not saved: " + error.Message; }
+                    }
+                    results.Add(new(id, "Saved " + saved.Description + ". " + photoStatus));
                 }
-                catch (Exception error) when (error is not OperationCanceledException)
-                { photoStatus = "Item imported; stockroom photo unavailable: " + error.Message; }
+                catch (OperationCanceledException) { results.Add(new(id, "Canceled; any already committed item is retained.")); break; }
+                catch (Exception error) { results.Add(new(id, "Not imported: " + error.Message)); }
+                finally { if (photo is not null) { try { File.Delete(photo); } catch (Exception error) when (error is IOException or UnauthorizedAccessException) { } } }
+                if (!_isClosed) ShowResults();
             }
-            cancel.Token.ThrowIfCancellationRequested();
-            if (_isClosed) return;
-            var imported = await Task.Run(() => _data.ImportStockroomPart(item)); saved = true;
-            if (temporaryPhoto is not null)
+            if (!_isClosed)
             {
-                try { imported = await Task.Run(() => _data.SavePartPhoto(imported.Id, temporaryPhoto)); }
-                catch (Exception error) { photoStatus = "Item saved; photo could not be saved: " + error.Message; }
+                ShowResults();
+                _parts = await Task.Run(() => _data.LoadParts());
+                if (_isClosed) return;
+                AdminPartList.ItemsSource = _parts.OrderBy(p => p.PartNumber).ThenBy(p => p.Description).ToList();
+                if (lastSavedId is not null) AdminPartList.SelectedItem = _parts.Single(p => p.Id == lastSavedId);
+                SetImportStatus($"Imported {importedCount} of {ids.Count} Item IDs. " + (cancel.IsCancellationRequested ? "Canceled. " : "") + "See each result below. Existing assignments and documents are retained.");
             }
-            if (_isClosed) return;
-            _parts = _data.LoadParts();
-            AdminPartList.ItemsSource = _parts.OrderBy(p => p.PartNumber).ThenBy(p => p.Description).ToList();
-            AdminPartList.SelectedItem = _parts.Single(p => p.Id == imported.Id);
-            ImportItemStatus.Text = "Saved " + imported.Description + " · Item ID " + imported.PartNumber + ". " + photoStatus;
-            AdminStatusText.Text = "Stockroom part saved. Optional unit assignments can be changed below.";
         }
-        catch (OperationCanceledException) { if (!_isClosed) ImportItemStatus.Text = "Import canceled."; }
-        catch (Exception error) { if (!_isClosed) ImportItemStatus.Text = (saved ? "Item was saved, but setup could not reload: " : "Nothing imported: ") + error.Message; }
-        finally
-        {
-            if (temporaryPhoto is not null) { try { File.Delete(temporaryPhoto); } catch (IOException) { } }
-            _importCancellation = null;
-            if (!_isClosed) SetupTabs.IsEnabled = true;
-        }
+        catch (Exception error) { if (!_isClosed) SetImportStatus($"Imported {importedCount} items before the operation stopped: " + error.Message); }
+        finally { _importCancellation = null; if (!_isClosed) { SetupTabs.IsEnabled = true; CancelPartImportButton.Visibility = Visibility.Collapsed; } }
     }
     private static async Task<string> DownloadPartPhotoAsync(Uri origin, string source, CancellationToken token)
     {

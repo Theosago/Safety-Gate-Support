@@ -9,6 +9,7 @@ public class PartRecord : System.ComponentModel.INotifyPropertyChanged
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string PartNumber { get; set; } = "";
     public string Description { get; set; } = "";
+    public string StockroomDescription { get; set; } = "";
     public string Manufacturer { get; set; } = "";
     public string Keywords { get; set; } = "";
     public string Notes { get; set; } = "";

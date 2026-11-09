@@ -9,6 +9,8 @@ internal static class PartsPageChecks
     public static IEnumerable<(string Name, Action Check)> Cases =>
     [
         ("Blank plant libraries stay empty across restarts and pilot PDFs preserve other assignments", BlankPlantSetup),
+        ("Catalog refresh targets unrelated IDs without trusting diagnostic rows", CatalogLookup),
+        ("Long and alphanumeric IDs import full stockroom fields and bulk input stays exact", LongItemIds),
         ("Phone guide exports are self-contained and QR labels decode to offline text or exact approved links", PhoneGuides),
         ("Common problem topics persist shared photos, visibility and edits without losing other topics", CommonProblems),
         ("Unconfirmed Blazor inventory stays diagnostic even when every requested Item ID matches", UnconfirmedInventory),
@@ -22,6 +24,42 @@ internal static class PartsPageChecks
         ("Stockroom reader submits the Safe2Cross search form with its hidden fields", SearchForms),
         ("Stockroom HTTP fetch stays bounded, rejects failures and honors cancellation", StockroomFetch)
     ];
+    private static void LongItemIds()
+    {
+        string html = "<table><tr><th>ITEM ID</th><th>ITEM NAME</th><th>AVAILABLE</th><th>LOCATION</th><th>DESCRIPTION</th><th>PLANT</th></tr><tr><td><code>0273012250428</code></td><td>ADDITIVE, 1214G, FATTY ALCOHOL</td><td>51,071.52</td><td><span>TRUCK SHOP</span></td><td>Full specification including handling instructions.</td><td>HRM</td></tr><tr><td>02730122504280</td><td>Prefix distractor</td><td>999</td><td>Wrong</td><td>Wrong</td><td>HRM</td></tr><tr><td>NSOP</td><td>Outside metal processing</td><td>0</td><td></td><td>Service item</td><td>HRM</td></tr></table>";
+        var snapshot = StockroomService.Parse(html); var part = StockroomService.ImportItem(snapshot, "0273012250428");
+        Require(part.PartNumber == "0273012250428" && part.Description == "ADDITIVE, 1214G, FATTY ALCOHOL" && part.StockroomDescription == "Full specification including handling instructions." && part.ReportedQuantity == 51071.52m && part.BinLocation == "TRUCK SHOP" && part.Site == "HRM", "Long ID import lost source information or matched the prefix distractor.");
+        Require(StockroomService.ImportItem(snapshot, "nsop").ReportedQuantity == 0 && StockroomService.IsItemId("AB-12.4/5_6"), "Alphanumeric/punctuated IDs or zero stock rejected.");
+        Require(StockroomService.StockKey("00ABC") != StockroomService.StockKey("ABC") && StockroomService.StockKey("0115639") == StockroomService.StockKey("115639"), "Normalization changed nonnumeric identity or broke legacy numeric IDs.");
+        var ids = StockroomService.ParseItemIds("0273012250428,NSOP\n0273012250428;nsop AB-12.4/5_6");
+        Require(ids.SequenceEqual(["0273012250428", "NSOP", "AB-12.4/5_6"]), "Bulk input lost leading zeros or failed to deduplicate.");
+        bool refused = false; try { StockroomService.ParseItemIds("valid invalid!"); } catch (InvalidOperationException) { refused = true; }
+        Require(refused, "Invalid bulk IDs were silently accepted.");
+    }
+    private static void CatalogLookup()
+    {
+        var initial = new StockroomService.Snapshot([new("0115639", 2, "HRM", "A", "Available")], DateTimeOffset.UtcNow);
+        var calls = new List<string>();
+        Task<StockroomService.Snapshot> Search(string id, CancellationToken token)
+        {
+            calls.Add(id);
+            return id switch
+            {
+                "0273012250428" => Task.FromResult(new StockroomService.Snapshot([new(id, 51071.52m, "HRM", "TRUCK SHOP", "Available"), new("999999", 999, "", "", "Available")], DateTimeOffset.UtcNow)),
+                "NSOP" => Task.FromException<StockroomService.Snapshot>(new TimeoutException("Fixture failure")),
+                _ => Task.FromResult(new StockroomService.Snapshot([new(id, 99, "", "", "Available")], DateTimeOffset.UtcNow) { QuantitiesConfirmed = false })
+            };
+        }
+        var result = StockroomService.FetchCatalogAsync(["0115639", "0273012250428", "0273012250428", "NSOP", "UNKNOWN"], _ => Task.FromResult(initial), Search, CancellationToken.None).GetAwaiter().GetResult();
+        Require(calls.SequenceEqual(["0273012250428", "NSOP", "UNKNOWN"]) && result.Rows.Count == 2 && StockroomService.Find(result, new PartRecord { PartNumber = "0273012250428" }, true)?.Quantity == 51071.52m, "Catalog refresh did not target only missing exact IDs.");
+        Require(StockroomService.Find(result, new PartRecord { PartNumber = "0115639" }, true)?.Quantity == 2 && result.Reader.Contains("Fixture failure") && !result.Rows.Any(r => r.Stock == "999999" || r.Stock == "UNKNOWN"), "Partial failure hid a valid quantity or promoted unrelated/unconfirmed rows.");
+        var ambiguous = initial with { Rows = [..initial.Rows, ..initial.Rows] }; calls.Clear();
+        StockroomService.FetchCatalogAsync(["0115639"], _ => Task.FromResult(ambiguous), Search, CancellationToken.None).GetAwaiter().GetResult();
+        Require(calls.Count == 0, "A targeted request could hide existing ambiguity.");
+        using var cancel = new CancellationTokenSource(); bool canceled = false;
+        try { StockroomService.FetchCatalogAsync(["NSOP"], _ => Task.FromResult(initial), (id, ct) => { cancel.Cancel(); ct.ThrowIfCancellationRequested(); return Task.FromResult(initial); }, cancel.Token).GetAwaiter().GetResult(); } catch (OperationCanceledException) { canceled = true; }
+        Require(canceled, "Catalog cancellation returned stale results.");
+    }
     private static void BlankPlantSetup()
     {
         string root = Directory.CreateTempSubdirectory("blank-plant-").FullName;
@@ -99,6 +137,18 @@ internal static class PartsPageChecks
             var before = File.ReadAllBytes(output); bool refused = false;
             try { MobileSupportExporter.Export(data, output); } catch (InvalidOperationException) { refused = true; }
             Require(refused && File.ReadAllBytes(output).SequenceEqual(before), "Failed export overwrote the previous package.");
+            if (Environment.GetEnvironmentVariable("SAFETYGATE_QR_TEST_OUTPUT") is { Length: > 0 } qrFolder)
+            {
+                Directory.CreateDirectory(qrFolder);
+                const string payload = "Safety Gate Support QR test\nOffline text works without a server or login.\nThis is a test label, not a live unit.";
+                string svg = MobileSupportExporter.QrSvg(payload);
+                Require(DecodeQrSvg(svg) == payload, "Downloadable test QR did not decode.");
+                File.WriteAllText(Path.Combine(qrFolder, "offline-qr-test.svg"), svg);
+                using var generator = new QRCoder.QRCodeGenerator(); using var qr = generator.CreateQrCode(payload, QRCoder.QRCodeGenerator.ECCLevel.M);
+                using var png = new QRCoder.PngByteQRCode(qr);
+                File.WriteAllBytes(Path.Combine(qrFolder, "offline-qr-test.png"), png.GetGraphic(8));
+                File.WriteAllText(Path.Combine(qrFolder, "READ-ME.txt"), "Open the PNG on your computer or print it, then scan with your phone camera. Expected text:\n\n" + payload + "\n\nThis test contains no company data and does not need Q:, a website or employee login. Camera text-QR handling varies; check the intended phones and label size.");
+            }
         }
         finally { Directory.Delete(root, true); }
     }

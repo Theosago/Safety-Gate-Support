@@ -9,6 +9,7 @@
    <TextBlock Text="Start with one useful unit. Add its photo, one approved document and one common fix, then try the operator view before expanding to the rest of the plant." Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
    <CheckBox x:Name="AdvancedSetupCheck" Content="Show advanced tools" Click="AdvancedSetup_Click" Margin="0,8,0,0"/>
    <TextBlock x:Name="SetupTaskText" TextWrapping="Wrap" Margin="0,6,0,0"/>
+   <Button x:Name="CancelPartImportButton" Content="Cancel stockroom import" Click="CancelPartImport_Click" Visibility="Collapsed" HorizontalAlignment="Left"/>
    <TextBlock x:Name="StartGuideStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,4,0,0"/>
   </StackPanel>
   <TabControl x:Name="SetupTabs" Grid.Row="1" Margin="0,14,0,10" SelectionChanged="SetupTabs_SelectionChanged">
@@ -251,7 +252,7 @@
    <TabItem x:Name="PartsSetupTab" Header="Parts">
     <Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <WrapPanel><Button Content="+ Part" Click="NewPart_Click"/><Button Content="Delete" Click="DeletePart_Click"/></WrapPanel>
+      <WrapPanel><Button x:Name="NewPartButton" Content="+ Part" Click="NewPart_Click"/><Button Content="Delete" Click="DeletePart_Click"/></WrapPanel>
       <ListBox x:Name="AdminPartList" Grid.Row="1" Margin="0,8,0,0" SelectionChanged="AdminPartList_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.ItemContainerStyle><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox>
      </Grid>
      <ScrollViewer Grid.Column="2"><StackPanel>
@@ -261,8 +262,12 @@
       <TextBlock Text="Item ID" Margin="0,10,0,4"/><TextBox x:Name="PartNumberBox" Height="38" FontSize="18" KeyDown="ImportItem_KeyDown"/>
       <Button x:Name="ImportItemButton" Content="Import from stockroom" Click="ImportItem_Click" HorizontalAlignment="Left" Margin="0,8"/>
       <TextBlock x:Name="ImportItemStatus" TextWrapping="Wrap" Margin="0,4,0,12"/>
+      <Expander Header="Bulk import by Item ID"><StackPanel><TextBlock Text="Paste up to 100 IDs separated by lines, commas or spaces. Duplicates are skipped. Items are saved to the shared catalog; choose unit assignments afterward." TextWrapping="Wrap"/><TextBox x:Name="BulkItemIdsBox" AcceptsReturn="True" TextWrapping="Wrap" Height="100" VerticalScrollBarVisibility="Auto"/><Button x:Name="BulkImportButton" Content="Import these Item IDs" Click="BulkImport_Click" HorizontalAlignment="Left"/></StackPanel></Expander>
+      <ListBox x:Name="ImportResultsList" MaxHeight="180" Margin="0,8"><ListBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="Wrap"><Run Text="{Binding ItemId, Mode=OneWay}" FontWeight="Bold"/><Run Text=" · "/><Run Text="{Binding Status, Mode=OneWay}"/></TextBlock></DataTemplate></ListBox.ItemTemplate></ListBox>
+
       <Expander Header="Details / optional edits"><StackPanel>
-      <TextBlock Text="Description"/><TextBox x:Name="PartDescriptionBox" MinHeight="60" AcceptsReturn="True" TextWrapping="Wrap"/>
+      <TextBlock Text="Item name"/><TextBox x:Name="PartDescriptionBox" MinHeight="60" AcceptsReturn="True" TextWrapping="Wrap"/>
+      <TextBlock Text="Stockroom description" Margin="0,8,0,3"/><TextBox x:Name="PartSourceDescriptionBox" IsReadOnly="True" TextWrapping="Wrap" MinHeight="60"/>
       <TextBlock Text="Bin location" Margin="0,7,0,3"/><TextBox x:Name="PartBinBox" Height="34"/>
 
       <TextBlock Text="Reported quantity (snapshot)" Margin="0,7,0,3"/><TextBox x:Name="PartQuantityBox" Height="34"/>
@@ -276,7 +281,7 @@
       <TextBlock Text="Applies to gates" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="PartGateAssignments" Height="110" DisplayMemberPath="Display" SelectionMode="Multiple"/>
       <TextBlock Text="Applies to specific units (optional)" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="PartUnitAssignments" Height="100" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
       <TextBlock Text="Leave both assignment lists empty to make the part global." Foreground="{DynamicResource ThemeForeground666666}"/>
-      <Button Content="Save Part" Click="SavePart_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+      <Button x:Name="SavePartButton" Content="Save Part" Click="SavePart_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
      </StackPanel></ScrollViewer>
     </Grid>
    </TabItem>

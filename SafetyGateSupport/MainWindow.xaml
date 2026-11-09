@@ -35,7 +35,7 @@
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Plant setup" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0" ToolTip="Open Plant setup (Ctrl+Alt+Shift+A)"/>
      <Button x:Name="CloseDemoButton" Content="Close demo" Click="CloseDemo_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.4.5" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.4.6" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>

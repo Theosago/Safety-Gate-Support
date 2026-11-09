@@ -109,6 +109,10 @@ internal static class Program
             ("Area rename stays consistent and a locked shared record cannot crash setup", AreaRenameRegression),
             ("Common Problems shows shared photos and opens fixes; Setup edits preserve photos", CommonProblemWorkflow),
             ("Setup imports an Item ID without manual detail entry", AdminItemImport),
+            ("Bulk imports deduplicate IDs, retain successes and report failures", BulkItemImport),
+            ("Bulk cancellation retains committed records and stops pending lookups", CancelBulkItemImport),
+            ("Direct ID search waits for changed results without highlighted badges", () => DirectItemSearch(false)),
+            ("Direct ID search rejects unchanged initial inventory", () => DirectItemSearch(true)),
             ("Item ID lookup waits for numeric server acknowledgement and returns metadata", () => InteractiveStockroomSearch(true, true, "0117719")),
             ("Blazor inventory waits for delayed change handlers and server-confirmed search", () => InteractiveStockroomSearch(true, true)),
             ("Embedded stockroom reader searches past unrelated initial inventory without launching Edge debugging", () => InteractiveStockroomSearch(true)),
@@ -686,21 +690,102 @@ internal static class Program
         var fixture = NewFixture(); int reads = 0;
         Task<StockroomService.Snapshot> Lookup(string url, string id, CancellationToken token)
         {
-            Require(url.EndsWith("/inventory/02") && id == "987654", "Setup did not search the entered Item ID at the chosen plant."); reads++;
-            return Task.FromResult(StockroomService.Parse("<table><tr><th>Item ID</th><th>Item name</th><th>Available</th><th>Bin</th></tr><tr><td>987654</td><td>Imported switch</td><td>0</td><td>K-2</td></tr></table>"));
+            Require(url.EndsWith("/inventory/02") && id == "0273012250428", "Setup did not search the entered Item ID at the chosen plant."); reads++;
+            return Task.FromResult(StockroomService.Parse("<table><tr><th>Item ID</th><th>Item name</th><th>Available</th><th>Bin</th></tr><tr><td>0273012250428</td><td>Imported switch</td><td>0</td><td>K-2</td></tr></table>"));
         }
         var admin = Track(new AdminWindow(fixture.Data, Lookup)); ShowOffscreen(admin);
         await WaitUntil(() => admin.IsEnabled, "Setup not loaded.");
         Control<ComboBox>(admin, "ImportPlantBox").SelectedItem = StockroomPlant.Find("02");
-        Control<TextBox>(admin, "PartNumberBox").Text = "987654";
+        Control<TextBox>(admin, "PartNumberBox").Text = "0273012250428";
         Click(Control<Button>(admin, "ImportItemButton"));
-        await WaitUntil(() => Control<TextBlock>(admin, "ImportItemStatus").Text.StartsWith("Saved "), "Item ID import did not save automatically.");
-        var part = fixture.Data.LoadParts().Single(p => p.PartNumber == "987654");
+        await WaitUntil(() => Control<TextBlock>(admin, "ImportItemStatus").Text.StartsWith("Imported 1 of 1"), "Item ID import did not save automatically.");
+        var part = fixture.Data.LoadParts().Single(p => p.PartNumber == "0273012250428");
         Require(reads == 1 && part.Description == "Imported switch" && part.ReportedQuantity == 0 && part.BinLocation == "K-2", "Setup lost imported fields.");
         Click(Control<Button>(admin, "ImportItemButton"));
         await WaitUntil(() => reads == 2 && Control<TabControl>(admin, "SetupTabs").IsEnabled, "Repeat import did not finish.");
-        Require(fixture.Data.LoadParts().Count(p => p.PartNumber == "987654") == 1, "Setup created a duplicate Item ID.");
+        Require(fixture.Data.LoadParts().Count(p => p.PartNumber == "0273012250428") == 1, "Setup created a duplicate Item ID.");
+        Control<TabItem>(admin, "PartsSetupTab").IsSelected = true;
+        Click(Control<Button>(admin, "NewPartButton"));
+        Control<TextBox>(admin, "PartNumberBox").Text = "0273012250428";
+        Click(Control<Button>(admin, "SavePartButton"));
+        await WaitUntil(() => reads == 3 && Control<TabControl>(admin, "SetupTabs").IsEnabled, "ID-only Save did not perform stockroom import.");
+        Require(fixture.Data.LoadParts().Count(p => p.PartNumber == "0273012250428") == 1, "ID-only Save created an empty duplicate.");
         admin.Close();
+    }
+
+    private static async Task BulkItemImport()
+    {
+        var fixture = NewFixture(); var reads = new List<string>();
+        Task<StockroomService.Snapshot> Lookup(string url, string id, CancellationToken token)
+        {
+            reads.Add(id);
+            if (id == "MISSING") throw new InvalidOperationException("Fixture missing item");
+            return Task.FromResult(StockroomService.Parse($"<table><tr><th>ITEM ID</th><th>ITEM NAME</th><th>AVAILABLE</th><th>LOCATION</th><th>DESCRIPTION</th><th>PLANT</th></tr><tr><td>{id}</td><td>Imported {id}</td><td>51,071.52</td><td>TRUCK SHOP</td><td>Complete specification</td><td>HRM</td></tr></table>"));
+        }
+        var admin = Track(new AdminWindow(fixture.Data, Lookup)); ShowOffscreen(admin);
+        await WaitUntil(() => admin.IsEnabled, "Setup not loaded.");
+        Control<ComboBox>(admin, "ImportPlantBox").SelectedItem = StockroomPlant.Find("02");
+        Control<TextBox>(admin, "BulkItemIdsBox").Text = "0273012250428, MISSING; NSOP\n0273012250428";
+        Click(Control<Button>(admin, "BulkImportButton"));
+        await WaitUntil(() => Control<TextBlock>(admin, "ImportItemStatus").Text.StartsWith("Imported 2 of 3"), "Bulk result totals incorrect.");
+        Require(reads.SequenceEqual(new[] { "0273012250428", "MISSING", "NSOP" }), "Bulk input was not deduplicated or stopped after one failure.");
+        var part = fixture.Data.LoadParts().Single(p => p.PartNumber == "0273012250428");
+        Require(part.ReportedQuantity == 51071.52m && part.StockroomDescription == "Complete specification" && part.Site == "HRM", "Bulk import lost stockroom metadata.");
+        Require(Control<System.Windows.Controls.ItemsControl>(admin, "ImportResultsList").Items.Count == 3, "Per-item results missing.");
+        admin.Close();
+    }
+
+    private static async Task CancelBulkItemImport()
+    {
+        var fixture = NewFixture(); var reads = new List<string>();
+        async Task<StockroomService.Snapshot> Lookup(string url, string id, CancellationToken token)
+        {
+            reads.Add(id);
+            if (id == "PENDING") await Task.Delay(Timeout.Infinite, token);
+            return StockroomService.Parse($"<table><tr><th>ITEM ID</th><th>ITEM NAME</th><th>AVAILABLE</th></tr><tr><td>{id}</td><td>Imported item</td><td>0</td></tr></table>");
+        }
+        var admin = Track(new AdminWindow(fixture.Data, Lookup)); ShowOffscreen(admin);
+        await WaitUntil(() => admin.IsEnabled, "Setup not loaded.");
+        Control<ComboBox>(admin, "ImportPlantBox").SelectedItem = StockroomPlant.Find("02");
+        Control<TextBox>(admin, "BulkItemIdsBox").Text = "NSOP PENDING NEVER";
+        Click(Control<Button>(admin, "BulkImportButton"));
+        await WaitUntil(() => reads.Count == 2, "Second lookup never started.");
+        var cancel = Control<Button>(admin, "CancelPartImportButton");
+        Require(cancel.IsEnabled && !Control<TabControl>(admin, "SetupTabs").IsEnabled, "Cancel unavailable during bulk import.");
+        Click(cancel);
+        await WaitUntil(() => Control<TabControl>(admin, "SetupTabs").IsEnabled, "Cancel did not finish.");
+        Require(reads.Count == 2 && fixture.Data.LoadParts().Any(p => p.PartNumber == "NSOP") && !fixture.Data.LoadParts().Any(p => p.PartNumber == "PENDING"), "Cancel lost committed data or imported pending items.");
+        admin.Close();
+    }
+
+    private static async Task DirectItemSearch(bool unchanged)
+    {
+        const string id = "0273012250428";
+        string root = NewDirectory(), path = Path.Combine(root, "item.html");
+        string html = """
+        <html><body><div class="inventory-container"><input class="search-input"></div>
+        <div class="search-info">Searching: <span class="search-terms"></span></div>
+        <table><tr><th>ITEM ID</th><th>ITEM NAME</th><th>AVAILABLE</th><th>LOCATION</th><th>DESCRIPTION</th><th>PLANT</th></tr>
+        <tr id="row"><td>0273012250428</td><td>Old inventory</td><td>999</td><td>OLD</td><td>Stale</td><td>HRM</td></tr></table>
+        <script>document.querySelector('input').addEventListener('change',e=>{
+        document.querySelector('.search-terms').textContent=e.target.value;
+        setTimeout(()=>{document.querySelector('#row').innerHTML='<td>0273012250428</td><td>Imported additive</td><td>51,071.52</td><td>TRUCK SHOP</td><td>Complete source specification</td><td>HRM</td>';},1800);
+        });</script></body></html>
+        """;
+        if (unchanged) html = html.Replace("},1800);", "},60000);");
+        File.WriteAllText(path, html);
+        if (!unchanged && Environment.GetEnvironmentVariable("SAFETYGATE_ITEM_SMOKE_FIXTURE") is { Length: > 0 } output)
+        { Directory.CreateDirectory(Path.GetDirectoryName(output)!); File.WriteAllText(output, html); }
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(unchanged ? 8 : 18));
+        try
+        {
+            var snapshot = await StockroomWebViewReader.SearchAsync(new Uri(path).AbsoluteUri, id, cancel.Token);
+            Require(!unchanged, "Initial inventory was accepted without a result update.");
+            var part = StockroomService.ImportItem(snapshot, id);
+            Require(part.PartNumber == id && part.Description == "Imported additive" && part.ReportedQuantity == 51071.52m && part.BinLocation == "TRUCK SHOP" && part.Site == "HRM" && part.StockroomDescription == "Complete source specification", "Unhighlighted delayed results lost source fields or accepted stale inventory.");
+        }
+        catch (OperationCanceledException) when (unchanged && cancel.IsCancellationRequested)
+        { Require(StockroomWebViewReader.LastSearchDiagnostics.Contains(id) && StockroomWebViewReader.LastSearchDiagnostics.Contains("tableChanged=False"), "Rejection did not exercise acknowledged unchanged inventory."); }
     }
 
     private static Task InteractiveStockroomSearch() => InteractiveStockroomSearch(false);
@@ -755,7 +840,7 @@ internal static class Program
         try
         {
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(18));
-            var result = embedded ? await StockroomService.FetchAsync(url, deadline.Token, requested: ["0117719"], interactiveReader: (address, token) => StockroomWebViewReader.SearchAsync(address, term, token)) : await StockroomService.FetchAsync(url, deadline.Token);
+            var result = embedded ? await StockroomService.FetchAsync(url, deadline.Token, requested: ["0117719"], interactiveReader: (address, token) => term == "Safe2Cross" ? StockroomWebViewReader.FetchAsync(address, token) : StockroomWebViewReader.SearchAsync(address, term, token)) : await StockroomService.FetchAsync(url, deadline.Token);
             if (term != "Safe2Cross") Require(StockroomService.ImportItem(result, term).Description == term + " Gate", "Item ID metadata not returned.");
             if (embedded) Require(result.Reader == "WebView2: " + term + " search", "Embedded reader fell back to the unfiltered initial table.");
             Require(searches > 0 && result.Rows.Select(r => r.Stock).Distinct().Count() == 19 && result.Rows.Single(r => r.Stock == "0117719").Quantity == 0, "Interactive stockroom search did not return all 19 items, including the zero-stock scanner.");
@@ -1419,6 +1504,7 @@ internal static class Program
     private static async Task GuidedPlantSetup()
     {
         string root = NewDirectory(); var data = new DataService(false, Path.Combine(root, "local"));
+        data.Settings.SharedRoot = Path.Combine(root, "not-initialized");
         var admin = Track(new AdminWindow(data)); ShowOffscreen(admin);
         await WaitUntil(() => admin.IsEnabled, "Guided Setup did not load.");
         Require(Control<TabItem>(admin, "StartSetupTab").IsSelected && Control<TabItem>(admin, "ResourcesSetupTab").Visibility == Visibility.Collapsed, "Setup did not start with a focused first-plant flow.");
