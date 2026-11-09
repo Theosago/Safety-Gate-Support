@@ -116,6 +116,7 @@ public static class StockroomBrowserReader
           if(!['search','text'].includes(type)||el.disabled||el.readOnly||el.getClientRects().length===0)continue;
           const hint=[el.name,el.id,el.placeholder,el.getAttribute('aria-label'),el.closest('label')?.textContent].join(' ').toLowerCase();
           let s=type==='search'?10:0;
+          if(el.matches('.inventory-container input.search-input'))s+=40;
           if(/search|filter|keyword|query/.test(hint))s+=8;
           if(s>0&&/stock|inventory|storeroom|material/.test(hint))s+=6;
           if(el.closest('.dataTables_filter,.dt-search'))s+=20;

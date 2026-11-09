@@ -785,7 +785,8 @@ internal static class Program
             Require(part.PartNumber == id && part.Description == "Imported additive" && part.ReportedQuantity == 51071.52m && part.BinLocation == "TRUCK SHOP" && part.Site == "HRM" && part.StockroomDescription == "Complete source specification", "Unhighlighted delayed results lost source fields or accepted stale inventory.");
         }
         catch (OperationCanceledException) when (unchanged && cancel.IsCancellationRequested)
-        { Require(StockroomWebViewReader.LastSearchDiagnostics.Contains(id) && StockroomWebViewReader.LastSearchDiagnostics.Contains("tableChanged=False"), "Rejection did not exercise acknowledged unchanged inventory."); }
+        { Require(StockroomWebViewReader.LastSearchDiagnostics.Contains(id) && StockroomWebViewReader.LastSearchDiagnostics.Contains("tableChanged=False"), "Rejection did not exercise acknowledged unchanged inventory: " + StockroomWebViewReader.LastSearchDiagnostics); }
+        catch (Exception error) when (!unchanged) { throw new InvalidOperationException("Direct ID fixture: " + StockroomWebViewReader.LastSearchDiagnostics, error); }
     }
 
     private static Task InteractiveStockroomSearch() => InteractiveStockroomSearch(false);
