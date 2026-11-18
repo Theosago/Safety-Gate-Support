@@ -1,0 +1,25 @@
+<Window x:Class="SafetyGateSupport.OperatorDriveWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Operator PDF · Google Drive" Width="700" SizeToContent="Height"
+ WindowStartupLocation="CenterOwner" Style="{StaticResource {x:Type Window}}">
+ <StackPanel Margin="24">
+  <TextBlock x:Name="UnitText" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,12"/>
+  <TextBlock Text="Operator PDF in the shared data folder" />
+  <DockPanel Margin="0,4,0,12">
+   <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="Browse…" Click="Browse_Click"/>
+   <TextBox x:Name="PdfBox" IsReadOnly="True"/>
+  </DockPanel>
+  <TextBlock Text="Google Shared Drive root folder ID" />
+  <TextBox x:Name="RootBox" Margin="0,4,0,12"/>
+  <TextBlock Text="Existing Drive PDF ID (optional if the filename matches)" />
+  <TextBox x:Name="FileBox" Margin="0,4,0,12"/>
+  <TextBlock Text="Automatic sync checks both copies while the app runs. Use an approved operator-only PDF and a pilot folder." TextWrapping="Wrap" Margin="0,0,0,12"/>
+  <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,8"/>
+  <TextBox x:Name="LinkBox" IsReadOnly="True" Visibility="Collapsed" Margin="0,0,0,8"/>
+  <WrapPanel>
+   <Button x:Name="SyncButton" Content="Enable sync" Click="Sync_Click"/>
+   <Button x:Name="PauseButton" Content="Pause sync" Click="Pause_Click" IsEnabled="False"/>
+   <Button x:Name="OpenButton" Content="Open Drive PDF" Click="Open_Click" IsEnabled="False"/>
+   <Button x:Name="QrButton" Content="Save QR label" Click="Qr_Click" IsEnabled="False"/>
+  </WrapPanel>
+ </StackPanel>
+</Window>

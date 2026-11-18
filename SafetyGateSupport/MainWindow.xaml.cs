@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     private string _manualFilterGateId = "";
     private string _manualFilterUnitId = "";
 
+    private readonly DispatcherTimer _operatorDriveTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly DispatcherTimer _notesSaveTimer = new() { Interval = TimeSpan.FromMilliseconds(900) };
     private readonly DispatcherTimer _notesRefreshTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private readonly DispatcherTimer _searchDebounceTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
@@ -70,6 +71,14 @@ public partial class MainWindow : Window
         _searchIndexRefreshTimer.Tick += (_, _) => _ = RefreshSearchIndexAsync();
         _notesRefreshTimer.Start();
         _searchIndexRefreshTimer.Start();
+        if (!data.IsHomePreview && !data.IsOnboardingDemo)
+        {
+            _operatorDriveTimer.Tick += async (_, _) =>
+            {
+                if (_sharedDataReady) await OperatorDriveRunner.RunAsync(Path.GetFullPath(_data.SharedRoot));
+            };
+            _operatorDriveTimer.Start();
+        }
         Closing += (_, args) => { if (InlineBusy) { args.Cancel = true; MessageBox.Show(this, "Finish or cancel the current USB/file operation before closing."); } else { CloseInlineTool(); SaveSharedNotesNow(); } };
         Closed += (_, _) =>
         {
@@ -83,6 +92,7 @@ public partial class MainWindow : Window
             _notesRefreshTimer.Stop();
             _searchDebounceTimer.Stop();
             _searchIndexRefreshTimer.Stop();
+            _operatorDriveTimer.Stop();
         };
         ShowHome();
         HomeSubtitleText.Text = _data.IsHomePreview ? "HOME PREVIEW • Local starter photos and units. Select a photo card, or search Asset DEMO to explore the sample light configuration. USB is disabled." : _content.HomeSubtitle;

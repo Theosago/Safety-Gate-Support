@@ -71,6 +71,7 @@
      <TextBlock x:Name="PilotQrStatus" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8"/>
      <WrapPanel><Button x:Name="EditPilotQrButton" Content="Edit pilot QR settings" Click="StartPhoneGuides_Click"/><Button Content="Export this pilot…" Click="ExportPilotPhoneGuide_Click"/></WrapPanel>
      <TextBlock x:Name="PilotExportStatus" TextWrapping="Wrap"/>
+     <Button Content="Google Drive operator PDF…" Click="OpenOperatorDrivePilot_Click" HorizontalAlignment="Left"/>
     </StackPanel></GroupBox>
    </StackPanel></ScrollViewer></TabItem>
 

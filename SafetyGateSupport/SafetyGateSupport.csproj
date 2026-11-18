@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3650.58" />
     <PackageReference Include="QRCoder" Version="1.8.1"/>
+    <PackageReference Include="Google.Apis.Auth" Version="1.78.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <EmbeddedResource Include="SeedData.zip" />
     <EmbeddedResource Include="DemoAssets/*" />
