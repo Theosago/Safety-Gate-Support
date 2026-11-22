@@ -81,7 +81,7 @@ internal sealed record OperatorPublicationSources(OperatorGuideSection? Primary,
         if (primary is not null) sections.Insert(0, primary with { Title = "Electrical drawing" });
         var fingerprint = JsonSerializer.SerializeToUtf8Bytes(new
         {
-            LayoutVersion = 1,
+            LayoutVersion = 2,
             item.Label,
             item.Gate.Category,
             item.Gate.Location,

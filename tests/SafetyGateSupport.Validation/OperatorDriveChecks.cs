@@ -62,6 +62,7 @@ internal static class OperatorDriveChecks
             Require(guide.GetPage(1).GetImages().Count() == 1, "The cover should include the unit identification photo.");
             Require(guide.NumberOfPages == 3, "The guide should contain a cover, the drawing and the explicitly attached PDF.");
             Require(guide.GetPage(1).Text.Contains("1066", StringComparison.Ordinal) &&
+                guide.GetPage(1).Text.Contains("Gränges", StringComparison.Ordinal) &&
                 guide.GetPage(1).Text.Contains("Signal column", StringComparison.Ordinal) &&
                 guide.GetPage(2).Text.Contains("ELECTRICAL SCHEMATIC", StringComparison.Ordinal), "The cover and source page text should be readable.");
             using var standalone = PdfDocument.Open(File.ReadAllBytes(first.PdfPath));
@@ -158,14 +159,14 @@ internal static class OperatorDriveChecks
 
     private static void CheckQrLabels()
     {
-        var labels = Enumerable.Range(1, 11).Select(i => new UnitQrLabel("Asset 1066", $"Unit {i}", "West bay",
+        var labels = Enumerable.Range(1, 11).Select(i => new UnitQrLabel("Asset 1066", $"Unit {i}", "Mérida",
             $"https://drive.google.com/drive/folders/stable{i}")).ToArray();
         byte[] bytes = OperatorPublishingPdf.QrLabels(labels);
         using var pdf = PdfDocument.Open(bytes);
         Require(pdf.NumberOfPages == 2 && pdf.GetPage(1).Width == 612 && pdf.GetPage(1).Height == 792,
             "All labels should fit across two US Letter print sheets.");
         Require(pdf.GetPage(1).GetAnnotations().Count() == 8 && pdf.GetPage(2).GetAnnotations().Count() == 3 &&
-            pdf.GetPage(2).Text.Contains("Unit 11"), "Each label needs a clickable URL and explicit unit name.");
+            pdf.GetPage(2).Text.Contains("Unit 11") && pdf.GetPage(2).Text.Contains("Mérida"), "Each label needs a clickable URL and explicit unit name.");
         var destinations = new List<string>();
         foreach (var page in pdf.GetPages())
         {
@@ -216,7 +217,7 @@ internal static class OperatorDriveChecks
         {
             Data = new(false, Path.Combine(DirectoryPath, "settings"));
             Data.CreateBlankPlantLibrary(Path.Combine(DirectoryPath, "share"), "Assembly");
-            Gate = new() { Id = "gate1", AssetNumber = "1066", AssetFolder = "Assets/Asset 1066", Category = "Assembly", Location = "West bay" };
+            Gate = new() { Id = "gate1", AssetNumber = "1066", AssetFolder = "Assets/Asset 1066", Category = "Assembly", Location = "West bay", Manufacturer = "Gränges" };
             Units = [new() { Id = "unit2", GateId = Gate.Id, UnitNumber = "2" }, new() { Id = "unit3", GateId = Gate.Id, UnitNumber = "3" }];
             Data.SaveGates([Gate]);
             Data.SaveSystems([.. Units]);

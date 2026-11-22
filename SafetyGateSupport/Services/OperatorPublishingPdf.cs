@@ -1,7 +1,10 @@
+using System.IO;
+using System.Text;
 using QRCoder;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Actions;
+using UglyToad.PdfPig.Annotations;
 using UglyToad.PdfPig.Core;
-using UglyToad.PdfPig.Fonts.Standard14Fonts;
 using UglyToad.PdfPig.Outline;
 using UglyToad.PdfPig.Outline.Destinations;
 using UglyToad.PdfPig.Writer;
@@ -14,6 +17,9 @@ internal sealed record UnitQrLabel(string Asset, string Unit, string Location, s
 
 internal static class OperatorPublishingPdf
 {
+    private static readonly Lazy<byte[]> RegularFont = new(() => ReadFont("Regular"));
+    private static readonly Lazy<byte[]> BoldFont = new(() => ReadFont("Bold"));
+    private static readonly AnnotationBorder BorderlessLink = new(0, 0, 0, []);
     private const double Width = 612, Height = 792;
     private static readonly (byte, byte, byte) Ink = (18, 42, 58), Muted = (63, 83, 96),
         Accent = (0, 102, 108), Pale = (237, 244, 246), Line = (192, 209, 216), White = (255, 255, 255);
@@ -24,8 +30,8 @@ internal static class OperatorPublishingPdf
         using var document = new PdfDocumentBuilder(1.7);
         document.DocumentInformation.Title = item.Label + " - Unit guide";
         document.DocumentInformation.Subject = "Unit identification and electrical reference";
-        var normal = document.AddStandard14Font(Standard14Font.Helvetica);
-        var bold = document.AddStandard14Font(Standard14Font.HelveticaBold);
+        var normal = document.AddTrueTypeFont(RegularFont.Value);
+        var bold = document.AddTrueTypeFont(BoldFont.Value);
         var cover = document.AddPage(Width, Height);
         var entries = new List<(string Title, int Page, int Count)>();
         int contentsPages = sources.Count > 3 ? (int)Math.Ceiling((sources.Count - 3) / 19d) : 0;
@@ -82,7 +88,7 @@ internal static class OperatorPublishingPdf
         if (contentsPages > 0)
         {
             Text(cover, "More documents on the next page", 36, 149, 11, normal, Accent, 540);
-            cover.AddLink(Destination(2), new PdfRectangle(36, 142, 310, 161));
+            Link(cover, new GoToAction(Destination(2)), new PdfRectangle(36, 142, 310, 161));
         }
 
         double next = 36;
@@ -115,7 +121,7 @@ internal static class OperatorPublishingPdf
         Text(page, entry.Title, 47, y, 12, bold, Ink, 414);
         string pageNumber = entry.Count == 1 ? $"Page {entry.Page}" : $"Pages {entry.Page}-{entry.Page + entry.Count - 1}";
         Text(page, pageNumber, 475, y, 10, normal, Accent, 94);
-        page.AddLink(Destination(entry.Page), new PdfRectangle(36, y - 9, 576, y + 19));
+        Link(page, new GoToAction(Destination(entry.Page)), new PdfRectangle(36, y - 9, 576, y + 19));
     }
 
     private static void Footer(PdfPageBuilder page, string folderLink, PdfDocumentBuilder.AddedFont font, string section)
@@ -130,7 +136,7 @@ internal static class OperatorPublishingPdf
     {
         double width = Text(page, label, x, y, 11, font, Accent, 350);
         if (MobileSupportExporter.ValidLink(link))
-            page.AddLink(link, new PdfRectangle(x, y - 4, x + width, y + 13));
+            Link(page, new UriAction(link), new PdfRectangle(x, y - 4, x + width, y + 13));
         return width;
     }
 
@@ -142,8 +148,8 @@ internal static class OperatorPublishingPdf
 
         using var document = new PdfDocumentBuilder();
         document.DocumentInformation.Title = "Safety Gate Support - Unit QR codes";
-        var normal = document.AddStandard14Font(Standard14Font.Helvetica);
-        var bold = document.AddStandard14Font(Standard14Font.HelveticaBold);
+        var normal = document.AddTrueTypeFont(RegularFont.Value);
+        var bold = document.AddTrueTypeFont(BoldFont.Value);
         using var generator = new QRCodeGenerator();
         const int perPage = 8;
         for (int start = 0; start < labels.Count; start += perPage)
@@ -166,12 +172,15 @@ internal static class OperatorPublishingPdf
                 Text(page, label.Unit, x + 117, y + 90, 16, bold, Ink, 151);
                 Text(page, label.Location, x + 117, y + 67, 10, normal, Muted, 151);
                 Text(page, "Scan to open unit files", x + 117, y + 40, 10, normal, Accent, 151);
-                page.AddLink(label.Url, new PdfRectangle(x + 10, y + 35, x + 113, y + 138));
+                Link(page, new UriAction(label.Url), new PdfRectangle(x + 10, y + 35, x + 113, y + 138));
             }
             Text(page, "Print at actual size (100%). Cut along the borders.", 28, 23, 9, normal, Muted, 550);
         }
         return document.Build();
     }
+
+    private static void Link(PdfPageBuilder page, PdfAction action, PdfRectangle rectangle) =>
+        page.AddLink(new LinkAnnotation(action, rectangle, BorderlessLink));
 
     private static void DrawQr(PdfPageBuilder page, QRCodeData code, double x, double y, double size)
     {
@@ -204,20 +213,42 @@ internal static class OperatorPublishingPdf
     private static double Text(PdfPageBuilder page, string value, double x, double y, double size,
         PdfDocumentBuilder.AddedFont font, (byte R, byte G, byte B) color, double maxWidth)
     {
-        // Standard PDF fonts support Latin text. Replace unsupported marks before measuring the line.
-        const string punctuation = "‘’“”–—…";
-        value = new string(value.Select(c => c >= ' ' && c <= '~' || c >= 'À' && c <= 'ÿ' ? c
-            : char.IsWhiteSpace(c) ? ' ' : punctuation.Contains(c) ? '-' : '?').ToArray()).Trim();
+        value = new string(value.Normalize().Select(c => char.IsWhiteSpace(c) || char.IsControl(c) ? ' ' : c)
+            .Take(180).ToArray()).Trim();
         if (value.Length == 0) return 0;
         double Measure(string text) => page.MeasureText(text, size, new PdfPoint(0, 0), font)[^1].EndBaseLine.X;
-        if (Measure(value) > maxWidth)
+        double width;
+        try { width = Measure(value); }
+        catch (InvalidOperationException)
         {
-            value = value[..Math.Min(value.Length, 140)];
+            // Names may include characters outside the embedded font. Continue publishing with a visible replacement.
+            var supported = new StringBuilder(value.Length);
+            foreach (var rune in value.EnumerateRunes())
+            {
+                string symbol = rune.ToString();
+                try { Measure(symbol); supported.Append(symbol); }
+                catch (InvalidOperationException) { supported.Append('?'); }
+            }
+            value = supported.ToString();
+            width = Measure(value);
+        }
+        if (width > maxWidth)
+        {
             while (value.Length > 0 && Measure(value + "...") > maxWidth) value = value[..^1].TrimEnd();
             value += "...";
+            width = Measure(value);
         }
         page.SetTextAndFillColor(color.R, color.G, color.B);
         page.AddText(value, size, new PdfPoint(x, y), font);
-        return Measure(value);
+        return width;
+    }
+
+    private static byte[] ReadFont(string weight)
+    {
+        using var stream = typeof(OperatorPublishingPdf).Assembly.GetManifestResourceStream($"Publishing.LiberationSans-{weight}.ttf")
+            ?? throw new InvalidOperationException("The embedded publishing font is unavailable.");
+        using var output = new MemoryStream();
+        stream.CopyTo(output);
+        return output.ToArray();
     }
 }
