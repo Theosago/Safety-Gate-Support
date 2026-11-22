@@ -66,7 +66,7 @@ internal static class Program
             ];
             checks.AddRange(SearchChecks.Cases);
             checks.AddRange(SupportLibraryChecks.Cases);
-            checks.Add(("One operator PDF syncs both ways while retaining its Drive ID and prior copies", OperatorDriveChecks.Check));
+            checks.Add(("One operator PDF publishes from Q drive with a stable unit QR and shared notes", OperatorDriveChecks.Check));
             checks.AddRange(AssetStorageChecks.Cases);
             checks.AddRange(AreaChecks.Cases);
             checks.Add(("PDF reading direction detects upside-down and sideways text including page rotation metadata", DrawingOrientationChecks.Check));

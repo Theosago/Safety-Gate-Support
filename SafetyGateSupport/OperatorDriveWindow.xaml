@@ -12,14 +12,15 @@
   <TextBox x:Name="RootBox" Margin="0,4,0,12"/>
   <TextBlock Text="Existing Drive PDF ID (optional if the filename matches)" />
   <TextBox x:Name="FileBox" Margin="0,4,0,12"/>
-  <TextBlock Text="Automatic sync checks both copies while the app runs. Use an approved operator-only PDF and a pilot folder." TextWrapping="Wrap" Margin="0,0,0,12"/>
+  <TextBlock Text="Publishes the approved shared-drive PDF to the unit folder. Operators edit notes in a separate Google Doc." TextWrapping="Wrap" Margin="0,0,0,12"/>
   <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,8"/>
   <TextBox x:Name="LinkBox" IsReadOnly="True" Visibility="Collapsed" Margin="0,0,0,8"/>
   <WrapPanel>
    <Button x:Name="SyncButton" Content="Enable sync" Click="Sync_Click"/>
    <Button x:Name="PauseButton" Content="Pause sync" Click="Pause_Click" IsEnabled="False"/>
-   <Button x:Name="OpenButton" Content="Open Drive PDF" Click="Open_Click" IsEnabled="False"/>
-   <Button x:Name="QrButton" Content="Save QR label" Click="Qr_Click" IsEnabled="False"/>
+   <Button x:Name="OpenButton" Content="Open unit folder" Click="Open_Click" IsEnabled="False"/>
+   <Button x:Name="NotesButton" Content="Open operator notes" Click="Notes_Click" IsEnabled="False"/>
+   <Button x:Name="QrButton" Content="Save unit folder QR" Click="Qr_Click" IsEnabled="False"/>
   </WrapPanel>
  </StackPanel>
 </Window>

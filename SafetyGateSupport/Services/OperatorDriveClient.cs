@@ -93,12 +93,17 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
         ReadAsync<Item>(HttpMethod.Patch, Upload + "files/" + Uri.EscapeDataString(id) + FileQuery + "&uploadType=media",
             PdfContent(bytes), token, etag);
 
-    internal async Task<byte[]> DownloadAsync(string id, CancellationToken token)
+    internal async Task<Item> NotesAsync(Item unit, string? id, CancellationToken token)
     {
-        using var response = await SendAsync(HttpMethod.Get,
-            Api + "files/" + Uri.EscapeDataString(id) + "?supportsAllDrives=true&alt=media", null, token);
-        using var stream = await response.Content.ReadAsStreamAsync(token);
-        return await OperatorDrivePilot.ReadLimitedAsync(stream, token);
+        const string name = "Operator notes";
+        const string mimeType = "application/vnd.google-apps.document";
+        var notes = id is null ? await FindAsync(unit, name, token) : await GetAsync(id, token);
+        notes ??= await ReadAsync<Item>(HttpMethod.Post, Api + "files" + FileQuery,
+            JsonContent.Create(new { name, mimeType, parents = new[] { unit.Id } }), token);
+        if (notes.Trashed || notes.MimeType != mimeType || notes.DriveId != unit.DriveId ||
+            notes.Parents?.Contains(unit.Id) != true)
+            throw new InvalidOperationException("Expected an Operator notes Google Doc in the unit folder.");
+        return notes;
     }
 
     private async Task<T> ReadAsync<T>(HttpMethod method, string url, HttpContent? content, CancellationToken token, string? etag = null)

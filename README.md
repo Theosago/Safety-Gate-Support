@@ -13,7 +13,7 @@ Version 8.4.4 adds PLC, light column and scanner examples to the operator demo a
 
 Version 8.4.3 adds a [fictional operator demo and a guided first-unit checklist](docs/V8_4_3.md).
 
-The [Google Drive pilot](docs/GOOGLE_DRIVE_PILOT.md) synchronizes one approved operator PDF and creates a printable QR label for its Drive link.
+The [Google Drive pilot](docs/GOOGLE_DRIVE_PILOT.md) publishes one approved operator PDF from the shared library and creates a printable QR label for its unit folder.
 
 Version 8.4.2 adds a [one-unit QR pilot](docs/V8_4_2.md).
 

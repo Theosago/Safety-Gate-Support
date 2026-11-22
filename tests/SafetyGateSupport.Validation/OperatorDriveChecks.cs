@@ -41,27 +41,23 @@ internal static class OperatorDriveChecks
             pilot = OperatorDrivePilot.Load(state)!;
             Require(handler.Patches == 1 && handler.Creates == 1 && handler.Bytes!.SequenceEqual(second)
                 && pilot.FileId == "pdf-id" && pilot.Link == PilotDrive.Link, "Local changes should patch the same Drive file.");
-            Require(MobileSupportExporter.QrSvg(pilot.Link!).Contains("<svg"), "The stable link should produce a QR label.");
+            Require(pilot.FolderLink == "https://drive.google.com/drive/folders/unit-folder"
+                && MobileSupportExporter.QrSvg(pilot.FolderLink).Contains("<svg"), "The unit folder should supply the QR target.");
+            Require(pilot.NotesId == "notes" && pilot.NotesLink == "https://docs.google.com/document/d/notes/edit"
+                && handler.NotesCreates == 1, "Publishing should create and reuse one operator notes document.");
 
-            byte[] third = Pdf("Drive revision");
+            byte[] third = Pdf("unexpected Drive revision");
             handler.Change(third);
-            await pilot.SyncAsync(client, state, default);
-            pilot = OperatorDrivePilot.Load(state)!;
-            string backup = Directory.GetFiles(Path.Combine(root, ".operator-pdf-history")).Single();
-            Require((await File.ReadAllBytesAsync(local)).SequenceEqual(third)
-                && (await File.ReadAllBytesAsync(backup)).SequenceEqual(second), "Drive changes should update the local PDF and preserve its previous bytes.");
+            await ExpectDriveDifferenceAsync(pilot, client, state);
+            Require((await File.ReadAllBytesAsync(local)).SequenceEqual(second) && handler.Bytes!.SequenceEqual(third),
+                "A Drive-only edit must preserve both the Q drive source and the unexpected remote revision.");
+            Require(Directory.GetFiles(root).Length == 2, "Publishing should create no local backup beside the source.");
 
             byte[] conflicting = Pdf("local conflict");
             await File.WriteAllBytesAsync(local, conflicting);
-            handler.Change(Pdf("remote conflict"));
-            try
-            {
-                await pilot.SyncAsync(client, state, default);
-                throw new Exception("Expected a conflict.");
-            }
-            catch (InvalidOperationException error) when (error.Message.Contains("both copies")) { }
+            await ExpectDriveDifferenceAsync(pilot, client, state);
             Require(handler.Patches == 1 && (await File.ReadAllBytesAsync(local)).SequenceEqual(conflicting)
-                && OperatorDrivePilot.Load(state) == pilot, "Conflicts should retain both sides and the prior sync state.");
+                && OperatorDrivePilot.Load(state) == pilot, "Conflicts should retain both sides and the prior publish state.");
 
             // Bind a legacy PDF using its ID even when its Drive name differs.
             await File.WriteAllBytesAsync(local, handler.Bytes!);
@@ -71,6 +67,16 @@ internal static class OperatorDriveChecks
                 "An existing Drive ID should be adopted in place.");
         }
         finally { Directory.Delete(root, recursive: true); }
+    }
+
+    private static async Task ExpectDriveDifferenceAsync(OperatorDrivePilot pilot, OperatorDriveClient client, string state)
+    {
+        try
+        {
+            await pilot.SyncAsync(client, state, default);
+            throw new Exception("Expected a Drive conflict.");
+        }
+        catch (InvalidOperationException error) when (error.Message.Contains("Q drive copy was preserved")) { }
     }
 
     private static byte[] Pdf(string text) => Encoding.ASCII.GetBytes("%PDF-1.7\n" + text);
@@ -85,6 +91,7 @@ internal static class OperatorDriveChecks
         internal const string Link = "https://drive.google.com/file/d/pdf-id/view";
         internal byte[]? Bytes { get; private set; }
         internal int Creates { get; private set; }
+        internal int NotesCreates { get; private set; }
         internal int Patches { get; private set; }
         private int _version;
         private bool _assetCreated;
@@ -111,6 +118,13 @@ internal static class OperatorDriveChecks
                     return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
                 }
                 string folder = await request.Content!.ReadAsStringAsync(ct);
+                if (folder.Contains("Operator notes"))
+                {
+                    Require(folder.Contains("unit-folder") && folder.Contains("application/vnd.google-apps.document"),
+                        "Notes should be a Google Doc in the unit folder.");
+                    NotesCreates++;
+                    return Json(NotesItem());
+                }
                 if (folder.Contains("Asset A")) { _assetCreated = true; return Json(Folder("asset", "root")); }
                 Require(folder.Contains("Unit 1") && folder.Contains("asset"), "The Unit folder should be nested under the Asset folder.");
                 _unitCreated = true;
@@ -134,11 +148,17 @@ internal static class OperatorDriveChecks
                 "root" => Json(Folder("root")),
                 "asset" => Json(Folder("asset", "root")),
                 "unit-folder" => Json(Folder("unit-folder", "asset")),
-                "pdf-id" when query.Contains("alt=media") => new(HttpStatusCode.OK) { Content = new ByteArrayContent(Bytes!) },
+                "notes" => Json(NotesItem()),
                 "pdf-id" => Json(PdfItem()),
                 _ => throw new InvalidOperationException("Unexpected fixture request.")
             };
         }
+
+        private static object NotesItem() => new
+        {
+            id = "notes", parents = new[] { "unit-folder" }, driveId = "shared-drive",
+            mimeType = "application/vnd.google-apps.document"
+        };
 
         private object PdfItem() => new
         {

@@ -14,6 +14,7 @@ public partial class OperatorDriveWindow : Window
     private readonly SafetySystem _unit;
     private readonly DispatcherTimer _refresh = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _busy;
+    private string? _notesLink;
 
     public OperatorDriveWindow(DataService data, SafetyGate asset, SafetySystem unit)
     {
@@ -48,7 +49,8 @@ public partial class OperatorDriveWindow : Window
                     RootBox.Text = pilot.DriveRoot;
                     FileBox.Text = pilot.FileId ?? "";
                 }
-                LinkBox.Text = pilot!.Link ?? "";
+                LinkBox.Text = pilot!.FolderLink ?? "";
+                _notesLink = pilot.NotesLink;
                 StatusText.Text = pilot.Paused ? "Automatic sync is paused." : OperatorDriveRunner.Status;
             }
             else if (pilot is not null)
@@ -56,6 +58,7 @@ public partial class OperatorDriveWindow : Window
                 StatusText.Text = $"This workstation is configured for {pilot.Asset} / {pilot.Unit}.";
             }
             LinkBox.Visibility = LinkBox.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            NotesButton.IsEnabled = MobileSupportExporter.ValidLink(_notesLink ?? "");
             OpenButton.IsEnabled = QrButton.IsEnabled = MobileSupportExporter.ValidLink(LinkBox.Text);
         }
         catch (Exception error)
@@ -126,9 +129,14 @@ public partial class OperatorDriveWindow : Window
         catch (Exception error) { StatusText.Text = error.Message; }
     }
 
+    private void Notes_Click(object sender, RoutedEventArgs e)
+    {
+        if (_notesLink is not null) FileLauncherService.Open(_notesLink);
+    }
+
     private void Qr_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new SaveFileDialog { Filter = "Printable QR image|*.svg", FileName = "Operator-PDF-QR.svg" };
+        var picker = new SaveFileDialog { Filter = "Printable QR image|*.svg", FileName = "Operator-Unit-QR.svg" };
         if (picker.ShowDialog(this) != true) return;
         try { File.WriteAllText(picker.FileName, MobileSupportExporter.QrSvg(LinkBox.Text)); }
         catch (Exception error) { StatusText.Text = error.Message; }

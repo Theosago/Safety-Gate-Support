@@ -6,7 +6,8 @@ namespace SafetyGateSupport.Services;
 
 internal sealed record OperatorDrivePilot(string SharedRoot, string GateId, string UnitId,
     string Asset, string Unit, string RelativePdf, string DriveRoot, string? FileId,
-    string? LastHash = null, string? Link = null, string? PendingFileId = null, bool Paused = false)
+    string? LastHash = null, string? Link = null, string? PendingFileId = null, bool Paused = false,
+    string? FolderId = null, string? FolderLink = null, string? NotesId = null, string? NotesLink = null)
 {
     internal const int MaximumPdfBytes = 25 * 1024 * 1024;
     internal static readonly string StatePath = Path.Combine(
@@ -47,7 +48,13 @@ internal sealed record OperatorDrivePilot(string SharedRoot, string GateId, stri
         bool linked = FileId is not null || PendingFileId is not null;
         var asset = await drive.FolderAsync(root, Asset, create: !linked, token);
         var unit = await drive.FolderAsync(asset, Unit, create: !linked, token);
-        var state = this;
+        if (FolderId is not null && unit.Id != FolderId)
+            throw new InvalidOperationException("The original Drive unit folder is unavailable. Restore it to continue publishing.");
+        var state = this with
+        {
+            FolderId = unit.Id,
+            FolderLink = unit.WebViewLink ?? $"https://drive.google.com/drive/folders/{unit.Id}"
+        };
         var remote = FileId is not null
             ? await drive.GetAsync(FileId, token)
             : PendingFileId is not null
@@ -58,7 +65,7 @@ internal sealed record OperatorDrivePilot(string SharedRoot, string GateId, stri
         if (remote is null)
         {
             string id = PendingFileId ?? await drive.GenerateIdAsync(token);
-            state = this with { PendingFileId = id, LastHash = localHash };
+            state = state with { PendingFileId = id, LastHash = localHash };
             state.Save(statePath);
             remote = await drive.CreatePdfAsync(id, unit.Id, Path.GetFileName(local), bytes, token);
             result = "Published operator PDF.";
@@ -74,56 +81,32 @@ internal sealed record OperatorDrivePilot(string SharedRoot, string GateId, stri
         string remoteHash = remote.Md5Checksum;
         if (localHash != remoteHash)
         {
-            if (LastHash is null || (localHash != LastHash && remoteHash != LastHash))
-                throw new InvalidOperationException("The shared-folder and Drive PDFs differ. Sync paused. Review both copies and make them match to resume.");
+            if (LastHash is null || remoteHash != LastHash)
+                throw new InvalidOperationException("The Drive PDF differs from the last approved copy. Review it in Drive before publishing again. The Q drive copy was preserved.");
 
-            if (remoteHash == LastHash)
-            {
-                if (Hash(await ReadPdfAsync(local, token)) != localHash)
-                    throw new IOException("The shared PDF changed during sync. Sync will retry.");
-                await drive.CheckUnchangedAsync(remote, token);
-                remote = await drive.UpdatePdfAsync(remote.Id, bytes, remote.ETag, token);
-                result = "Updated the existing Drive PDF.";
-                if (remote.Md5Checksum != localHash)
-                    throw new IOException("Drive did not confirm the uploaded PDF checksum.");
-            }
-            else
-            {
-                byte[] downloaded = await drive.DownloadAsync(remote.Id, token);
-                ValidatePdf(downloaded);
-                if (Hash(downloaded) != remoteHash) throw new IOException("Drive changed during download. Sync will retry.");
-                await drive.CheckUnchangedAsync(remote, token);
-                await ReplaceLocalAsync(local, downloaded, localHash, token);
-                localHash = remoteHash;
-                result = "Applied the Drive update to the shared operator PDF and archived the prior copy.";
-            }
+            if (Hash(await ReadPdfAsync(local, token)) != localHash)
+                throw new IOException("The shared PDF changed during publishing. The app will retry.");
+            await drive.CheckUnchangedAsync(remote, token);
+            remote = await drive.UpdatePdfAsync(remote.Id, bytes, remote.ETag, token);
+            result = "Updated the existing Drive PDF.";
+            if (remote.Md5Checksum != localHash)
+                throw new IOException("Drive did not confirm the uploaded PDF checksum.");
         }
 
-        (state with
+        state = state with
         {
             FileId = remote.Id, PendingFileId = null, LastHash = localHash,
             Link = remote.WebViewLink ?? state.Link ?? $"https://drive.google.com/file/d/{remote.Id}/view"
+        };
+        state.Save(statePath);
+
+        var notes = await drive.NotesAsync(unit, state.NotesId, token);
+        (state with
+        {
+            NotesId = notes.Id,
+            NotesLink = notes.WebViewLink ?? $"https://docs.google.com/document/d/{notes.Id}/edit"
         }).Save(statePath);
         return result;
-    }
-
-    private static async Task ReplaceLocalAsync(string path, byte[] bytes, string expectedHash, CancellationToken token)
-    {
-        string staged = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        string archive = Path.Combine(Path.GetDirectoryName(path)!, ".operator-pdf-history");
-        try
-        {
-            await File.WriteAllBytesAsync(staged, bytes, token);
-            Directory.CreateDirectory(archive);
-            string backup = Path.Combine(archive, $"{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.pdf");
-            if (Hash(await ReadPdfAsync(path, token)) != expectedHash)
-                throw new IOException("The shared PDF changed during sync. Sync will retry.");
-            token.ThrowIfCancellationRequested();
-            File.Replace(staged, path, backup);
-            if (Hash(await ReadPdfAsync(backup, token)) != expectedHash)
-                throw new IOException("The shared PDF changed during replacement. That copy is in .operator-pdf-history. Review both copies.");
-        }
-        finally { File.Delete(staged); }
     }
 
     private static async Task<byte[]> ReadPdfAsync(string path, CancellationToken token)
@@ -132,7 +115,7 @@ internal sealed record OperatorDrivePilot(string SharedRoot, string GateId, stri
         return ValidatePdf(await ReadLimitedAsync(stream, token));
     }
 
-    internal static async Task<byte[]> ReadLimitedAsync(Stream stream, CancellationToken token)
+    private static async Task<byte[]> ReadLimitedAsync(Stream stream, CancellationToken token)
     {
         using var output = new MemoryStream();
         byte[] buffer = new byte[81920];
