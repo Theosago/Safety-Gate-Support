@@ -58,8 +58,11 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
     internal async Task<Item?> FindAsync(Item parent, string name, CancellationToken token)
     {
         string q = $"'{QueryLiteral(parent.Id)}' in parents and name = '{QueryLiteral(name)}' and trashed = false";
-        string url = Api + "files?corpora=drive&includeItemsFromAllDrives=true&supportsAllDrives=true&pageSize=100"
-            + "&driveId=" + Uri.EscapeDataString(parent.DriveId!) + "&q=" + Uri.EscapeDataString(q)
+        string corpus = parent.DriveId is null
+            ? "corpora=user"
+            : "corpora=drive&includeItemsFromAllDrives=true&driveId=" + Uri.EscapeDataString(parent.DriveId);
+        string url = Api + "files?" + corpus + "&supportsAllDrives=true&pageSize=100"
+            + "&q=" + Uri.EscapeDataString(q)
             + "&fields=nextPageToken,incompleteSearch,files(" + Fields + ")";
         Item? item = null;
         string? page = null;
@@ -124,7 +127,7 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
         if (response.IsSuccessStatusCode) return response;
         var status = response.StatusCode;
         response.Dispose();
-        throw new HttpRequestException($"Google Drive returned HTTP {(int)status} for {method}. Check the linked item and Shared Drive access.", null, status);
+        throw new HttpRequestException($"Google Drive returned HTTP {(int)status} for {method}. Check the linked item and folder access for the signed-in account.", null, status);
     }
 
     private static ByteArrayContent PdfContent(byte[] bytes) =>

@@ -8,11 +8,13 @@
    <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="Browse…" Click="Browse_Click"/>
    <TextBox x:Name="PdfBox" IsReadOnly="True"/>
   </DockPanel>
-  <TextBlock Text="Google Shared Drive root folder ID" />
+  <TextBlock Text="Google Drive publishing folder link or ID" />
   <TextBox x:Name="RootBox" Margin="0,4,0,12"/>
-  <TextBlock Text="Existing Drive PDF ID (optional if the filename matches)" />
+  <TextBlock Text="Existing Drive PDF link or ID (optional if the filename matches)" />
   <TextBox x:Name="FileBox" Margin="0,4,0,12"/>
   <TextBlock Text="Publishes the approved shared-drive PDF to the unit folder. Operators edit notes in a separate Google Doc." TextWrapping="Wrap" Margin="0,0,0,12"/>
+  <Button x:Name="SignInButton" Content="Sign in with Google" Click="SignIn_Click" HorizontalAlignment="Left" Margin="0,0,0,8"/>
+  <TextBlock x:Name="SignInStatus" TextWrapping="Wrap" Margin="0,0,0,8"/>
   <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,8"/>
   <TextBox x:Name="LinkBox" IsReadOnly="True" Visibility="Collapsed" Margin="0,0,0,8"/>
   <WrapPanel>

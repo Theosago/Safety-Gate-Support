@@ -9,6 +9,7 @@ internal static class OperatorDriveRunner
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(60) };
     private static readonly SemaphoreSlim Mutex = new(1);
     private static GoogleCredential? _credential;
+    private static UserCredential? _signedIn;
     internal static string Status { get; private set; } = "";
 
     internal static async Task RunAsync(string root, Func<OperatorDrivePilot?, OperatorDrivePilot>? configure = null)
@@ -44,15 +45,31 @@ internal static class OperatorDriveRunner
         finally { Mutex.Release(); }
     }
 
+    internal static async Task SignInAsync(string path, CancellationToken token)
+    {
+        await Mutex.WaitAsync(token);
+        try { _signedIn = await OperatorDriveSignIn.ConnectAsync(path, token); }
+        finally { Mutex.Release(); }
+    }
+
     private static async Task<string> AccessTokenAsync(CancellationToken token)
     {
+        _signedIn ??= await OperatorDriveSignIn.LoadAsync(token);
+        if (_signedIn is not null)
+        {
+            try { return await _signedIn.GetAccessTokenForRequestAsync(cancellationToken: token); }
+            catch (Google.Apis.Auth.OAuth2.Responses.TokenResponseException)
+            {
+                throw new InvalidOperationException("Google sign-in expired or was revoked. Use Sign in with Google to reconnect.");
+            }
+        }
         if (_credential is null)
         {
             string? path = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-                throw new InvalidOperationException("Set GOOGLE_APPLICATION_CREDENTIALS to the Shared Drive service account JSON path, then restart the app.");
+                throw new InvalidOperationException("Select Sign in with Google and choose your Desktop app OAuth JSON.");
             _credential = CredentialFactory.FromFile<ServiceAccountCredential>(path)
-                .ToGoogleCredential().CreateScoped("https://www.googleapis.com/auth/drive");
+                .ToGoogleCredential().CreateScoped(OperatorDriveSignIn.Scope);
         }
         return await _credential.UnderlyingCredential.GetAccessTokenForRequestAsync(cancellationToken: token);
     }

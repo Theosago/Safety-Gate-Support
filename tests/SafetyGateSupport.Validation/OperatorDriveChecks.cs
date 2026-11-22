@@ -8,11 +8,15 @@ namespace SafetyGateSupport.Validation;
 
 internal static class OperatorDriveChecks
 {
-    internal static void Check() => CheckAsync().GetAwaiter().GetResult();
-
-    private static async Task CheckAsync()
+    internal static void Check()
     {
-        using var handler = new PilotDrive();
+        CheckAsync(sharedDrive: false).GetAwaiter().GetResult();
+        CheckAsync(sharedDrive: true).GetAwaiter().GetResult();
+    }
+
+    private static async Task CheckAsync(bool sharedDrive)
+    {
+        using var handler = new PilotDrive(sharedDrive);
         using var http = new HttpClient(handler);
         var client = new OperatorDriveClient(http, _ => Task.FromResult("fixture-token"));
         string root = Directory.CreateTempSubdirectory("drive-pilot-").FullName;
@@ -86,13 +90,14 @@ internal static class OperatorDriveChecks
         if (!condition) throw new Exception(message);
     }
 
-    private sealed class PilotDrive : HttpMessageHandler
+    private sealed class PilotDrive(bool sharedDrive) : HttpMessageHandler
     {
         internal const string Link = "https://drive.google.com/file/d/pdf-id/view";
         internal byte[]? Bytes { get; private set; }
         internal int Creates { get; private set; }
         internal int NotesCreates { get; private set; }
         internal int Patches { get; private set; }
+        private string? DriveId => sharedDrive ? "shared-drive" : null;
         private int _version;
         private bool _assetCreated;
         private bool _unitCreated;
@@ -139,6 +144,10 @@ internal static class OperatorDriveChecks
             }
             if (last == "files")
             {
+                Require(sharedDrive
+                    ? query.Contains("corpora=drive") && query.Contains("driveId=shared-drive")
+                    : query.Contains("corpora=user") && !query.Contains("driveId="),
+                    "Search should use the corpus for the actual parent folder.");
                 object[] files = query.Contains("name = 'Asset A'") && _assetCreated ? [Folder("asset", "root")]
                     : query.Contains("name = 'Unit 1'") && _unitCreated ? [Folder("unit-folder", "asset")] : [];
                 return Json(new { files });
@@ -154,21 +163,21 @@ internal static class OperatorDriveChecks
             };
         }
 
-        private static object NotesItem() => new
+        private object NotesItem() => new
         {
-            id = "notes", parents = new[] { "unit-folder" }, driveId = "shared-drive",
+            id = "notes", parents = new[] { "unit-folder" }, driveId = DriveId,
             mimeType = "application/vnd.google-apps.document"
         };
 
         private object PdfItem() => new
         {
-            id = "pdf-id", parents = new[] { "unit-folder" }, driveId = "shared-drive",
+            id = "pdf-id", parents = new[] { "unit-folder" }, driveId = DriveId,
             mimeType = "application/pdf", version = _version.ToString(), webViewLink = Link,
             md5Checksum = Convert.ToHexStringLower(MD5.HashData(Bytes!))
         };
 
-        private static object Folder(string id, string? parent = null) =>
-            new { id, driveId = "shared-drive", mimeType = OperatorDriveClient.FolderMime, parents = parent is null ? null : new[] { parent } };
+        private object Folder(string id, string? parent = null) =>
+            new { id, driveId = DriveId, mimeType = OperatorDriveClient.FolderMime, parents = parent is null ? null : new[] { parent } };
 
         private HttpResponseMessage Json(object body)
         {

@@ -43,8 +43,8 @@ internal sealed record OperatorDrivePilot(string SharedRoot, string GateId, stri
         byte[] bytes = await ReadPdfAsync(local, token);
         string localHash = Hash(bytes);
         var root = await drive.GetAsync(DriveRoot, token);
-        if (root.DriveId is null || root.MimeType != OperatorDriveClient.FolderMime || root.Trashed)
-            throw new InvalidOperationException("The target must be a folder in a Google Shared Drive.");
+        if (root.MimeType != OperatorDriveClient.FolderMime || root.Trashed)
+            throw new InvalidOperationException("Choose an active folder in Google Drive.");
         bool linked = FileId is not null || PendingFileId is not null;
         var asset = await drive.FolderAsync(root, Asset, create: !linked, token);
         var unit = await drive.FolderAsync(asset, Unit, create: !linked, token);

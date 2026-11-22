@@ -14,6 +14,7 @@ public partial class OperatorDriveWindow : Window
     private readonly SafetySystem _unit;
     private readonly DispatcherTimer _refresh = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _busy;
+    private CancellationTokenSource? _signIn;
     private string? _notesLink;
 
     public OperatorDriveWindow(DataService data, SafetyGate asset, SafetySystem unit)
@@ -26,7 +27,11 @@ public partial class OperatorDriveWindow : Window
         Refresh(populate: true);
         _refresh.Tick += (_, _) => Refresh();
         _refresh.Start();
-        Closed += (_, _) => _refresh.Stop();
+        Closed += (_, _) =>
+        {
+            _refresh.Stop();
+            _signIn?.Cancel();
+        };
     }
 
     private void Refresh(bool populate = false)
@@ -85,11 +90,11 @@ public partial class OperatorDriveWindow : Window
     private async void Sync_Click(object sender, RoutedEventArgs e)
     {
         string pdf = PdfBox.Text;
-        string folder = RootBox.Text.Trim();
-        string id = FileBox.Text.Trim();
-        if (pdf.Length == 0 || !ValidId(folder) || (id.Length > 0 && !ValidId(id)))
+        string? folder = DriveId(RootBox.Text, folder: true);
+        string? id = DriveId(FileBox.Text, folder: false);
+        if (pdf.Length == 0 || folder is null || (!string.IsNullOrWhiteSpace(FileBox.Text) && id is null))
         {
-            StatusText.Text = "Choose a shared operator PDF and enter Google Drive IDs.";
+            StatusText.Text = "Choose a shared operator PDF and enter valid Google Drive links or IDs.";
             return;
         }
         string gateId = _asset.Id;
@@ -100,7 +105,7 @@ public partial class OperatorDriveWindow : Window
         {
             if (previous is not null && !RequireMatch(previous).CanEditMapping) return previous with { Paused = false };
             return new OperatorDrivePilot(_root, gateId, unitId, assetName, unitName, pdf, folder,
-                id.Length == 0 ? null : id);
+                id);
         });
     }
 
@@ -110,16 +115,58 @@ public partial class OperatorDriveWindow : Window
     private async Task ConfigureAsync(Func<OperatorDrivePilot?, OperatorDrivePilot> configure)
     {
         _busy = true;
-        SyncButton.IsEnabled = PauseButton.IsEnabled = false;
+        SignInButton.IsEnabled = SyncButton.IsEnabled = PauseButton.IsEnabled = false;
         BrowseButton.IsEnabled = RootBox.IsEnabled = FileBox.IsEnabled = false;
         StatusText.Text = "Checking operator PDF sync…";
         try { await OperatorDriveRunner.RunAsync(_root, configure); }
-        finally { _busy = false; Refresh(populate: true); }
+        finally { _busy = false; SignInButton.IsEnabled = true; Refresh(populate: true); }
     }
 
     private OperatorDrivePilot RequireMatch(OperatorDrivePilot? pilot) =>
         pilot?.Matches(_root, _asset.Id, _unit.Id) == true
             ? pilot : throw new InvalidOperationException("The saved pilot changed. Reopen this window.");
+
+    private async void SignIn_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new OpenFileDialog
+        {
+            Title = "Select the JSON downloaded for Safety Gate Desktop",
+            Filter = "Google OAuth client JSON|*.json"
+        };
+        if (picker.ShowDialog(this) != true) return;
+
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        _signIn = cancellation;
+        _busy = true;
+        SignInButton.IsEnabled = SyncButton.IsEnabled = PauseButton.IsEnabled = false;
+        SignInStatus.Text = "Complete Google sign-in in your browser using the account that owns the publishing folder.";
+        try
+        {
+            await OperatorDriveRunner.SignInAsync(picker.FileName, cancellation.Token);
+            SignInStatus.Text = "Connected to Google. You can now publish to your Drive folder.";
+        }
+        catch (OperationCanceledException) { SignInStatus.Text = "Google sign-in ended before it was completed."; }
+        catch (InvalidOperationException error) { SignInStatus.Text = error.Message; }
+        catch (Exception) { SignInStatus.Text = "Google sign-in could not be completed. Check the desktop client JSON, connectivity and test user settings."; }
+        finally
+        {
+            _signIn = null;
+            _busy = false;
+            SignInButton.IsEnabled = true;
+            Refresh();
+        }
+    }
+
+    private static string? DriveId(string input, bool folder)
+    {
+        string trimmed = input.Trim();
+        if (ValidId(trimmed)) return trimmed;
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
+            !uri.Host.Equals("drive.google.com", StringComparison.OrdinalIgnoreCase)) return null;
+        string[] parts = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        int index = folder ? Array.IndexOf(parts, "folders") : Array.IndexOf(parts, "d");
+        return index >= 0 && index + 1 < parts.Length && ValidId(parts[index + 1]) ? parts[index + 1] : null;
+    }
 
     private static bool ValidId(string id) => id.Length > 0 && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
