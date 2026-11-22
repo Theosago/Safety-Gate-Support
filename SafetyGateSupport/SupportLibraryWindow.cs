@@ -178,7 +178,8 @@ public sealed class SupportLibraryWindow : Window
         try
         {
             var result = await Task.Run(() => _data.SaveDrawingPair(resource.ForUnit(unit.Id), gate, unit, files));
-            _status.Text = result.ReviewNote.Length > 0 ? result.ReviewNote : "Print pair linked. Use Applies to units to select additional units covered by this same print.";
+            string drive = await OperatorDriveRunner.AfterDrawingSavedAsync(_data, unit.Id);
+            _status.Text = string.Join(" ", new[] { "Drawing pair linked to the unit.", result.ReviewNote, drive }.Where(part => part.Length > 0));
         }
         catch (Exception error) { MessageBox.Show(this, error.Message, "Unable to assign print pair", MessageBoxButton.OK, MessageBoxImage.Warning); }
         finally { _pairUpdateBusy = false; IsEnabled = true; }

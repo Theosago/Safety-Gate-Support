@@ -9,14 +9,6 @@ namespace SafetyGateSupport;
 
 public partial class AdminWindow
 {
-    private void OpenOperatorDrivePilot_Click(object sender, RoutedEventArgs e)
-    {
-        if (_data.IsHomePreview || _data.IsOnboardingDemo || NeedLibrary() || Pilot() is not { } pilot) return;
-        var asset = _data.LoadGates().FirstOrDefault(gate => gate.Id == pilot.GateId);
-        if (asset is null) { PilotExportStatus.Text = "Assign the pilot unit to an asset first."; return; }
-        new OperatorDriveWindow(_data, asset, pilot) { Owner = this }.ShowDialog();
-    }
-
     private async void ExportPhoneGuides_Click(object sender, RoutedEventArgs e) =>
         await ExportPhoneGuidesAsync(PhoneExportStatus, ExportIncludeNotesCheck.IsChecked == true);
 

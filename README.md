@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console, version **8.4.6**, based on the supplied
+Windows WPF support console, version **8.5.0**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,
@@ -13,7 +13,7 @@ Version 8.4.4 adds PLC, light column and scanner examples to the operator demo a
 
 Version 8.4.3 adds a [fictional operator demo and a guided first-unit checklist](docs/V8_4_3.md).
 
-The [Google Drive pilot](docs/GOOGLE_DRIVE_PILOT.md) publishes one approved operator PDF from the shared library and creates a printable QR label for its unit folder.
+Version 8.5.0 adds **Publish & print QR** to the main sidebar. The app creates Drive folders and illustrated unit guides, updates the standalone electrical PDFs after paired drawing uploads, and prints all unit QR codes in one batch. See the [Drive publishing guide](docs/GOOGLE_DRIVE_PILOT.md).
 
 Version 8.4.2 adds a [one-unit QR pilot](docs/V8_4_2.md).
 

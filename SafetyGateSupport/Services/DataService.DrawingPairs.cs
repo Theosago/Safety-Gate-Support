@@ -14,8 +14,18 @@ public partial class DataService
         if (files.Length != 2 || files.Count(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 || files.Count(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1)
             throw new InvalidOperationException("Select exactly one PDF and its DWG companion. Neither file has been published; add the missing companion and try again.");
         if (view.StorageMode != "Asset") throw new InvalidOperationException("Run Setup → Shared Data / Software → Organize asset folders once before publishing paired drawing updates.");
-        var records = LoadResources(); var record = records.Single(r => r.Id == view.Id);
+        var records = LoadResources();
+        var record = records.SingleOrDefault(r => r.Id == view.Id);
+        if (record is null)
+        {
+            if (replaceFile is not null || string.IsNullOrWhiteSpace(gate.AssetFolder) ||
+                view.Id != AssetFileLayout.Create(gate, "Electrical Drawings").Id)
+                throw new InvalidOperationException("The drawing collection is unavailable. Refresh the unit and try again.");
+            record = AssetFileLayout.Create(gate, "Electrical Drawings");
+            records.Add(record);
+        }
         if (AssetFileLayout.Category(record) != "Electrical Drawings") throw new InvalidOperationException("Use the electrical drawing collection for print pairs.");
+        if (unit.GateId != gate.Id || record.GateId != gate.Id) throw new InvalidOperationException("The selected unit and drawing collection must belong to this asset.");
         string pdfSource = files.Single(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase));
         string dwgSource = files.Single(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase));
         string pdfHash = AssetStorageMigration.Hash(pdfSource), dwgHash = AssetStorageMigration.Hash(dwgSource);
@@ -30,7 +40,6 @@ public partial class DataService
             SaveResources(records); view.FileAssignments = record.FileAssignments; view.DrawingPairs = record.DrawingPairs; WriteAssetFileIndex(gate);
             return new(Path.Combine(folder, identical.Pdf), Path.Combine(folder, identical.Dwg), identical.ReviewNote);
         }
-        if (unit.GateId != gate.Id || record.GateId != gate.Id) throw new InvalidOperationException("The selected unit and drawing collection must belong to this asset.");
         if (replaceFile is not null && !Path.GetFullPath(replaceFile).Equals(Path.GetFullPath(Path.Combine(folder, Path.GetFileName(replaceFile))), StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Choose a current print from this collection for replacement.");
         var previousPair = replaceFile is null ? null : record.DrawingPairs.FirstOrDefault(p => p.Contains(Path.GetFileName(replaceFile)));
@@ -65,7 +74,12 @@ public partial class DataService
             foreach (string name in oldNames) record.FileAssignments.Remove(name);
             record.FileAssignments[names[0]] = scope.ToList(); record.FileAssignments[names[1]] = scope.ToList();
             if (previousPair is not null) record.DrawingPairs.Remove(previousPair);
-            record.DrawingPairs.Add(new DrawingFilePair { Id = previousPair?.Id ?? Guid.NewGuid().ToString("N"), Pdf = names[0], Dwg = names[1], PdfHash = pdfHash, DwgHash = dwgHash, UploadedTogetherUtc = DateTimeOffset.UtcNow, ReviewNote = review });
+            record.DrawingPairs.Add(new DrawingFilePair
+            {
+                Id = previousPair?.Id ?? Guid.NewGuid().ToString("N"), Pdf = names[0], Dwg = names[1],
+                ReplacedPdf = previousPair?.ReplacedPdf ?? oldNames.FirstOrDefault(n => Path.GetExtension(n).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) ?? "",
+                PdfHash = pdfHash, DwgHash = dwgHash, UploadedTogetherUtc = DateTimeOffset.UtcNow, ReviewNote = review
+            });
             var manuals = LoadManualRecords(); var parts = LoadParts();
             foreach (string name in oldNames)
             {

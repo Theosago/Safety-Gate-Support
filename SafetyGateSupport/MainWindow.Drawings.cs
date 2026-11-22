@@ -76,7 +76,7 @@ public partial class MainWindow
         _drawingPath = ""; _drawingBytes = null; _drawingPage = _drawingPageCount = 0;
         DrawingImage.Source = null; DrawingFileText.Text = ""; DrawingPageText.Text = ""; DrawingAssignmentText.Text = "";
         DrawingMessage.Text = "Select a unit to see its assigned electrical drawing."; DrawingMessage.Visibility = Visibility.Visible;
-        DrawingFileBox.Visibility = Visibility.Collapsed; UpdateDrawingControls();
+        DrawingFileBox.Visibility = Visibility.Collapsed; UploadDrawingButton.IsEnabled = false; UpdateDrawingControls();
     }
 
     private async void LoadDrawings(SafetyGate gate, SafetySystem unit)
@@ -92,13 +92,22 @@ public partial class MainWindow
             DrawingFileBox.Visibility = listing.Files.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
             _settingDrawingFiles = true; DrawingFileBox.ItemsSource = listing.Files; _settingDrawingFiles = false;
             if (listing.Files.Count == 0)
-                DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The assigned drawing folder is unavailable. Check shared-drive access. Use Electrical Schematics to review the assignment." : "No current electrical drawing is assigned to this unit. Use Electrical Schematics to add or review its drawing.";
+                DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The drawing folder is unavailable. Check the shared library connection." : "No drawing assigned. Use Upload drawing pair to add the PDF and DWG.";
             else DrawingFileBox.SelectedIndex = 0;
             DrawingAssignmentText.Text = listing.Unavailable.Count > 0 ? "Unavailable drawing folders: " + string.Join(", ", listing.Unavailable) : listing.Files.Count > 1 ? $"{listing.Files.Count} assigned drawings. Select another above if needed." : "";
         }
         catch (OperationCanceledException) { }
         catch (Exception error) { if (!_isClosed && !token.IsCancellationRequested) DrawingMessage.Text = "Could not load the assigned drawing: " + error.Message; }
-        finally { if (ReferenceEquals(_drawingListing, source)) _drawingListing = null; source.Dispose(); }
+        finally
+        {
+            if (ReferenceEquals(_drawingListing, source))
+            {
+                _drawingListing = null;
+                if (!_isClosed && !token.IsCancellationRequested && SelectedUnit?.Id == unit.Id)
+                    UploadDrawingButton.IsEnabled = true;
+            }
+            source.Dispose();
+        }
     }
 
     private async void DrawingFile_Changed(object sender, SelectionChangedEventArgs e)
@@ -208,15 +217,66 @@ public partial class MainWindow
 
     private async void PreviousDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage == 0) return; _drawingPage--; await RenderDrawingPageAsync(); }
     private async void NextDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage + 1 >= _drawingPageCount) return; _drawingPage++; await RenderDrawingPageAsync(); }
-    private async void UpdateDrawing_Click(object sender, RoutedEventArgs e)
+    private async Task RefreshDrawingPublishStatusAsync()
     {
-        if (SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
-        var resources = await Task.Run(_data.LoadResources);
-        var choices = _data.ResourcesFor(gate, unit, resources).Where(AssignedDrawings.IsDrawing).ToList();
-        var resource = choices.FirstOrDefault(r => Path.GetDirectoryName(_drawingPath)?.Equals(_data.ResourceCurrentFolder(r, gate), StringComparison.OrdinalIgnoreCase) == true) ?? choices.FirstOrDefault();
-        if (resource is null) { MessageBox.Show(this, "Add this asset’s drawing collection in Setup or link a drawing from Support library first."); return; }
-        ShowInlineResource("Electrical Drawings");
-        if (!_isClosed && SelectedUnit?.Id == unit.Id) LoadDrawings(gate, unit);
+        if (_isClosed || SelectedUnit is not { } unit ||
+            !DrawingPublishStatus.Text.Contains(OperatorDriveRunner.QueuedMessage, StringComparison.Ordinal)) return;
+        string previous = DrawingPublishStatus.Text;
+        var status = await OperatorDriveRunner.DrawingStatusAsync(_data, unit.Id);
+        if (!_isClosed && SelectedUnit?.Id == unit.Id && DrawingPublishStatus.Text == previous && status is not null)
+        {
+            // Retain the local save result. The Drive status may improve after the next retry.
+            DrawingPublishStatus.Text = previous.Split(OperatorDriveRunner.QueuedMessage, 2)[0] +
+                (status == OperatorDriveRunner.PublishedMessage ? status : OperatorDriveRunner.QueuedMessage + " " + status);
+        }
     }
 
+    private async void UpdateDrawing_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is not { } gate || SelectedUnit is not { } unit || InlineBusy || _drawingListing is not null) return;
+        UploadDrawingButton.IsEnabled = false;
+        try
+        {
+            var selected = DrawingFileBox.SelectedItem as AssignedDrawings.FileItem;
+            var resources = await Task.Run(_data.LoadResources);
+            if (_isClosed || SelectedUnit?.Id != unit.Id) return;
+            var choices = _data.ResourcesFor(gate, unit, resources).Where(AssignedDrawings.IsDrawing).ToList();
+            var resource = choices.FirstOrDefault(r => r.Id == selected?.Resource?.Id) ?? choices.FirstOrDefault(r => r.StorageMode == "Asset");
+            if (resource is null && !string.IsNullOrWhiteSpace(gate.AssetFolder))
+                resource = AssetFileLayout.Create(gate, "Electrical Drawings").ForUnit(unit.Id);
+            if (resource is null || resource.StorageMode != "Asset")
+            {
+                MessageBox.Show(this, "Organize this library’s asset folders in Plant setup before updating older drawing collections.");
+                return;
+            }
+
+            var upload = new ResourceWindow(_data, gate, unit, resource) { Owner = this };
+            var content = (FrameworkElement)upload.Content;
+            upload.Content = null;
+            HostInline(upload, content);
+            try
+            {
+                var replacement = selected?.Resource?.Id == resource.Id ? selected.Path : null;
+                string? status = await upload.UploadDrawingPairAsync(replacement);
+                if (!_isClosed && SelectedUnit?.Id == unit.Id && status is not null)
+                {
+                    DrawingPublishStatus.Text = status;
+                    LoadDrawings(gate, unit);
+                    _ = RefreshSearchIndexAsync();
+                }
+            }
+            finally
+            {
+                CloseInlineTool();
+            }
+        }
+        catch (Exception error)
+        {
+            if (!_isClosed) MessageBox.Show(this, error.Message, "Upload drawing pair", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            if (!_isClosed && _drawingListing is null && SelectedUnit?.Id == unit.Id) UploadDrawingButton.IsEnabled = true;
+        }
+    }
 }

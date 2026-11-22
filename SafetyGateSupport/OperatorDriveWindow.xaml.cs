@@ -2,190 +2,230 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Win32;
-using SafetyGateSupport.Models;
 using SafetyGateSupport.Services;
 
 namespace SafetyGateSupport;
 
 public partial class OperatorDriveWindow : Window
 {
+    private readonly DataService _data;
     private readonly string _root;
-    private readonly SafetyGate _asset;
-    private readonly SafetySystem _unit;
-    private readonly DispatcherTimer _refresh = new() { Interval = TimeSpan.FromSeconds(2) };
+    private readonly string? _selectedUnitId;
+    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private readonly CancellationTokenSource _closed = new();
+    private OperatorPublicationUnit[] _units = [];
+    private OperatorPublishingState _state = new();
     private bool _busy;
-    private CancellationTokenSource? _signIn;
-    private string? _notesLink;
+    private bool _refreshing;
+    private string? _message;
 
-    public OperatorDriveWindow(DataService data, SafetyGate asset, SafetySystem unit)
+    public OperatorDriveWindow(DataService data, string? selectedUnitId = null)
     {
         InitializeComponent();
+        _data = data;
         _root = Path.GetFullPath(data.SharedRoot);
-        _asset = asset;
-        _unit = unit;
-        UnitText.Text = $"{asset.AssetDisplay} / {unit.UnitDisplay}";
-        Refresh(populate: true);
-        _refresh.Tick += (_, _) => Refresh();
-        _refresh.Start();
+        _selectedUnitId = selectedUnitId;
+        Loaded += async (_, _) =>
+        {
+            await RefreshAsync(loadUnits: true);
+            if (!_closed.IsCancellationRequested) _timer.Start();
+        };
+        _timer.Tick += async (_, _) => await RefreshAsync();
         Closed += (_, _) =>
         {
-            _refresh.Stop();
-            _signIn?.Cancel();
+            _timer.Stop();
+            _closed.Cancel();
         };
     }
 
-    private void Refresh(bool populate = false)
+    private async Task RefreshAsync(bool loadUnits = false)
     {
-        if (_busy) return;
+        if (_busy || _refreshing || _closed.IsCancellationRequested) return;
+        _refreshing = true;
         try
         {
-            var pilot = OperatorDrivePilot.Load(OperatorDrivePilot.StatePath);
-            bool matches = pilot?.Matches(_root, _asset.Id, _unit.Id) == true;
-            bool canEdit = pilot is null || (matches && pilot.CanEditMapping);
-            BrowseButton.IsEnabled = RootBox.IsEnabled = FileBox.IsEnabled = canEdit;
-            SyncButton.IsEnabled = pilot is null || matches;
-            PauseButton.IsEnabled = matches && !pilot!.Paused;
-            SyncButton.Content = pilot is null ? "Enable sync" : pilot.Paused ? "Resume sync" : canEdit ? "Save and sync" : "Sync now";
-            if (matches)
+            var snapshot = await Task.Run(() =>
             {
-                if (populate || !canEdit)
-                {
-                    PdfBox.Text = pilot!.RelativePdf;
-                    RootBox.Text = pilot.DriveRoot;
-                    FileBox.Text = pilot.FileId ?? "";
-                }
-                LinkBox.Text = pilot!.FolderLink ?? "";
-                _notesLink = pilot.NotesLink;
-                StatusText.Text = pilot.Paused ? "Automatic sync is paused." : OperatorDriveRunner.Status;
-            }
-            else if (pilot is not null)
+                var state = OperatorPublishingState.Load(_root);
+                state.ImportPilot(_root);
+                return (state, units: loadUnits ? OperatorPublicationSources.ListUnits(_data) : null);
+            });
+            if (_closed.IsCancellationRequested) return;
+            _state = snapshot.state;
+            if (snapshot.units is not null)
             {
-                StatusText.Text = $"This workstation is configured for {pilot.Asset} / {pilot.Unit}.";
+                string? selected = (GuideUnitPicker.SelectedItem as OperatorPublicationUnit)?.Unit.Id ?? _selectedUnitId;
+                _units = snapshot.units;
+                GuideUnitPicker.ItemsSource = _units;
+                GuideUnitPicker.SelectedItem = _units.FirstOrDefault(item => item.Unit.Id == selected) ?? _units.FirstOrDefault();
             }
-            LinkBox.Visibility = LinkBox.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-            NotesButton.IsEnabled = MobileSupportExporter.ValidLink(_notesLink ?? "");
-            OpenButton.IsEnabled = QrButton.IsEnabled = MobileSupportExporter.ValidLink(LinkBox.Text);
+            Render();
         }
         catch (Exception error)
         {
-            SyncButton.IsEnabled = PauseButton.IsEnabled = false;
-            StatusText.Text = error.Message;
+            if (!_closed.IsCancellationRequested)
+            {
+                StatusLabel.Text = error.Message;
+                PublishButton.IsEnabled = PrintButton.IsEnabled = false;
+            }
         }
+        finally { _refreshing = false; }
     }
 
-    private void Browse_Click(object sender, RoutedEventArgs e)
+    private void Render()
     {
-        var picker = new OpenFileDialog { Filter = "PDF documents|*.pdf", InitialDirectory = _root };
-        if (picker.ShowDialog(this) != true) return;
-        string relative = Path.GetRelativePath(_root, picker.FileName);
-        if (Path.IsPathRooted(relative) || relative.Split(Path.DirectorySeparatorChar)[0] == "..")
-        {
-            StatusText.Text = "Choose a PDF inside the shared data folder.";
-            return;
-        }
-        PdfBox.Text = relative;
-        StatusText.Text = "";
+        bool connected = OperatorDriveRunner.CanPublish;
+        ConnectionLabel.Text = connected ? "Google Drive connected" : "Connect Google Drive";
+        ConnectButton.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
+        int ready = _units.Count(item => HasQr(item));
+        SummaryLabel.Text = _state.PublishAll
+            ? $"{ready} of {_units.Length} unit folders ready for QR labels. Drawing updates publish automatically while a signed-in app is open."
+            : connected
+                ? "Publish all units to create their Drive folders, guides and QR destinations automatically."
+                : ready > 0 ? $"{ready} saved unit folders. Sign in to publish updates." : "Sign in once on this computer to publish the library.";
+        StatusLabel.Text = _message ?? OperatorDriveRunner.Status;
+        PublishButton.Content = _state.PublishAll ? "Publish updates now" : "Publish all units";
+        PublishButton.IsEnabled = !_busy && connected && _units.Length > 0;
+        PublishButton.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
+        PrintButton.Visibility = ready > 0 && ready == _units.Length ? Visibility.Visible : Visibility.Collapsed;
+        PrintButton.IsEnabled = !_busy;
+        AddGuideButton.IsEnabled = !_busy && _units.Length > 0;
+        SwitchClientButton.IsEnabled = !_busy;
+        OpenDriveButton.Visibility = MobileSupportExporter.ValidLink(_state.Root?.Link ?? "") ? Visibility.Visible : Visibility.Collapsed;
+        ChooseFolderPanel.Visibility = _state.Root is null ? Visibility.Visible : Visibility.Collapsed;
+        var issues = _units.Where(item => _state.Units.GetValueOrDefault(item.Unit.Id)?.Error is not null)
+            .Select(item => $"{item.Label} — {_state.Units[item.Unit.Id].Error}").ToArray();
+        IssuesList.ItemsSource = issues;
+        IssuesPanel.Header = $"Publishing issues ({issues.Length})";
+        IssuesPanel.Visibility = issues.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private async void Sync_Click(object sender, RoutedEventArgs e)
+    private async void Connect_Click(object sender, RoutedEventArgs e) => await ConnectAsync(!OperatorDriveRunner.HasSavedClient);
+    private async void SwitchClient_Click(object sender, RoutedEventArgs e) => await ConnectAsync(chooseJson: true);
+
+    private async Task ConnectAsync(bool chooseJson)
     {
-        string pdf = PdfBox.Text;
-        string? folder = DriveId(RootBox.Text, folder: true);
-        string? id = DriveId(FileBox.Text, folder: false);
-        if (pdf.Length == 0 || folder is null || (!string.IsNullOrWhiteSpace(FileBox.Text) && id is null))
+        if (_busy) return;
+        string? path = null;
+        if (chooseJson)
         {
-            StatusText.Text = "Choose a shared operator PDF and enter valid Google Drive links or IDs.";
-            return;
+            var picker = new OpenFileDialog { Title = "Choose the Google Desktop app OAuth JSON", Filter = "Google OAuth client JSON|*.json" };
+            if (picker.ShowDialog(this) != true) return;
+            path = picker.FileName;
         }
-        string gateId = _asset.Id;
-        string unitId = _unit.Id;
-        string assetName = _asset.AssetDisplay;
-        string unitName = _unit.UnitDisplay;
-        await ConfigureAsync(previous =>
+        await RunActionAsync("Complete Google sign-in in your browser.", async () =>
         {
-            if (previous is not null && !RequireMatch(previous).CanEditMapping) return previous with { Paused = false };
-            return new OperatorDrivePilot(_root, gateId, unitId, assetName, unitName, pdf, folder,
-                id);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_closed.Token);
+            timeout.CancelAfter(TimeSpan.FromMinutes(5));
+            await OperatorDriveRunner.SignInAsync(path, timeout.Token);
+            return "Connected to Google Drive.";
         });
     }
 
-    private async void Pause_Click(object sender, RoutedEventArgs e) =>
-        await ConfigureAsync(previous => RequireMatch(previous) with { Paused = true });
-
-    private async Task ConfigureAsync(Func<OperatorDrivePilot?, OperatorDrivePilot> configure)
+    private async void Publish_Click(object sender, RoutedEventArgs e)
     {
-        _busy = true;
-        SignInButton.IsEnabled = SyncButton.IsEnabled = PauseButton.IsEnabled = false;
-        BrowseButton.IsEnabled = RootBox.IsEnabled = FileBox.IsEnabled = false;
-        StatusText.Text = "Checking operator PDF sync…";
-        try { await OperatorDriveRunner.RunAsync(_root, configure); }
-        finally { _busy = false; SignInButton.IsEnabled = true; Refresh(populate: true); }
+        if (_busy) return;
+        string? rootId = null;
+        _message = null;
+        if (_state.Root is null && !string.IsNullOrWhiteSpace(FolderInput.Text))
+        {
+            rootId = FolderId(FolderInput.Text);
+            if (rootId is null)
+            {
+                _message = "Enter the link to the existing Google Drive publishing folder.";
+                StatusLabel.Text = _message;
+                return;
+            }
+        }
+
+        await RunActionAsync("Preparing unit folders and documents…", async () =>
+        {
+            var progress = new Progress<OperatorPublishProgress>(p =>
+            {
+                if (_closed.IsCancellationRequested || !_busy || p.Unit.Length == 0) return;
+                PublishProgress.Visibility = Visibility.Visible;
+                PublishProgress.Maximum = Math.Max(1, p.Total);
+                PublishProgress.Value = p.Completed;
+                StatusLabel.Text = $"Checking {p.Completed + 1} of {p.Total} · {p.Unit}";
+            });
+            return await OperatorDriveRunner.RunAsync(_data, publishNow: true, requestedRoot: rootId, progress: progress, token: _closed.Token);
+        });
     }
 
-    private OperatorDrivePilot RequireMatch(OperatorDrivePilot? pilot) =>
-        pilot?.Matches(_root, _asset.Id, _unit.Id) == true
-            ? pilot : throw new InvalidOperationException("The saved pilot changed. Reopen this window.");
-
-    private async void SignIn_Click(object sender, RoutedEventArgs e)
+    private async void Print_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFileDialog
-        {
-            Title = "Select the JSON downloaded for Safety Gate Desktop",
-            Filter = "Google OAuth client JSON|*.json"
-        };
+        if (_busy || _units.Length == 0 || !_units.All(HasQr)) return;
+        var labels = _units.Select(item => new UnitQrLabel(item.AssetFolder, item.UnitFolder,
+            item.Gate.Location, _state.Units[item.Unit.Id].Folder!.Link!)).ToArray();
+        var picker = new SaveFileDialog { Title = "Save all unit QR codes for printing", Filter = "PDF document|*.pdf",
+            FileName = "Safety Gate Unit QR Codes.pdf", AddExtension = true };
         if (picker.ShowDialog(this) != true) return;
-
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5));
-        _signIn = cancellation;
-        _busy = true;
-        SignInButton.IsEnabled = SyncButton.IsEnabled = PauseButton.IsEnabled = false;
-        SignInStatus.Text = "Complete Google sign-in in your browser using the account that owns the publishing folder.";
-        try
+        await RunActionAsync("Preparing the QR sheets…", async () =>
         {
-            await OperatorDriveRunner.SignInAsync(picker.FileName, cancellation.Token);
-            SignInStatus.Text = "Connected to Google. You can now publish to your Drive folder.";
+            await Task.Run(() => OperatorPublishingState.WriteFile(picker.FileName, OperatorPublishingPdf.QrLabels(labels)), _closed.Token);
+            if (!_closed.IsCancellationRequested) FileLauncherService.Open(picker.FileName);
+            return $"{labels.Length} QR codes saved in one PDF. Print all pages at actual size.";
+        });
+    }
+
+    private bool HasQr(OperatorPublicationUnit item) =>
+        _state.Units.GetValueOrDefault(item.Unit.Id) is { Folder: { Pending: false, Link: { } url } } entry
+        && entry.GateId == item.Gate.Id &&
+        MobileSupportExporter.ValidLink(url);
+
+    private void OpenDrive_Click(object sender, RoutedEventArgs e)
+    {
+        if (_state.Root?.Link is { } link) FileLauncherService.Open(link);
+    }
+
+    private async void AddGuide_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || GuideUnitPicker.SelectedItem is not OperatorPublicationUnit item) return;
+        var picker = new OpenFileDialog { Title = $"Add a PDF to {item.Label}", Filter = "PDF document|*.pdf" };
+        if (picker.ShowDialog(this) != true) return;
+        await RunActionAsync("Saving the guide PDF…", async () =>
+        {
+            await OperatorDriveRunner.SaveGuidePdfAsync(_data, item.Unit, picker.FileName);
+            return $"Added {Path.GetFileName(picker.FileName)} to {item.Label}.";
+        });
+    }
+
+    private async Task RunActionAsync(string working, Func<Task<string>> action)
+    {
+        _busy = true;
+        _message = working;
+        ConnectButton.IsEnabled = false;
+        Render();
+        try { _message = await action(); }
+        catch (OperationCanceledException) { _message = "The operation ended before it was completed."; }
+        catch (Google.Apis.Auth.OAuth2.Responses.TokenResponseException)
+        {
+            _message = "Google sign-in could not be completed. Check that this account is listed as a test user.";
         }
-        catch (OperationCanceledException) { SignInStatus.Text = "Google sign-in ended before it was completed."; }
-        catch (InvalidOperationException error) { SignInStatus.Text = error.Message; }
-        catch (Exception) { SignInStatus.Text = "Google sign-in could not be completed. Check the desktop client JSON, connectivity and test user settings."; }
+        catch (Exception error) { _message = error.Message; }
         finally
         {
-            _signIn = null;
             _busy = false;
-            SignInButton.IsEnabled = true;
-            Refresh();
+            if (!_closed.IsCancellationRequested)
+            {
+                ConnectButton.IsEnabled = true;
+                PublishProgress.Visibility = Visibility.Collapsed;
+                await RefreshAsync(loadUnits: true);
+            }
         }
     }
 
-    private static string? DriveId(string input, bool folder)
+    private static string? FolderId(string value)
     {
-        string trimmed = input.Trim();
-        if (ValidId(trimmed)) return trimmed;
-        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
-            !uri.Host.Equals("drive.google.com", StringComparison.OrdinalIgnoreCase)) return null;
-        string[] parts = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        int index = folder ? Array.IndexOf(parts, "folders") : Array.IndexOf(parts, "d");
-        return index >= 0 && index + 1 < parts.Length && ValidId(parts[index + 1]) ? parts[index + 1] : null;
-    }
-
-    private static bool ValidId(string id) => id.Length > 0 && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
-
-    private void Open_Click(object sender, RoutedEventArgs e)
-    {
-        try { FileLauncherService.Open(LinkBox.Text); }
-        catch (Exception error) { StatusText.Text = error.Message; }
-    }
-
-    private void Notes_Click(object sender, RoutedEventArgs e)
-    {
-        if (_notesLink is not null) FileLauncherService.Open(_notesLink);
-    }
-
-    private void Qr_Click(object sender, RoutedEventArgs e)
-    {
-        var picker = new SaveFileDialog { Filter = "Printable QR image|*.svg", FileName = "Operator-Unit-QR.svg" };
-        if (picker.ShowDialog(this) != true) return;
-        try { File.WriteAllText(picker.FileName, MobileSupportExporter.QrSvg(LinkBox.Text)); }
-        catch (Exception error) { StatusText.Text = error.Message; }
+        value = value.Trim();
+        if (Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            if (uri.Scheme != Uri.UriSchemeHttps || !uri.Host.Equals("drive.google.com", StringComparison.OrdinalIgnoreCase)) return null;
+            string[] parts = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            int index = Array.IndexOf(parts, "folders");
+            if (index < 0 || index + 1 >= parts.Length) return null;
+            value = parts[index + 1];
+        }
+        return value.Length > 0 && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_') ? value : null;
     }
 }

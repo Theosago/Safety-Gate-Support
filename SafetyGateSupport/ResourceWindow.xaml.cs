@@ -74,10 +74,10 @@ public partial class ResourceWindow : Window
     private void OpenCurrentFolder_Click(object sender, RoutedEventArgs e) { var folder = CurrentFolder(); Directory.CreateDirectory(folder); FileLauncherService.Open(folder); }
     private void OpenArchive_Click(object sender, RoutedEventArgs e) { var folder = ArchiveFolder(); Directory.CreateDirectory(folder); FileLauncherService.Open(folder); }
 
-    private void Update_Click(object sender, RoutedEventArgs e)
+    private async void Update_Click(object sender, RoutedEventArgs e)
     {
         if (!_resource.AllowUserUpload) return;
-        if (AssignedDrawings.IsDrawing(_resource)) { UploadDrawingPair(null); return; }
+        if (AssignedDrawings.IsDrawing(_resource)) { await UploadDrawingPairAsync(null); return; }
         var filter = _resource.Label.Contains("Drawing", StringComparison.OrdinalIgnoreCase)
             ? "Drawings|*.pdf;*.dwg;*.dxf|PDF|*.pdf|AutoCAD|*.dwg;*.dxf|All files|*.*"
             : "All files|*.*";
@@ -92,32 +92,63 @@ public partial class ResourceWindow : Window
         catch (Exception ex) { MessageBox.Show(ex.Message, "Unable to update resource", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
-    private void ReplaceFile_Click(object sender, RoutedEventArgs e)
+    private async void ReplaceFile_Click(object sender, RoutedEventArgs e)
     {
         if (FileList.SelectedItem is not ResourceFileItem item) { StatusText.Text = "Select the sheet or file you are replacing first."; return; }
-        if (AssignedDrawings.IsDrawing(_resource)) { UploadDrawingPair(item.Path); return; }
+        if (AssignedDrawings.IsDrawing(_resource)) { await UploadDrawingPairAsync(item.Path); return; }
         var dialog = new OpenFileDialog { Title = "Choose the replacement for " + item.Name, Multiselect = false, Filter = "All files|*.*" };
         if (dialog.ShowDialog(Owner ?? this) != true) return;
         if (MessageBox.Show(Owner ?? this, $"Replace '{item.Name}' with '{Path.GetFileName(dialog.FileName)}'?\n\nThe previous file will be archived. Every unit linked to this same file will use the replacement; unrelated sheets stay current.", "Replace selected file", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         try { _data.ReplaceAssetFile(_resource, _gate, item.Path, dialog.FileName); RefreshFiles(); StatusText.Text = "Replacement saved. Previous revision archived; existing unit links preserved."; }
         catch (Exception error) { MessageBox.Show(Owner ?? this, error.Message, "Unable to replace file", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
-    private async void UploadDrawingPair(string? replacing)
+    internal async Task<string?> UploadDrawingPairAsync(string? replacing)
     {
-        if (_fileUpdateBusy) return;
-        var dialog = new OpenFileDialog { Title = replacing is null ? "Select the PDF and DWG for one print" : "Select both replacement companions", Multiselect = true, Filter = "Print pair (PDF + DWG)|*.pdf;*.dwg" };
-        if (dialog.ShowDialog(Owner ?? this) != true) return;
-        if (dialog.FileNames.Length != 2 || dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 || dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1)
-        { MessageBox.Show(Owner ?? this, "Select one PDF and its corresponding DWG together. The missing companion must be included before this print can be published.", "PDF/DWG companion required", MessageBoxButton.OK, MessageBoxImage.Information); return; }
-        string action = replacing is null ? "Add this print pair?" : "Replace the selected print pair?";
-        if (MessageBox.Show(Owner ?? this, action + "\n\n" + string.Join("\n", dialog.FileNames.Select(Path.GetFileName)) + "\n\nBoth companions will be published together. Replacing a shared print retains all its existing unit links and archives its previous files. Other prints are unchanged.", "Publish PDF + DWG", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-        _fileUpdateBusy = true; IsEnabled = false; StatusText.Text = "Staging and verifying both drawing files…";
+        if (_fileUpdateBusy) return null;
+        var dialog = new OpenFileDialog
+        {
+            Title = $"Choose the PDF and DWG for {_gate.AssetDisplay} / {_unit.UnitDisplay}",
+            Multiselect = true,
+            Filter = "Drawing pair (*.pdf, *.dwg)|*.pdf;*.dwg"
+        };
+        if (dialog.ShowDialog(Owner ?? this) != true) return null;
+        if (dialog.FileNames.Length != 2 ||
+            dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 ||
+            dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1)
+        {
+            MessageBox.Show(Owner ?? this, "Select one PDF and its matching DWG together.", "Both drawing files are required",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return null;
+        }
+
+        if (replacing is not null)
+        {
+            string oldName = Path.GetFileName(replacing);
+            string message = $"Replace {oldName} for {_gate.AssetDisplay} / {_unit.UnitDisplay}?";
+            if (_resource.FileAssignments.TryGetValue(oldName, out var links) && (links.Count == 0 || links.Count > 1))
+                message += "\n\nThis drawing is shared. Every linked unit will receive the replacement.";
+            if (MessageBox.Show(Owner ?? this, message, "Replace drawing pair", MessageBoxButton.YesNo,
+                MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return null;
+        }
+
+        _fileUpdateBusy = true;
+        IsEnabled = false;
+        StatusText.Text = "Saving both drawing files…";
         try
         {
-            var result = await System.Threading.Tasks.Task.Run(() => _data.SaveDrawingPair(_resource, _gate, _unit, dialog.FileNames, replacing));
-            RefreshFiles(); StatusText.Text = result.ReviewNote.Length == 0 ? "PDF and DWG published together; unit links retained." : result.ReviewNote + " Verify the corresponding export; this warning is also shown beside the drawing.";
+            var result = await Task.Run(() => _data.SaveDrawingPair(_resource, _gate, _unit, dialog.FileNames, replacing));
+            string drive = await OperatorDriveRunner.AfterDrawingSavedAsync(_data, _unit.Id);
+            string status = string.Join(" ", new[] { "PDF and DWG saved to the library.", result.ReviewNote, drive }
+                .Where(part => part.Length > 0));
+            RefreshFiles();
+            StatusText.Text = status;
+            return status;
         }
-        catch (Exception error) { MessageBox.Show(Owner ?? this, error.Message, "Drawing pair not published", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception error)
+        {
+            MessageBox.Show(Owner ?? this, error.Message, "Drawing pair could not be saved", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
+        }
         finally { _fileUpdateBusy = false; IsEnabled = true; }
     }
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)

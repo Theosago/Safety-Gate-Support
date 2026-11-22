@@ -5,6 +5,7 @@ public class DrawingFilePair
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Pdf { get; set; } = "";
     public string Dwg { get; set; } = "";
+    public string ReplacedPdf { get; set; } = "";
     public string PdfHash { get; set; } = "";
     public string DwgHash { get; set; } = "";
     public DateTimeOffset? UploadedTogetherUtc { get; set; }

@@ -9,10 +9,11 @@ namespace SafetyGateSupport.Services;
 
 internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToken, Task<string>> authorize)
 {
+    private const int MultipartLimit = 5 * 1024 * 1024;
     internal const string FolderMime = "application/vnd.google-apps.folder";
     private const string Api = "https://www.googleapis.com/drive/v3/";
     private const string Upload = "https://www.googleapis.com/upload/drive/v3/";
-    private const string Fields = "id,parents,driveId,mimeType,trashed,md5Checksum,version,webViewLink";
+    private const string Fields = "id,parents,driveId,mimeType,trashed,md5Checksum,version,webViewLink,resourceKey";
     private const string FileQuery = "?supportsAllDrives=true&fields=" + Fields;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -20,6 +21,7 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
         bool Trashed, string? Md5Checksum, string? Version, string? WebViewLink)
     {
         public string? ETag { get; init; }
+        public string? ResourceKey { get; init; }
     }
 
     private sealed record FileList(Item[] Files, string? NextPageToken, bool IncompleteSearch);
@@ -43,17 +45,17 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
             throw new IOException("The Drive file changed during sync. Sync will retry.");
     }
 
-    internal async Task<Item> FolderAsync(Item parent, string name, bool create, CancellationToken token)
-    {
-        var folder = await FindAsync(parent, name, token);
-        if (folder is null && create)
-            folder = await ReadAsync<Item>(HttpMethod.Post, Api + "files" + FileQuery,
-                JsonContent.Create(new { name, mimeType = FolderMime, parents = new[] { parent.Id } }), token);
-        if (folder?.MimeType != FolderMime || folder.Trashed || folder.DriveId != parent.DriveId ||
-            folder.Parents?.Contains(parent.Id) != true)
-            throw new InvalidOperationException($"Expected a folder named {name} under the configured Drive path.");
-        return folder;
-    }
+    internal Task<Item> CreateFolderAsync(string id, Item parent, string name, CancellationToken token) =>
+        ReadAsync<Item>(HttpMethod.Post, Api + "files" + FileQuery,
+            JsonContent.Create(new { id, name, mimeType = FolderMime, parents = new[] { parent.Id } }), token);
+
+    internal static string FolderLink(Item folder) => folder.WebViewLink ??
+        $"https://drive.google.com/drive/folders/{folder.Id}" +
+        (folder.ResourceKey is null ? "" : "?resourcekey=" + Uri.EscapeDataString(folder.ResourceKey));
+
+    internal static string PdfLink(Item file) => file.WebViewLink ??
+        $"https://drive.google.com/file/d/{file.Id}/view" +
+        (file.ResourceKey is null ? "" : "?resourcekey=" + Uri.EscapeDataString(file.ResourceKey));
 
     internal async Task<Item?> FindAsync(Item parent, string name, CancellationToken token)
     {
@@ -86,15 +88,37 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
 
     internal async Task<Item> CreatePdfAsync(string id, string parent, string name, byte[] bytes, CancellationToken token)
     {
+        using var metadata = JsonContent.Create(new { id, name, mimeType = "application/pdf", parents = new[] { parent } });
+        if (bytes.Length > MultipartLimit)
+            return await ResumablePdfAsync(HttpMethod.Post, Upload + "files", metadata, bytes, token);
         using var body = new MultipartContent("related");
-        body.Add(JsonContent.Create(new { id, name, mimeType = "application/pdf", parents = new[] { parent } }));
+        body.Add(metadata);
         body.Add(PdfContent(bytes));
         return await ReadAsync<Item>(HttpMethod.Post, Upload + "files" + FileQuery + "&uploadType=multipart", body, token);
     }
 
-    internal Task<Item> UpdatePdfAsync(string id, byte[] bytes, string? etag, CancellationToken token) =>
-        ReadAsync<Item>(HttpMethod.Patch, Upload + "files/" + Uri.EscapeDataString(id) + FileQuery + "&uploadType=media",
-            PdfContent(bytes), token, etag);
+    internal Task<Item> UpdatePdfAsync(string id, byte[] bytes, string? etag, CancellationToken token)
+    {
+        string url = Upload + "files/" + Uri.EscapeDataString(id);
+        return bytes.Length > MultipartLimit
+            ? ResumablePdfAsync(HttpMethod.Patch, url, JsonContent.Create(new { }), bytes, token, etag)
+            : ReadAsync<Item>(HttpMethod.Patch, url + FileQuery + "&uploadType=media", PdfContent(bytes), token, etag);
+    }
+
+    private async Task<Item> ResumablePdfAsync(HttpMethod method, string url, HttpContent metadata, byte[] bytes,
+        CancellationToken token, string? etag = null)
+    {
+        using var response = await SendAsync(method, url + FileQuery + "&uploadType=resumable", metadata, token, etag,
+            request =>
+            {
+                request.Headers.TryAddWithoutValidation("X-Upload-Content-Type", "application/pdf");
+                request.Headers.TryAddWithoutValidation("X-Upload-Content-Length", bytes.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            });
+        if (response.Headers.Location is not { IsAbsoluteUri: true } session ||
+            session.Scheme != Uri.UriSchemeHttps || session.Host != "www.googleapis.com")
+            throw new IOException("Drive did not provide a usable upload session.");
+        return await ReadAsync<Item>(HttpMethod.Put, session.AbsoluteUri, PdfContent(bytes), token);
+    }
 
     internal async Task<Item> NotesAsync(Item unit, string? id, CancellationToken token)
     {
@@ -118,11 +142,12 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
     }
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, HttpContent? content,
-        CancellationToken token, string? etag = null)
+        CancellationToken token, string? etag = null, Action<HttpRequestMessage>? configure = null)
     {
         using var request = new HttpRequestMessage(method, url) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await authorize(token));
         if (etag is not null) request.Headers.TryAddWithoutValidation("If-Match", etag);
+        configure?.Invoke(request);
         var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         if (response.IsSuccessStatusCode) return response;
         var status = response.StatusCode;

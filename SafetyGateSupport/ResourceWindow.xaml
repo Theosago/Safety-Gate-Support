@@ -36,17 +36,23 @@
      </ListBox.ItemTemplate>
     </ListBox>
     <TextBlock x:Name="EmptyText" Grid.Row="0" Text="No files have been added yet." Foreground="{DynamicResource ThemeForeground777777}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
-    <WrapPanel Grid.Row="1" Margin="0,8,0,0">
-     <Button Content="Open Selected" Click="OpenSelected_Click"/>
-     <Button Content="Open Current Folder" Click="OpenCurrentFolder_Click"/>
-     <Button x:Name="UpdateButton" Content="Upload / Update Drawing" Click="Update_Click" Visibility="Collapsed"/>
-     <Button x:Name="ReplaceFileButton" Content="Replace selected file…" Click="ReplaceFile_Click" Visibility="Collapsed"/>
-     <Button x:Name="FileUnitsButton" Content="Applies to units…" Click="FileUnits_Click" Visibility="Collapsed"/>
-     <Button Content="View Archive" Click="OpenArchive_Click"/>
-     <Button x:Name="UamDiagnosticsButton" Content="Read scanner USB status…" Click="UamDiagnostics_Click" Visibility="Collapsed"/>
-     <Button x:Name="SignalColumnButton" Content="Check / configure column…" Click="SignalColumn_Click" Visibility="Collapsed"/>
-     <Button x:Name="LaunchButton" Click="Launch_Click" Visibility="Collapsed"/>
-    </WrapPanel>
+    <StackPanel Grid.Row="1" Margin="0,8,0,0">
+     <WrapPanel>
+      <Button Content="Open selected file" Click="OpenSelected_Click"/>
+      <Button x:Name="UpdateButton" Content="Add files…" Click="Update_Click" Visibility="Collapsed"/>
+      <Button x:Name="ReplaceFileButton" Content="Replace selected file…" Click="ReplaceFile_Click" Visibility="Collapsed"/>
+      <Button x:Name="UamDiagnosticsButton" Content="Read scanner USB status…" Click="UamDiagnostics_Click" Visibility="Collapsed"/>
+      <Button x:Name="SignalColumnButton" Content="Check / configure column…" Click="SignalColumn_Click" Visibility="Collapsed"/>
+      <Button x:Name="LaunchButton" Click="Launch_Click" Visibility="Collapsed"/>
+     </WrapPanel>
+     <Expander Header="More file actions" Margin="4,6,0,0">
+      <WrapPanel Margin="0,4,0,0">
+       <Button Content="Open current folder" Click="OpenCurrentFolder_Click"/>
+       <Button Content="View archive" Click="OpenArchive_Click"/>
+       <Button x:Name="FileUnitsButton" Content="Applies to units…" Click="FileUnits_Click" Visibility="Collapsed"/>
+      </WrapPanel>
+     </Expander>
+    </StackPanel>
    </Grid>
   </GroupBox>
 

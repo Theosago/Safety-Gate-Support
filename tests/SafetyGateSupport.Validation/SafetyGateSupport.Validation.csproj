@@ -27,7 +27,10 @@
     <Compile Include="../../SafetyGateSupport/Services/StockroomBrowserReader.cs" Link="Services/StockroomBrowserReader.cs" />
     <Compile Include="../../SafetyGateSupport/Services/MobileSupportExporter.cs" Link="Services/MobileSupportExporter.cs"/>
     <Compile Include="../../SafetyGateSupport/Services/OperatorDriveClient.cs" Link="Services/OperatorDriveClient.cs" />
-    <Compile Include="../../SafetyGateSupport/Services/OperatorDrivePilot.cs" Link="Services/OperatorDrivePilot.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/OperatorPublishingState.cs" Link="Services/OperatorPublishingState.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/OperatorPublicationSources.cs" Link="Services/OperatorPublicationSources.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/OperatorPublishingPdf.cs" Link="Services/OperatorPublishingPdf.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/OperatorDrivePublisher.cs" Link="Services/OperatorDrivePublisher.cs" />
     <Compile Include="../../SafetyGateSupport/Services/StockroomService.cs" Link="Services/StockroomService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.PartPhotos.cs" Link="Services/DataService.PartPhotos.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.DrawingViews.cs" Link="Services/DataService.DrawingViews.cs" />

@@ -1,76 +1,74 @@
-# Google Drive operator PDF pilot
+# Publish unit guides and print QR codes
 
-Use one Windows workstation and one saved pilot unit. The engineering library
-stays on the company’s mapped `Q:` drive. The desktop app uses the workstation’s
-Windows permissions to read the library. It publishes only the selected approved
-PDF to Google Drive, where operators open the unit folder on their phones.
+## Start publishing
 
-## Sign in to My Drive
+1. Open **Publish & print QR** in the main sidebar. The app reuses the Google
+   sign-in and the Drive folder from the previous pilot on the publishing PC.
+   If Google needs you to reconnect, select **Sign in with Google**. On a new
+   PC, choose the Google Desktop app OAuth JSON once. The app stores a Windows
+   user-encrypted session.
+2. Select **Publish all units**. The app creates **Safety Gate Operator PDFs**
+   in My Drive if there is no saved publishing folder. Under it, the app creates
+   one folder per asset and unit, including units waiting for their first drawing.
+   Libraries with an existing folder can select it once under **Google Drive
+   settings** before their first publication.
+3. Use **Open Drive folder** to check the result. If the folder is new and
+   operators should view it while signed out, set **Anyone with the link** on
+   this one parent folder. Unit folders inherit its access.
+4. Select **Print all QR codes…** after all folders are ready. The app creates
+   one US Letter PDF and opens it so you can print every label together.
+   Print at actual size. Each label opens its unit folder in a phone browser.
 
-1. In your Google Cloud project, enable the Google Drive API. In Google Auth
-   Platform, set the audience to **External** and add your Drive account under
-   **Test users** while the project is in Testing.
-2. Create an OAuth client of type **Desktop app** and download its JSON file to
-   the Windows workstation. Keep the file outside the repository and the shared
-   library.
-3. In the app, open **Plant setup → Start here → Google Drive operator PDF…**.
-   Click **Sign in with Google**, select the downloaded JSON, and sign in with the
-   account that can edit the publishing folder. The app saves session credentials
-   encrypted for your Windows user. Automatic publishing can resume after
-   restarting the app. Google can expire refresh tokens for External apps in
-   Testing after seven days. If prompted, use **Sign in with Google** again.
-4. In Google Drive, create a dedicated folder under **My Drive**, such as
-   **Safety Gate Operator PDFs**. Copy its link into the app's **Google Drive
-   publishing folder link or ID** field. The app requests full Drive scope
-   because it needs to find and update existing folders and files by ID.
-5. The workstation needs access to Google sign-in, `oauth2.googleapis.com` and
-   `www.googleapis.com`. Operators open the unit folder at `drive.google.com`.
+## Update a unit
 
-Existing Shared Drive publishers can still use their configured service account
-through `GOOGLE_APPLICATION_CREDENTIALS`. A desktop Google sign-in takes precedence
-for that Windows user.
+Select the unit in the regular app, then choose **Upload drawing pair…** to
+replace the displayed sheet or add its first pair. Choose the matching PDF and
+DWG together. To add a separate sheet while keeping the displayed sheet, use
+**Drawing files → Add PDF + DWG…**. The app saves both companions to the shared
+library and publishes the PDF to Drive automatically. A signed-in publisher
+running with the library connected checks pending changes about every 30 seconds.
+It also picks up changes from coworkers who saved pairs on another workstation.
 
-## Publish and label one unit
+The unit folder contains the standalone electrical drawing, a **Unit guide**
+PDF, and **Operator notes**. The guide starts with the unit's identification photo,
+asset and unit numbers, location, equipment details, and a linked contents list.
+The first assigned drawing starts the drawing section unless a previously
+published main drawing is already linked. Additional assigned drawing PDFs
+follow it. Use **Add a PDF to a unit guide** in the publishing window to attach
+an optional document, such as an exported signal column configuration. Attach
+the same filename again to replace that attachment. Supplemental PDFs appear
+as separate sections in the guide. DWG files and desktop shared notes stay in
+the engineering library.
 
-1. In **Plant setup → Start here**, select the saved pilot unit. Prepare an
-   approved PDF of up to 25 MiB at a stable path in the shared data folder.
-2. Open **Google Drive operator PDF…** under step 5. Choose the approved PDF
-   and paste the publishing folder link. The app publishes under
-   `<root>/Asset <asset>/Unit <unit>/`.
-3. If a printed QR already opens a PDF, enter that PDF’s Drive file ID. It must
-   already be in the correct unit folder. If the ID is omitted, the app looks
-   for an exact filename match and creates the PDF if none exists. The app
-   pauses on duplicate names. Start with identical copies when linking an
-   existing Drive PDF.
-4. Enable publishing and use **Save unit folder QR**. Verify that the QR opens
-   the correct asset and unit from a phone.
-5. For phone viewing without signing in, set the approved
-   operator folder to **Anyone with the link → Viewer**, where company policy
-   permits. Test while signed out. The app leaves sharing permissions as set in Drive.
+## Existing links and recovery
 
-## Operator notes
+Published unit folders and existing PDFs are addressed by their Drive IDs.
+Changing a drawing's filename or publishing another revision keeps the printed
+folder QR and any direct links to the primary PDF working. The app leaves
+the Operator notes document and its sharing permissions in Drive.
 
-The app creates or finds one Google Doc named **Operator notes** in the unit
-folder. Operators can open it from the same folder as the PDFs. Grant the
-operators’ Google accounts or group **Editor** access on that document only.
-They sign in to edit notes, while the approved PDFs remain view-only. Folder
-view access can also expose the notes document to link holders. Use it for notes
-approved for that audience. The app leaves the document’s contents to operators.
+If Drive is unavailable, the drawing pair stays saved in the library. The
+publishing window shows individual issues, and the app retries. If someone
+changes a generated PDF directly in Drive, review and restore the last
+published revision there before automatic publishing can overwrite it.
+The app leaves Drive and engineering files in place when units are removed.
 
-## Changes and recovery
+The app keeps publishing mappings in the shared library under
+`_AppData/Operator Publishing/publishing.json`. Keep this file with the
+library if you move or restore it. After upgrading from the pilot, open the
+library on the original pilot PC first so it can import the saved Drive IDs.
 
-The app checks every 30 seconds while running with the shared library connected.
-**Sync now** checks immediately. Use **Pause sync** to stop automatic publishing.
+## Google account setup on a new installation
 
-- A change to the selected PDF on `Q:` updates the existing Drive file ID.
-  Existing direct-to-PDF labels continue working. The folder QR is independent
-  of individual PDF revisions.
-- Drive PDF changes never write to `Q:`. If the Drive PDF was edited separately,
-  the app preserves both copies and pauses the update. Review the Drive revision
-  and restore the last published revision there or deliberately reconcile the
-  two copies before resuming.
-- The app never propagates deletions. Restore access to the original item if a
-  bound file, folder or notes document is missing, moved or trashed.
-- Pilot mappings live in
-  `%LOCALAPPDATA%\SafetyGateSupport\operator-drive-pilot.json`. Back up this
-  file when moving the pilot workstation. Sign in again on the new workstation.
+Enable the Google Drive API in your Google Cloud project and create a
+**Desktop app** OAuth client. If the app is **External** and still in
+**Testing**, add the publishing account to **Test users**. Google can expire
+those test refresh tokens after seven days. Use **Sign in with Google** to
+reconnect using the previously saved client. Keep the credential JSON local.
+Existing Shared Drive publishers can instead use a configured service account
+with access to their existing folder through `GOOGLE_APPLICATION_CREDENTIALS`.
+
+The publisher requests Drive access to create unit folders and update existing
+files by ID. The workstation needs access to Google sign-in,
+`oauth2.googleapis.com` and `www.googleapis.com`. Google Drive determines
+browser access and notes editing from the folder and document sharing settings.

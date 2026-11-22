@@ -1,28 +1,55 @@
-<Window x:Class="SafetyGateSupport.OperatorDriveWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
- xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Operator PDF · Google Drive" Width="700" SizeToContent="Height"
+<Window x:Class="SafetyGateSupport.OperatorDriveWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Publish &amp; print QR" Width="710" MinWidth="550" SizeToContent="Height" MaxHeight="760"
  WindowStartupLocation="CenterOwner" Style="{StaticResource {x:Type Window}}">
- <StackPanel Margin="24">
-  <TextBlock x:Name="UnitText" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,12"/>
-  <TextBlock Text="Operator PDF in the shared data folder" />
-  <DockPanel Margin="0,4,0,12">
-   <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="Browse…" Click="Browse_Click"/>
-   <TextBox x:Name="PdfBox" IsReadOnly="True"/>
-  </DockPanel>
-  <TextBlock Text="Google Drive publishing folder link or ID" />
-  <TextBox x:Name="RootBox" Margin="0,4,0,12"/>
-  <TextBlock Text="Existing Drive PDF link or ID (optional if the filename matches)" />
-  <TextBox x:Name="FileBox" Margin="0,4,0,12"/>
-  <TextBlock Text="Publishes the approved shared-drive PDF to the unit folder. Operators edit notes in a separate Google Doc." TextWrapping="Wrap" Margin="0,0,0,12"/>
-  <Button x:Name="SignInButton" Content="Sign in with Google" Click="SignIn_Click" HorizontalAlignment="Left" Margin="0,0,0,8"/>
-  <TextBlock x:Name="SignInStatus" TextWrapping="Wrap" Margin="0,0,0,8"/>
-  <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,8"/>
-  <TextBox x:Name="LinkBox" IsReadOnly="True" Visibility="Collapsed" Margin="0,0,0,8"/>
-  <WrapPanel>
-   <Button x:Name="SyncButton" Content="Enable sync" Click="Sync_Click"/>
-   <Button x:Name="PauseButton" Content="Pause sync" Click="Pause_Click" IsEnabled="False"/>
-   <Button x:Name="OpenButton" Content="Open unit folder" Click="Open_Click" IsEnabled="False"/>
-   <Button x:Name="NotesButton" Content="Open operator notes" Click="Notes_Click" IsEnabled="False"/>
-   <Button x:Name="QrButton" Content="Save unit folder QR" Click="Qr_Click" IsEnabled="False"/>
-  </WrapPanel>
- </StackPanel>
+ <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+  <StackPanel Margin="24">
+   <TextBlock Text="Publish &amp; print QR" FontSize="26" FontWeight="SemiBold"/>
+   <TextBlock Text="Send unit guides and electrical drawings to Google Drive. Print a QR sheet for the whole library."
+              TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground536E81}" Margin="0,6,0,18"/>
+
+   <Border BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}" BorderThickness="1" CornerRadius="6" Padding="14">
+    <StackPanel>
+     <TextBlock x:Name="ConnectionLabel" FontWeight="SemiBold" FontSize="16"/>
+     <TextBlock x:Name="SummaryLabel" TextWrapping="Wrap" Margin="0,5,0,8"/>
+     <Button x:Name="ConnectButton" Content="Sign in with Google" Click="Connect_Click" HorizontalAlignment="Left"/>
+     <TextBlock x:Name="StatusLabel" TextWrapping="Wrap" Margin="0,4,0,4"/>
+     <ProgressBar x:Name="PublishProgress" Height="6" Visibility="Collapsed" Margin="0,7,0,7"/>
+     <WrapPanel Margin="0,4,0,0">
+      <Button x:Name="PublishButton" Content="Publish all units" Click="Publish_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/>
+      <Button x:Name="PrintButton" Content="Print all QR codes…" Click="Print_Click" IsEnabled="False"/>
+      <Button x:Name="OpenDriveButton" Content="Open Drive folder" Click="OpenDrive_Click" Visibility="Collapsed"/>
+     </WrapPanel>
+    </StackPanel>
+   </Border>
+
+   <Expander x:Name="IssuesPanel" Header="Publishing issues" Visibility="Collapsed" Margin="0,12,0,0">
+    <ListBox x:Name="IssuesList" MaxHeight="160" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+     <ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="2"/></DataTemplate></ListBox.ItemTemplate>
+    </ListBox>
+   </Expander>
+
+   <Expander Header="Add a PDF to a unit guide" Margin="0,14,0,0">
+    <StackPanel Margin="4,8,0,0">
+     <TextBlock Text="Optional documents, such as a signal column configuration PDF, appear after the electrical drawing." TextWrapping="Wrap"/>
+     <DockPanel Margin="0,7,0,0">
+      <Button x:Name="AddGuideButton" DockPanel.Dock="Right" Content="Choose PDF…" Click="AddGuide_Click" Margin="8,0,0,0"/>
+      <ComboBox x:Name="GuideUnitPicker" DisplayMemberPath="Label" AutomationProperties.Name="Unit for additional guide PDF"/>
+     </DockPanel>
+    </StackPanel>
+   </Expander>
+
+   <Expander x:Name="DriveOptions" Header="Google Drive settings" Margin="0,12,0,0">
+    <StackPanel Margin="4,8,0,0">
+     <StackPanel x:Name="ChooseFolderPanel">
+      <TextBlock Text="Existing publishing folder (optional)" />
+      <TextBox x:Name="FolderInput" Margin="0,5,0,6" AutomationProperties.Name="Existing Google Drive folder link"/>
+      <TextBlock Text="Leave blank to create Safety Gate Operator PDFs in My Drive." TextWrapping="Wrap" Margin="0,0,0,6"/>
+     </StackPanel>
+     <Button x:Name="SwitchClientButton" Content="Connect with a different OAuth JSON…" Click="SwitchClient_Click" HorizontalAlignment="Left"/>
+    </StackPanel>
+   </Expander>
+  </StackPanel>
+ </ScrollViewer>
 </Window>

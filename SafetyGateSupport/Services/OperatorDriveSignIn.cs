@@ -13,6 +13,8 @@ internal static class OperatorDriveSignIn
     private const string ClientKey = "desktop-client";
     private static readonly LocalStore Store = new();
 
+    internal static bool HasClient => Store.Exists<ClientSecrets>(ClientKey);
+
     internal static async Task<UserCredential?> LoadAsync(CancellationToken token)
     {
         var client = await Store.GetAsync<ClientSecrets>(ClientKey);
@@ -32,7 +34,7 @@ internal static class OperatorDriveSignIn
         throw new InvalidOperationException("Use Sign in with Google to reconnect the publisher.");
     }
 
-    internal static async Task<UserCredential> ConnectAsync(string jsonPath, CancellationToken token)
+    private static async Task<ClientSecrets> ReadClientAsync(string jsonPath, CancellationToken token)
     {
         using var json = JsonDocument.Parse(await File.ReadAllBytesAsync(jsonPath, token));
         if (!json.RootElement.TryGetProperty("installed", out var installed) ||
@@ -42,7 +44,14 @@ internal static class OperatorDriveSignIn
             id.GetString() is not { Length: > 0 } clientId || secret.GetString() is not { Length: > 0 } clientSecret)
             throw new InvalidOperationException("Select the JSON downloaded for your Google Desktop app OAuth client.");
 
-        var client = new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret };
+        return new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret };
+    }
+
+    internal static async Task<UserCredential> ConnectAsync(string? jsonPath, CancellationToken token)
+    {
+        var client = jsonPath is null ? await Store.GetAsync<ClientSecrets>(ClientKey) : await ReadClientAsync(jsonPath, token);
+        if (client?.ClientId is not { Length: > 0 } clientId)
+            throw new InvalidOperationException("Choose your Google Desktop app OAuth JSON for the first connection.");
         // Keep any existing working session intact until a new browser sign-in succeeds.
         var initializer = CreateFlow(client, null);
         initializer.Prompt = "consent select_account";
@@ -68,13 +77,15 @@ internal static class OperatorDriveSignIn
     private sealed class LocalStore : IDataStore
     {
         private static readonly string DirectoryPath = Path.Combine(
-            Path.GetDirectoryName(OperatorDrivePilot.StatePath)!, "drive-login");
+            OperatorPublishingState.LocalDirectory, "drive-login");
 
         private static string FilePath<T>(string key)
         {
             string name = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(typeof(T).FullName + ":" + key)));
             return Path.Combine(DirectoryPath, name);
         }
+
+        internal bool Exists<T>(string key) => File.Exists(FilePath<T>(key));
 
         public Task StoreAsync<T>(string key, T value)
         {

@@ -196,6 +196,7 @@ public partial class AdminWindow
         StartSetupTab.IsSelected = true;
         SetupTaskText.Text = "Export uses the pilot’s saved settings.";
         StartSetupTab.UpdateLayout();
+        OfflineLabelsExpander.IsExpanded = true;
         PilotPhoneStep.BringIntoView();
     }
     private void PilotUnitBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

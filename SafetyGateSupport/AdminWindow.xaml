@@ -66,12 +66,15 @@
     <GroupBox Header="4 · Try the operator’s job"><StackPanel Margin="12"><TextBlock Text="Open the pilot and ask a colleague to identify it by the photo, open Manuals / documents, and find the fix under Common Problems. If they can do those three things without coaching, you have a useful pilot. Use Plant setup in the sidebar to make corrections before adding more units." TextWrapping="Wrap"/>
      <Button x:Name="StartOperatorButton" Content="Open the saved pilot in operator view" Click="StartOperator_Click" HorizontalAlignment="Left" Margin="0,10"/>
     </StackPanel></GroupBox>
-    <GroupBox x:Name="PilotPhoneStep" Header="5 · Try the pilot on a phone"><StackPanel Margin="12">
-     <TextBlock Text="For a home test, use offline QR text and a printed photo guide. A PDF attached above opens in the desktop app. For phone document access, use an approved HTTPS link that works while signed out." TextWrapping="Wrap"/>
-     <TextBlock x:Name="PilotQrStatus" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8"/>
-     <WrapPanel><Button x:Name="EditPilotQrButton" Content="Edit pilot QR settings" Click="StartPhoneGuides_Click"/><Button Content="Export this pilot…" Click="ExportPilotPhoneGuide_Click"/></WrapPanel>
-     <TextBlock x:Name="PilotExportStatus" TextWrapping="Wrap"/>
-     <Button Content="Google Drive operator PDF…" Click="OpenOperatorDrivePilot_Click" HorizontalAlignment="Left"/>
+    <GroupBox x:Name="PilotPhoneStep" Header="5 · Phone access"><StackPanel Margin="12">
+     <TextBlock Text="Use Publish &amp; print QR in the main app to publish unit folders and print Drive labels." TextWrapping="Wrap"/>
+     <Expander x:Name="OfflineLabelsExpander" Header="Offline label export" Margin="0,10,0,0">
+      <StackPanel>
+       <TextBlock x:Name="PilotQrStatus" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8"/>
+       <WrapPanel><Button x:Name="EditPilotQrButton" Content="Edit offline QR settings" Click="StartPhoneGuides_Click"/><Button Content="Export this pilot…" Click="ExportPilotPhoneGuide_Click"/></WrapPanel>
+       <TextBlock x:Name="PilotExportStatus" TextWrapping="Wrap"/>
+      </StackPanel>
+     </Expander>
     </StackPanel></GroupBox>
    </StackPanel></ScrollViewer></TabItem>
 

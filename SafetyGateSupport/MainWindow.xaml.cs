@@ -75,7 +75,9 @@ public partial class MainWindow : Window
         {
             _operatorDriveTimer.Tick += async (_, _) =>
             {
-                if (_sharedDataReady) await OperatorDriveRunner.RunAsync(Path.GetFullPath(_data.SharedRoot));
+                if (!_sharedDataReady) return;
+                await OperatorDriveRunner.RunAsync(_data);
+                await RefreshDrawingPublishStatusAsync();
             };
             _operatorDriveTimer.Start();
         }
@@ -173,8 +175,15 @@ public partial class MainWindow : Window
         finally { _loadingData = false; if (!_isClosed) { IsEnabled = true; if (HomeShell.IsVisible) UnitSearchBox.Focus(); } }
     }
 
+    private void PublishDrive_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sharedDataReady && OperatorDriveRunner.IsSupported(_data))
+            new OperatorDriveWindow(_data, SelectedUnit?.Id) { Owner = this }.ShowDialog();
+    }
+
     private void UpdateConnectionStatus()
     {
+        PublishDriveNav.Visibility = _sharedDataReady && OperatorDriveRunner.IsSupported(_data) ? Visibility.Visible : Visibility.Collapsed;
         if (_data.IsOnboardingDemo)
         {
             ConnectionText.Text = "Fictional example";
@@ -493,6 +502,7 @@ public partial class MainWindow : Window
         SaveSharedNotesNow();
         var gate = GateFor(unit); if (gate is null) { ClearUnit(); return; }
         NoUnitPanel.Visibility = Visibility.Collapsed; UnitDetailPanel.Visibility = Visibility.Visible;
+        DrawingPublishStatus.Text = "";
         string asset = gate.AssetKey == "Unassigned" ? gate.Display : gate.AssetDisplay;
         UnitTitleText.Text = $"{asset} · {unit.UnitDisplay}";
         UnitAreaText.Text = string.Join(" • ", new[] { gate.Category, gate.Location }.Where(s => !string.IsNullOrWhiteSpace(s)));
@@ -504,7 +514,7 @@ public partial class MainWindow : Window
     {
         CancelPhotoLoad();
         ClearDrawings();
-        UnitTitleText.Text = "Select a unit"; UnitAreaText.Text = "";
+        UnitTitleText.Text = "Select a unit"; UnitAreaText.Text = ""; DrawingPublishStatus.Text = "";
         SaveSharedNotesNow(); _notesSystem = null; _sharedNotesDirty = false; _loadingSharedNotes = true; SharedNotesBox.Text = ""; _loadingSharedNotes = false;
         NoUnitPanel.Visibility = Visibility.Visible; UnitDetailPanel.Visibility = Visibility.Collapsed; GateImage.Source = null;
         UnitPartsButton.IsEnabled = false;
