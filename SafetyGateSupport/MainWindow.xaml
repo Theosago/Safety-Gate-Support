@@ -36,7 +36,7 @@
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Plant setup" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0" ToolTip="Open Plant setup (Ctrl+Alt+Shift+A)"/>
      <Button x:Name="CloseDemoButton" Content="Close demo" Click="CloseDemo_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.5.6" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.5.7" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -158,6 +158,8 @@
        <TextBlock x:Name="UnitAreaText" Foreground="{DynamicResource ThemeForeground536E81}" Margin="0,4,0,0" TextWrapping="Wrap"/>
       </StackPanel>
      </DockPanel>
+     <Button x:Name="MaintainXWorkOrdersButton" Content="MaintainX work orders" Click="MaintainXWorkOrders_Click"
+             HorizontalAlignment="Left" Margin="0,8,0,0" Visibility="Collapsed"/>
     </StackPanel>
     <ScrollViewer x:Name="UnitWorkspaceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <StackPanel x:Name="NoUnitPanel" Margin="24"><TextBlock Text="Select a unit to see its photo, files and troubleshooting." FontSize="21" TextWrapping="Wrap"/><Button Content="Find a unit" Click="HomeNav_Click" HorizontalAlignment="Left" Margin="0,18,0,0"/></StackPanel>

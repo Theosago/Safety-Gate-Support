@@ -67,6 +67,7 @@ internal static class Program
             checks.AddRange(SearchChecks.Cases);
             checks.AddRange(SupportLibraryChecks.Cases);
             checks.AddRange(OperatorDriveChecks.Cases);
+            checks.AddRange(MaintainXChecks.Cases);
             checks.AddRange(AssetStorageChecks.Cases);
             checks.AddRange(AreaChecks.Cases);
             checks.Add(("PDF reading direction detects upside-down and sideways text including page rotation metadata", DrawingOrientationChecks.Check));

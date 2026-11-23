@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console, version **8.5.6**, based on the supplied
+Windows WPF support console, version **8.5.7**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,
@@ -12,6 +12,8 @@ Version 8.4.6 imports stockroom metadata by Item ID, supports bulk ID lists, and
 Version 8.4.4 adds PLC, light column and scanner examples to the operator demo and puts PLC files directly on the unit page.
 
 Version 8.4.3 adds a [fictional operator demo and a guided first-unit checklist](docs/V8_4_3.md).
+
+Version 8.5.7 shows current MaintainX work orders from a unit’s page. See [MaintainX setup](docs/WINDOWS_QUICK_START.md#view-maintainx-work-orders).
 
 Version 8.5.6 scans stockroom counts for QR spare-parts PDFs daily and registers the optional background task directly with Windows Task Scheduler. See [QR publishing and stockroom refresh](docs/GOOGLE_DRIVE_PILOT.md).
 

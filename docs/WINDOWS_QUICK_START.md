@@ -14,6 +14,19 @@ for the same library. Huntingdon sample data is an optional training choice, not
 the new-plant default. See [the guided setup walkthrough](V8_4_1.md).
 Local settings live at `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
 
+## View MaintainX work orders
+
+Open a unit and choose **MaintainX work orders**. In **MaintainX settings**,
+enter the ID of the corresponding asset in MaintainX and a plant API key
+that can read assets and work orders. Choose **Connect and load**, then verify
+the asset name. Ask your MaintainX administrator for the key and asset ID.
+
+The shared library remembers the unit’s asset link. Every Windows user needs
+their own approved key, which Windows encrypts on that PC. Use **Refresh** to
+update the list. If two units use the same asset record in MaintainX, link both
+units to that asset ID. The list includes open, in-progress, and on-hold work
+orders for the linked asset. Create and manage work orders in MaintainX.
+
 ## Import the supplied support files
 
 From **Manuals → Import documents…**, select the PDFs and Word files together.

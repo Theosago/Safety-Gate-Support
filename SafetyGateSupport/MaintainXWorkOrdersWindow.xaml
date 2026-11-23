@@ -1,0 +1,62 @@
+<Window x:Class="SafetyGateSupport.MaintainXWorkOrdersWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MaintainX work orders" Width="760" Height="550" MinWidth="560" MinHeight="440"
+        WindowStartupLocation="CenterOwner" Loaded="Window_Loaded">
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,10">
+            <Button x:Name="RefreshButton" Content="Refresh" Click="Refresh_Click" DockPanel.Dock="Right"
+                    VerticalAlignment="Top" IsEnabled="False"/>
+            <StackPanel>
+                <TextBlock Text="Current work orders" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <TextBlock x:Name="UnitText" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                <TextBlock x:Name="LinkText" TextWrapping="Wrap" Margin="0,3,0,0"
+                           Foreground="{DynamicResource ThemeForeground536E81}"/>
+            </StackPanel>
+        </DockPanel>
+        <TextBlock x:Name="StatusText" Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,10" AutomationProperties.LiveSetting="Polite"/>
+        <DataGrid x:Name="OrdersGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True"
+                  CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" HeadersVisibility="Column"
+                  AutomationProperties.Name="Current MaintainX work orders">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Order" Binding="{Binding NumberText}" Width="72"/>
+                <DataGridTemplateColumn Header="Title" Width="*" SortMemberPath="TitleText">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding TitleText}" TextWrapping="Wrap" Padding="5,3"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="90"/>
+                <DataGridTextColumn Header="Priority" Binding="{Binding PriorityText}" Width="70"/>
+                <DataGridTextColumn Header="Due date" Binding="{Binding DueText}" SortMemberPath="DueDate" Width="108"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <Expander x:Name="SettingsPanel" Grid.Row="3" Header="MaintainX settings" Margin="0,12,0,0" IsEnabled="False">
+            <StackPanel Margin="0,6,0,0">
+                <TextBlock Text="Use a plant API key with access to this asset and its work orders. Links are shared across the plant library. Your key is saved for your Windows account." TextWrapping="Wrap"/>
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="115"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Label Content="MaintainX asset ID" Target="{Binding ElementName=AssetIdBox}"/>
+                    <TextBox x:Name="AssetIdBox" Grid.Column="1" MaxLength="19" Margin="0,0,0,5"/>
+                    <Label Content="API key" Grid.Row="1" Target="{Binding ElementName=ApiKeyBox}"/>
+                    <PasswordBox x:Name="ApiKeyBox" Grid.Row="1" Grid.Column="1" MaxLength="2048" Margin="0,0,0,5"/>
+                </Grid>
+                <Button Content="Connect and load" Click="Connect_Click" HorizontalAlignment="Left"/>
+            </StackPanel>
+        </Expander>
+    </Grid>
+</Window>

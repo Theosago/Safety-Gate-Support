@@ -186,6 +186,12 @@ public partial class MainWindow : Window
         if (publishing.GuidePdfsChanged && SelectedGate is { } gate && SelectedUnit is { } unit) LoadDrawings(gate, unit);
     }
 
+    private void MaintainXWorkOrders_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_sharedDataReady || _data.IsHomePreview || _data.IsOnboardingDemo || SelectedUnit is not { } unit) return;
+        new MaintainXWorkOrdersWindow(_data, unit) { Owner = this }.ShowDialog();
+    }
+
     private void UpdateConnectionStatus()
     {
         PublishDriveNav.Visibility = _sharedDataReady && OperatorDriveRunner.IsSupported(_data) ? Visibility.Visible : Visibility.Collapsed;
@@ -525,6 +531,7 @@ public partial class MainWindow : Window
         UnitTitleText.Text = "Select a unit"; UnitAreaText.Text = ""; DrawingPublishStatus.Text = ""; _drawingPublicationUnits = [];
         SaveSharedNotesNow(); _notesSystem = null; _sharedNotesDirty = false; _loadingSharedNotes = true; SharedNotesBox.Text = ""; _loadingSharedNotes = false;
         NoUnitPanel.Visibility = Visibility.Visible; UnitDetailPanel.Visibility = Visibility.Collapsed; GateImage.Source = null;
+        MaintainXWorkOrdersButton.Visibility = Visibility.Collapsed;
         UnitPartsButton.IsEnabled = false;
         UnitPartsButton.Content = "Replacement parts";
     }
@@ -541,6 +548,8 @@ public partial class MainWindow : Window
     }
     private void UpdateEquipmentActions(SafetySystem unit)
     {
+        MaintainXWorkOrdersButton.Visibility = _sharedDataReady && !_data.IsHomePreview && !_data.IsOnboardingDemo
+            ? Visibility.Visible : Visibility.Collapsed;
         LightColumnButton.Visibility = unit.ShowLightConfiguration ? Visibility.Visible : Visibility.Collapsed;
         ScannerButton.Visibility = unit.ShowScannerConfiguration ? Visibility.Visible : Visibility.Collapsed;
     }
