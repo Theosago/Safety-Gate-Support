@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console, version **8.5.5**, based on the supplied
+Windows WPF support console, version **8.5.6**, based on the supplied
 `SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
 
 The console provides gate/unit browsing, identification photos, shared notes,
@@ -13,7 +13,9 @@ Version 8.4.4 adds PLC, light column and scanner examples to the operator demo a
 
 Version 8.4.3 adds a [fictional operator demo and a guided first-unit checklist](docs/V8_4_3.md).
 
-Version 8.5.5 publishes unit spare-parts PDFs with individually dated stockroom counts and an optional Windows refresh schedule. See [QR publishing and stockroom refresh](docs/GOOGLE_DRIVE_PILOT.md).
+Version 8.5.6 scans stockroom counts for QR spare-parts PDFs daily and registers the optional background task directly with Windows Task Scheduler. See [QR publishing and stockroom refresh](docs/GOOGLE_DRIVE_PILOT.md).
+
+Version 8.5.5 adds unit spare-parts PDFs with individually dated stockroom counts.
 
 Version 8.5.4 adds batch PDF and Word imports directly in **Manuals**. It also shows drawing coverage on the unit page and lets one PDF attachment appear in several unit guides.
 

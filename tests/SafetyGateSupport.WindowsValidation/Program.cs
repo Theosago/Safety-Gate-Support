@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Windows.Interop;
 using System.Text;
 using System.Text.Json;
@@ -120,7 +121,7 @@ internal static class Program
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
             ("Canceling stockroom lookup restores refresh controls and keeps unconfirmed rows unknown", CancelStockroomLookup),
             ("Plant selection is local, starts unselected and cancels stale stockroom results", StockroomPlantSelection),
-            ("Spare-parts scheduling uses the current Windows profile and the background-only app command", SparePartsSchedule),
+            ("Windows Task Scheduler registers and replaces a daily spare-parts task for the signed-in user", SparePartsSchedule),
             ("Inline unit files, scanner and column tools retain context and theme selection persists", InlineWorkspace),
             ("Unit parts stay beside the unit and live availability changes without snapshots", ReplacementPartsRail),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
@@ -1335,19 +1336,41 @@ internal static class Program
     private static Task SparePartsSchedule()
     {
         var schedule = typeof(MainWindow).Assembly.GetType("SafetyGateSupport.Services.OperatorPartsSchedule", throwOnError: true)!;
-        var create = schedule.GetMethod("CreateTask", BindingFlags.Static | BindingFlags.NonPublic)!;
-        const string path = @"C:\Plant tools\Safety & Gate\SafetyGateSupport.exe", sid = "S-1-5-21-100-200-300-1001";
-        var xml = (XDocument)create.Invoke(null, [path, sid, DateTimeOffset.UtcNow])!;
+        var register = schedule.GetMethod("RegisterDailyTask", BindingFlags.Static | BindingFlags.NonPublic)!;
+        using var account = WindowsIdentity.GetCurrent();
+        string sid = account.User!.Value;
+        string name = "Safety Gate Support validation " + Guid.NewGuid().ToString("N");
+        string directory = Directory.CreateDirectory(Path.Combine(NewDirectory(), "Safety Gate & Tools")).FullName;
+        string path = Path.Combine(directory, "SafetyGateSupport.exe");
+        File.Copy(Path.Combine(Environment.SystemDirectory, "cmd.exe"), path);
+        dynamic scheduler = Activator.CreateInstance(Type.GetTypeFromProgID("Schedule.Service", throwOnError: true)!)!;
+        scheduler.Connect();
+        dynamic folder = scheduler.GetFolder(@"\");
         XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
-        var task = XDocument.Parse(xml.ToString()).Root!;
-        Require(task.Descendants(ns + "Command").Single().Value == path &&
-            task.Descendants(ns + "Arguments").Single().Value == "--publish-spare-parts",
-            "The task should run only the spare-parts command, including when the program path has spaces.");
-        Require(task.Descendants(ns + "Interval").Single().Value == "PT30M" &&
-            task.Descendants(ns + "UserId").Single().Value == sid &&
-            task.Descendants(ns + "LogonType").Single().Value == "InteractiveToken" &&
-            task.Descendants(ns + "MultipleInstancesPolicy").Single().Value == "IgnoreNew",
-            "The task should repeat under the chosen signed-in Windows user without overlapping.");
+        bool registered = false;
+        try
+        {
+            var future = DateTime.Now.AddYears(10);
+            register.Invoke(null, [name, path, sid, future]);
+            registered = true;
+            var updated = future.AddHours(1);
+            register.Invoke(null, [name, path, sid, updated]);
+            dynamic saved = folder.GetTask(name);
+            var task = XDocument.Parse((string)saved.Xml).Root!;
+            Require(task.Descendants(ns + "Command").Single().Value == path &&
+                task.Descendants(ns + "Arguments").Single().Value == "--publish-spare-parts",
+                "The registered task should execute the background command and preserve the path with spaces.");
+            Require(task.Descendants(ns + "DaysInterval").Single().Value == "1" &&
+                !task.Descendants(ns + "Interval").Any() &&
+                DateTime.Parse(task.Descendants(ns + "StartBoundary").Single().Value) == updated.AddTicks(-(updated.Ticks % TimeSpan.TicksPerSecond)),
+                "Re-registering should replace the start time and retain a daily schedule.");
+            Require((int)saved.Definition.Principal.LogonType == 3 && (int)saved.Definition.Settings.MultipleInstances == 2,
+                "The registered task should use the signed-in account and prevent overlapping runs.");
+        }
+        finally
+        {
+            if (registered) folder.DeleteTask(name, 0);
+        }
         return Task.CompletedTask;
     }
 

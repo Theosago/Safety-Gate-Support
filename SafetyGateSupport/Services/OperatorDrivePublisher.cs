@@ -23,7 +23,7 @@ internal sealed class OperatorDrivePublisher(
 
     internal async Task PublishSparePartsAsync(DataService data, string sharedRoot, OperatorPublishingState state,
         Func<string, IReadOnlyCollection<string>, CancellationToken, Task<StockroomService.Snapshot>> reader,
-        DateTimeOffset now, CancellationToken token)
+        DateTimeOffset now, CancellationToken token, bool forceScan = false)
     {
         if (state.Root is not { Pending: false } boundRoot) return;
         OperatorPublicationUnit[] units;
@@ -54,7 +54,7 @@ internal sealed class OperatorDrivePublisher(
             scan = state.StockroomScans.GetValueOrDefault(plant.Id);
             if (ids.Length > 0)
             {
-                var latest = await OperatorSpareParts.ScanAsync(plant, ids, scan, reader, now, token);
+                var latest = await OperatorSpareParts.ScanAsync(plant, ids, scan, reader, now, token, forceScan);
                 if (!ReferenceEquals(latest, scan))
                 {
                     scan = latest;

@@ -208,7 +208,7 @@ public partial class OperatorDriveWindow : Window
         await RunActionAsync("Scheduling spare-parts refresh…", async () =>
         {
             await OperatorPartsSchedule.InstallAsync(_closed.Token);
-            return "Scheduled every 30 minutes on this PC while you are signed in to Windows.";
+            return "Daily spare-parts refresh scheduled on this PC while you are signed in to Windows.";
         });
     }
 

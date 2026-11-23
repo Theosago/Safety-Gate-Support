@@ -1,9 +1,7 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
-using System.Xml;
-using System.Xml.Linq;
 
 namespace SafetyGateSupport.Services;
 
@@ -11,59 +9,49 @@ internal static class OperatorPartsSchedule
 {
     internal const string Argument = "--publish-spare-parts";
     private const string TaskPrefix = "Safety Gate Support - Spare parts refresh";
+    private const int DailyTrigger = 2, ExecuteAction = 0, InteractiveToken = 3, CreateOrUpdate = 6;
+    private const int LeastPrivilege = 0, IgnoreNew = 2;
 
-    internal static async Task InstallAsync(CancellationToken token)
+    internal static Task InstallAsync(CancellationToken token)
     {
         string path = Environment.ProcessPath ?? throw new IOException("The app's location could not be found.");
         using var account = WindowsIdentity.GetCurrent();
         string user = account.User?.Value ?? throw new IOException("The current Windows account could not be identified.");
-        string taskFile = Path.Combine(Path.GetTempPath(), "SafetyGateParts-" + Guid.NewGuid().ToString("N") + ".xml");
-        try
-        {
-            CreateTask(path, user, DateTimeOffset.Now.AddMinutes(1)).Save(taskFile);
-            var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "schtasks.exe"))
-            {
-                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
-            };
-            foreach (string argument in new[] { "/Create", "/TN", TaskPrefix + " - " + user, "/XML", taskFile, "/F" })
-                start.ArgumentList.Add(argument);
-            using var process = Process.Start(start) ?? throw new IOException("Windows Task Scheduler could not start.");
-            var output = process.StandardOutput.ReadToEndAsync(token);
-            var error = process.StandardError.ReadToEndAsync(token);
-            try { await process.WaitForExitAsync(token); }
-            catch (OperationCanceledException)
-            {
-                if (!process.HasExited) process.Kill();
-                throw;
-            }
-            await Task.WhenAll(output, error);
-            if (process.ExitCode != 0)
-                throw new IOException("Windows could not schedule spare-parts refresh. " + (error.Result + " " + output.Result).Trim());
-        }
-        finally { File.Delete(taskFile); }
+        return Task.Run(() => RegisterDailyTask(TaskPrefix + " - " + user, path, user, DateTime.Now.AddMinutes(1)), token);
     }
 
-    internal static XDocument CreateTask(string executable, string userSid, DateTimeOffset start)
+    internal static void RegisterDailyTask(string name, string executable, string userSid, DateTime start)
     {
-        XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
-        return new(new XElement(ns + "Task", new XAttribute("version", "1.3"),
-            new XElement(ns + "RegistrationInfo",
-                new XElement(ns + "Description", "Refreshes the spare-parts PDFs in previously published unit folders.")),
-            new XElement(ns + "Triggers", new XElement(ns + "TimeTrigger",
-                new XElement(ns + "Enabled", true),
-                new XElement(ns + "StartBoundary", start.ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture)),
-                new XElement(ns + "Repetition", new XElement(ns + "Interval", XmlConvert.ToString(OperatorSpareParts.ScanInterval))))),
-            new XElement(ns + "Principals", new XElement(ns + "Principal", new XAttribute("id", "Publisher"),
-                new XElement(ns + "UserId", userSid), new XElement(ns + "LogonType", "InteractiveToken"),
-                new XElement(ns + "RunLevel", "LeastPrivilege"))),
-            new XElement(ns + "Settings",
-                new XElement(ns + "MultipleInstancesPolicy", "IgnoreNew"),
-                new XElement(ns + "DisallowStartIfOnBatteries", false),
-                new XElement(ns + "StopIfGoingOnBatteries", false),
-                new XElement(ns + "StartWhenAvailable", true),
-                new XElement(ns + "ExecutionTimeLimit", "PT15M")),
-            new XElement(ns + "Actions", new XAttribute("Context", "Publisher"), new XElement(ns + "Exec",
-                new XElement(ns + "Command", executable), new XElement(ns + "Arguments", Argument)))));
+        var schedulerType = Type.GetTypeFromProgID("Schedule.Service")
+            ?? throw new IOException("Windows Task Scheduler is unavailable.");
+        try
+        {
+            dynamic scheduler = Activator.CreateInstance(schedulerType)!;
+            scheduler.Connect();
+            dynamic task = scheduler.NewTask(0);
+            task.RegistrationInfo.Description = "Refreshes the spare-parts PDFs in previously published unit folders.";
+            task.Principal.UserId = userSid;
+            task.Principal.LogonType = InteractiveToken;
+            task.Principal.RunLevel = LeastPrivilege;
+            task.Settings.MultipleInstances = IgnoreNew;
+            task.Settings.DisallowStartIfOnBatteries = false;
+            task.Settings.StopIfGoingOnBatteries = false;
+            task.Settings.StartWhenAvailable = true;
+            task.Settings.ExecutionTimeLimit = "PT15M";
+
+            dynamic trigger = task.Triggers.Create(DailyTrigger);
+            trigger.StartBoundary = start.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture);
+            trigger.DaysInterval = (short)1;
+            dynamic action = task.Actions.Create(ExecuteAction);
+            action.Path = executable;
+            action.Arguments = Argument;
+            action.WorkingDirectory = Path.GetDirectoryName(executable);
+            scheduler.GetFolder(@"\").RegisterTaskDefinition(name, task, CreateOrUpdate, userSid, null, InteractiveToken, null);
+        }
+        catch (COMException error)
+        {
+            throw new IOException("Windows could not schedule spare-parts refresh. " + error.Message, error);
+        }
     }
 
     internal static async Task<int> RunAsync()

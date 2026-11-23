@@ -58,8 +58,9 @@ coverage. DWG files stay in the engineering library.
 2. Expand **Spare parts and stockroom refresh** to check the plant. The
    publisher starts with the plant already selected on the publishing PC.
    The selected QR stockroom is saved for the shared library.
-3. To refresh with the app window closed, click **Refresh every 30 minutes
-   with app closed** once on the publishing PC. Use a PC that can reach the
+3. To refresh with the app window closed, click **Refresh daily with app
+   closed** once on the publishing PC. The task starts about a minute after
+   setup and repeats at that local time each day. Use a PC that can reach the
    shared library, the stockroom and Google Drive. Keep it awake and signed in
    to the Windows account used to connect Google Drive.
 
@@ -67,7 +68,8 @@ The PDF lists the same replacement parts as the unit's desktop page, with Item
 IDs, bins, and each item's last confirmed quantity and scan time. UTC is printed
 with the times. If a scan fails or only confirms some Item IDs, the PDF keeps
 older confirmed counts with their original times. Unchecked quantities appear
-as unknown.
+as unknown. Automatic scans run once per day. **Publish updates now** can
+request another scan the same day.
 
 Find the task under **Safety Gate Support - Spare parts refresh** with the
 Windows account ID. Use Windows Task Scheduler to disable it. If you extract

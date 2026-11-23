@@ -6,8 +6,7 @@ using SafetyGateSupport.Models;
 namespace SafetyGateSupport.Services;
 
 internal sealed record ConfirmedStock(decimal Quantity, string Bin, DateTimeOffset CheckedUtc);
-internal sealed record OperatorStockroomScan(DateTimeOffset AttemptedUtc, string[] ItemIds,
-    Dictionary<string, ConfirmedStock> Counts, string? Message);
+internal sealed record OperatorStockroomScan(DateTimeOffset AttemptedUtc, Dictionary<string, ConfirmedStock> Counts, string? Message);
 internal sealed record SparePartLine(string ItemId, string Description, string CatalogBin, ConfirmedStock? Stock);
 internal sealed record UnitSpareParts(string? Plant, IReadOnlyList<SparePartLine> Parts)
 {
@@ -19,15 +18,11 @@ internal sealed record UnitSpareParts(string? Plant, IReadOnlyList<SparePartLine
 internal static class OperatorSpareParts
 {
     internal const string FileName = "03 Spare parts.pdf";
-    internal static readonly TimeSpan ScanInterval = TimeSpan.FromMinutes(30);
-
     internal static async Task<OperatorStockroomScan> ScanAsync(StockroomPlant plant, IReadOnlyList<string> itemIds,
         OperatorStockroomScan? prior, Func<string, IReadOnlyCollection<string>, CancellationToken, Task<StockroomService.Snapshot>> reader,
-        DateTimeOffset now, CancellationToken token)
+        DateTimeOffset now, CancellationToken token, bool forceScan)
     {
-        var keys = itemIds.Select(StockroomService.StockKey).ToArray();
-        // Allow for launch and network jitter between successive scheduled starts.
-        if (prior is not null && now.AddSeconds(45) < prior.AttemptedUtc + ScanInterval && keys.All(prior.ItemIds.Contains))
+        if (!forceScan && prior is not null && prior.AttemptedUtc.LocalDateTime.Date >= now.LocalDateTime.Date)
             return prior;
 
         var known = prior is null ? new Dictionary<string, ConfirmedStock>() : new(prior.Counts);
@@ -53,7 +48,7 @@ internal static class OperatorSpareParts
             message = "Stockroom scan could not finish. The PDF keeps the last confirmed counts. " + error.Message;
         }
         token.ThrowIfCancellationRequested();
-        return new(now, keys, known, message);
+        return new(now, known, message);
     }
 
     internal static UnitSpareParts ForUnit(IReadOnlyList<PartRecord> parts, StockroomPlant? plant, OperatorStockroomScan? scan) =>

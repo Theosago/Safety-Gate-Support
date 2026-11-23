@@ -36,7 +36,7 @@
      <ComboBox x:Name="PartsStockroomPicker" DisplayMemberPath="Name" AutomationProperties.Name="Stockroom shown in QR folders"
                SelectionChanged="PartsStockroom_Changed" HorizontalAlignment="Left" MinWidth="195" Margin="0,5,0,5"/>
      <TextBlock x:Name="StockroomStatusLabel" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground536E81}"/>
-     <Button x:Name="EnablePartsScheduleButton" Content="Refresh every 30 minutes with app closed" Click="EnablePartsSchedule_Click"
+     <Button x:Name="EnablePartsScheduleButton" Content="Refresh daily with app closed" Click="EnablePartsSchedule_Click"
              HorizontalAlignment="Left" Margin="0,8,0,0"/>
     </StackPanel>
    </Expander>

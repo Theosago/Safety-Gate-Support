@@ -98,7 +98,7 @@ internal static class OperatorDriveRunner
                     }
                 }
                 await publisher.PublishSparePartsAsync(data, root, state, StockroomWebViewReader.FetchCatalogAsync,
-                    DateTimeOffset.UtcNow, token);
+                    DateTimeOffset.UtcNow, token, forceScan: publishNow || stockroomPlantId is not null);
                 if (!sparePartsOnly) return summary!.Message;
                 var issue = state.SparePartsCatalogError ?? state.Units.Values.FirstOrDefault(unit => unit.SparePartsError is not null)?.SparePartsError;
                 if (issue is not null) throw new IOException(issue);
