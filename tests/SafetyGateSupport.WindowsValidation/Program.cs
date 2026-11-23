@@ -1487,7 +1487,7 @@ internal static class Program
         await WaitUntil(() => HasColor(photo.Source, Colors.Blue), "Main window did not keep the final selected unit's blue photo.");
         Require(Control<TextBlock>(window, "UnitTitleText").Text.Contains(fixture.BlueUnit.UnitDisplay, StringComparison.Ordinal), "Unit title does not match the final selection.");
         var drawings = Control<Button>(window, "FilesButton");
-        Require(drawings.IsVisible && drawings.Content.Equals("Drawing files"), "The selected unit did not show its drawing files action.");
+        Require(drawings.IsVisible && Equals(drawings.Content, "Manage drawings…"), "The selected unit did not show its Manage drawings action.");
         units.SelectedIndex = 0;
         units.SelectedItem = null;
         await DispatcherSettled();
