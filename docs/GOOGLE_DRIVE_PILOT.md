@@ -50,6 +50,31 @@ appears in each selected unit's **Drawings and guide PDFs** list and QR guide.
 Choose the same filename again to replace the attachment and review its
 coverage. DWG files stay in the engineering library.
 
+## Show spare parts in the QR folder
+
+1. Open **Publish & print QR** and select **Publish updates now** if the
+   unit folders already exist. Units with replacement parts get
+   **03 Spare parts.pdf** in the same QR folder.
+2. Expand **Spare parts and stockroom refresh** to check the plant. The
+   publisher starts with the plant already selected on the publishing PC.
+   The selected QR stockroom is saved for the shared library.
+3. To refresh with the app window closed, click **Refresh every 30 minutes
+   with app closed** once on the publishing PC. Use a PC that can reach the
+   shared library, the stockroom and Google Drive. Keep it awake and signed in
+   to the Windows account used to connect Google Drive.
+
+The PDF lists the same replacement parts as the unit's desktop page, with Item
+IDs, bins, and each item's last confirmed quantity and scan time. UTC is printed
+with the times. If a scan fails or only confirms some Item IDs, the PDF keeps
+older confirmed counts with their original times. Unchecked quantities appear
+as unknown.
+
+Find the task under **Safety Gate Support - Spare parts refresh** with the
+Windows account ID. Use Windows Task Scheduler to disable it. If you extract
+a newer version to a different folder, click the schedule button from that
+version to update the executable path. The latest scheduled run status is
+saved in the app's local settings folder as spare-parts-refresh.log.
+
 ## Sync shared notes with phones
 
 1. In the Google Cloud project you used for Drive sign-in, enable the

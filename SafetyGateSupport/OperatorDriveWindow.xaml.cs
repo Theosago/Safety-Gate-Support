@@ -1,7 +1,9 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using SafetyGateSupport.Models;
 using SafetyGateSupport.Services;
 
 namespace SafetyGateSupport;
@@ -17,6 +19,7 @@ public partial class OperatorDriveWindow : Window
     private OperatorPublishingState _state = new();
     private bool _busy;
     private bool _refreshing;
+    private bool _renderingStockroom;
     private string? _message;
     internal bool GuidePdfsChanged { get; private set; }
 
@@ -26,6 +29,7 @@ public partial class OperatorDriveWindow : Window
         _data = data;
         _root = Path.GetFullPath(data.SharedRoot);
         _selectedUnitId = selectedUnitId;
+        PartsStockroomPicker.ItemsSource = StockroomPlant.All;
         Loaded += async (_, _) =>
         {
             await RefreshAsync(loadUnits: true);
@@ -102,11 +106,24 @@ public partial class OperatorDriveWindow : Window
                 : "Publish a unit to make its notes available for sync.";
         EnableDocsButton.Visibility = _state.SyncSharedNotes && _state.NotesError?.StartsWith("Enable the Google Docs API", StringComparison.Ordinal) == true
             ? Visibility.Visible : Visibility.Collapsed;
+        var plant = StockroomPlant.Find(_state.StockroomPlantId) ?? StockroomPlant.Find(_data.Settings.StockroomPlantId);
+        _renderingStockroom = true;
+        PartsStockroomPicker.SelectedItem = plant;
+        _renderingStockroom = false;
+        PartsStockroomPicker.IsEnabled = !_busy && ready > 0 && connected;
+        EnablePartsScheduleButton.IsEnabled = PartsStockroomPicker.IsEnabled && plant is not null;
+        var scan = plant is null ? null : _state.StockroomScans.GetValueOrDefault(plant.Id);
+        var lastScan = scan?.Counts.Values.Max(count => (DateTimeOffset?)count.CheckedUtc);
+        StockroomStatusLabel.Text = plant is null ? "Choose the plant to start checking stockroom quantities." :
+            (lastScan is { } last ? "Last successful stockroom scan " + OperatorSpareParts.ScanTime(last) : "No confirmed counts yet.")
+            + (scan?.Message is { } scanMessage ? Environment.NewLine + scanMessage : "");
         var issues = new List<string>();
+        if (_state.SparePartsCatalogError is not null) issues.Add(_state.SparePartsCatalogError);
         foreach (var item in _units)
         {
             if (!_state.Units.TryGetValue(item.Unit.Id, out var unit)) continue;
             if (unit.Error is not null) issues.Add($"{item.Label} — {unit.Error}");
+            if (unit.SparePartsError is not null) issues.Add($"{item.Label} · Spare parts — {unit.SparePartsError}");
             if (_state.SyncSharedNotes && unit.NotesError is not null) issues.Add($"{item.Label} · Shared notes — {unit.NotesError}");
         }
         IssuesList.ItemsSource = issues;
@@ -176,6 +193,24 @@ public partial class OperatorDriveWindow : Window
 
     private void EnableDocs_Click(object sender, RoutedEventArgs e) =>
         FileLauncherService.Open("https://console.cloud.google.com/apis/library/docs.googleapis.com");
+
+    private async void PartsStockroom_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_renderingStockroom || _busy || _state.Root is not { Pending: false } ||
+            PartsStockroomPicker.SelectedItem is not StockroomPlant plant || plant.Id == _state.StockroomPlantId) return;
+        await RunActionAsync("Checking the selected stockroom…", () =>
+            OperatorDriveRunner.RunAsync(_data, token: _closed.Token, stockroomPlantId: plant.Id));
+    }
+
+    private async void EnablePartsSchedule_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || PartsStockroomPicker.SelectedItem is not StockroomPlant) return;
+        await RunActionAsync("Scheduling spare-parts refresh…", async () =>
+        {
+            await OperatorPartsSchedule.InstallAsync(_closed.Token);
+            return "Scheduled every 30 minutes on this PC while you are signed in to Windows.";
+        });
+    }
 
     private async void Print_Click(object sender, RoutedEventArgs e)
     {

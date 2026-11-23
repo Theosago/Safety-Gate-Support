@@ -12,6 +12,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Xml.Linq;
 using SafetyGateSupport.Models;
 using SafetyGateSupport.Services;
 using SafetyGateSupport.Siemens;
@@ -119,6 +120,7 @@ internal static class Program
             ("Stockroom search executes JavaScript and reads all 19 results without changing the page address", InteractiveStockroomSearch),
             ("Canceling stockroom lookup restores refresh controls and keeps unconfirmed rows unknown", CancelStockroomLookup),
             ("Plant selection is local, starts unselected and cancels stale stockroom results", StockroomPlantSelection),
+            ("Spare-parts scheduling uses the current Windows profile and the background-only app command", SparePartsSchedule),
             ("Inline unit files, scanner and column tools retain context and theme selection persists", InlineWorkspace),
             ("Unit parts stay beside the unit and live availability changes without snapshots", ReplacementPartsRail),
             ("Parts show uncropped photos and wrapping text, persist uploads, and refresh stock without blocking startup", PartsPhotosAndStock),
@@ -1327,6 +1329,25 @@ internal static class Program
         var light = fixture.Data.ResourcesFor(fixture.Gate, fixture.BlueUnit).First(SignalColumnService.IsLightResource);
         var lightWindow = Track(new ResourceWindow(fixture.Data, fixture.Gate, fixture.BlueUnit, light));
         Require(Control<Button>(lightWindow, "UamDiagnosticsButton").Visibility == Visibility.Collapsed, "UAM action shown for a light resource.");
+        return Task.CompletedTask;
+    }
+
+    private static Task SparePartsSchedule()
+    {
+        var schedule = typeof(MainWindow).Assembly.GetType("SafetyGateSupport.Services.OperatorPartsSchedule", throwOnError: true)!;
+        var create = schedule.GetMethod("CreateTask", BindingFlags.Static | BindingFlags.NonPublic)!;
+        const string path = @"C:\Plant tools\Safety & Gate\SafetyGateSupport.exe", sid = "S-1-5-21-100-200-300-1001";
+        var xml = (XDocument)create.Invoke(null, [path, sid, DateTimeOffset.UtcNow])!;
+        XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+        var task = XDocument.Parse(xml.ToString()).Root!;
+        Require(task.Descendants(ns + "Command").Single().Value == path &&
+            task.Descendants(ns + "Arguments").Single().Value == "--publish-spare-parts",
+            "The task should run only the spare-parts command, including when the program path has spaces.");
+        Require(task.Descendants(ns + "Interval").Single().Value == "PT30M" &&
+            task.Descendants(ns + "UserId").Single().Value == sid &&
+            task.Descendants(ns + "LogonType").Single().Value == "InteractiveToken" &&
+            task.Descendants(ns + "MultipleInstancesPolicy").Single().Value == "IgnoreNew",
+            "The task should repeat under the chosen signed-in Windows user without overlapping.");
         return Task.CompletedTask;
     }
 

@@ -43,7 +43,7 @@ public partial class MainWindow
         if (visible) RefreshReplacementParts();
     }
     private void ClosePartsRail_Click(object sender, RoutedEventArgs e) => SetPartsRail(false);
-    private List<PartRecord> ReplacementPartsFor(SafetySystem unit) => _parts.Where(p => unit.ReplacementPartIds is { } ids ? ids.Contains(p.Id, StringComparer.OrdinalIgnoreCase) : p.AppliesTo(unit.GateId, unit.Id)).OrderBy(p => p.Description).ToList();
+    private List<PartRecord> ReplacementPartsFor(SafetySystem unit) => DataService.ReplacementPartsFor(unit, _parts).ToList();
     private void RefreshReplacementParts()
     {
         var unit = SelectedUnit;

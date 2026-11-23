@@ -22,6 +22,7 @@ internal static class OperatorDriveChecks
         ("The previous pilot's Drive folder, drawing and notes IDs survive upgrade and a renamed upload", () => ImportPilotAsync().GetAwaiter().GetResult()),
         ("Shared drawing coverage updates every linked Drive guide and clears removed drawings", () => SharedDrawingPublicationAsync().GetAwaiter().GetResult()),
         ("A shared supplemental PDF appears in exactly the selected units and updates their guides in place", () => SharedGuidePdfAsync().GetAwaiter().GetResult()),
+        ("Spare parts follow unit assignments and keep each item's last confirmed scan in the original Drive PDF", () => SparePartsAsync().GetAwaiter().GetResult()),
         ("Operator notes sync to and from the phone document while preserving previous edits", SharedNotesSyncAsyncTest),
         ("Batch QR sheets contain every stable unit URL across multiple print pages", CheckQrLabels),
         ("Larger electrical PDFs open a resumable upload and preserve their file ID on update", () => ResumablePdfAsync().GetAwaiter().GetResult())
@@ -309,6 +310,73 @@ internal static class OperatorDriveChecks
         Require(revised.Published == 2 && revised.Current == 1 && File.Exists(left.Path) &&
             state.Units[first.Id].Guide!.Id == firstGuide && state.Units[second.Id].Guide!.Id == secondGuide &&
             state.Units[first.Id].Electrical!.Id == firstPdf, "Revising the shared PDF should preserve earlier bytes and the Drive IDs.");
+    }
+
+    private static async Task SparePartsAsync()
+    {
+        using var library = new Fixture();
+        using var drive = new FakeDrive();
+        using var http = new HttpClient(drive);
+        var publisher = new OperatorDrivePublisher(new(http, _ => Task.FromResult("fixture")), (_, _) => Task.FromResult<UnitGuidePhoto?>(null));
+        const string motor = "001224", sensor = "001225", latch = "LP-65";
+        library.Data.SaveParts([
+            new() { Id = "motor", PartNumber = motor, Description = "Gate motor" },
+            new() { Id = "sensor", PartNumber = sensor, Description = "Safety sensor", ReportedQuantity = 88 },
+            new() { Id = "latch", PartNumber = latch, Description = "Door latch", ReportedQuantity = 77 }
+        ]);
+        var first = library.Units[0];
+        var second = library.Units[1];
+        first.ReplacementPartIds = ["motor", "sensor"];
+        second.ReplacementPartIds = ["latch"];
+        library.Data.SaveSystems([first, second]);
+        var state = new OperatorPublishingState { PublishAll = true, StockroomPlantId = "02" };
+        await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        string firstFolder = state.Units[first.Id].Folder!.Id, firstGuide = state.Units[first.Id].Guide!.Id;
+        var initial = new DateTimeOffset(2026, 11, 22, 13, 0, 0, TimeSpan.Zero);
+        int scans = 0;
+        Task<StockroomService.Snapshot> Read(string url, IReadOnlyCollection<string> ids, CancellationToken token)
+        {
+            Require(url == StockroomPlant.Find("02")!.Url && ids.ToHashSet().SetEquals([motor, sensor, latch]),
+                "The published units should only scan their Item IDs at the selected stockroom.");
+            scans++;
+            if (scans == 3) throw new HttpRequestException("Plant network unavailable.");
+            return Task.FromResult(scans switch
+            {
+                1 => new StockroomService.Snapshot([new("1224", 7, "", "BIN-A", "Available"), new(sensor, 0, "", "BIN-B", "Available")], initial),
+                _ => new([new(motor, 4, "", "BIN-A", "Available"),
+                    new(sensor, 90, "", "BIN-C", "Available"), new(sensor, 95, "", "BIN-D", "Available")], initial.AddMinutes(30))
+            });
+        }
+        await publisher.PublishSparePartsAsync(library.Data, library.Root, state, Read, initial, default);
+        string firstParts = state.Units[first.Id].SpareParts!.Id, secondParts = state.Units[second.Id].SpareParts!.Id;
+        string PdfText(string id)
+        {
+            using var pdf = PdfDocument.Open(drive.Items[id].Bytes!);
+            return pdf.GetPage(1).Text;
+        }
+        string left = PdfText(firstParts), right = PdfText(secondParts);
+        Require(left.Contains("Last successful stockroom scan") && left.Contains("Nov 22, 2026 13:00 UTC") &&
+            left.Contains("Huntingdon stockroom") && left.Contains(motor) && left.Contains("BIN-A") && left.Contains("7 in stock") &&
+            left.Contains("0 in stock") && !left.Contains(latch), "The PDF should contain the assigned IDs, confirmed bins, zero stock and scan time.");
+        Require(right.Contains(latch) && right.Contains("Quantity unknown") && right.Contains("No confirmed count yet") &&
+            !right.Contains(motor) && !right.Contains("77 in stock"), "An unconfirmed catalog snapshot was shown as stock or leaked to the other unit.");
+
+        // Reload from Q to exercise the same persisted state used by the scheduled process.
+        state = OperatorPublishingState.Load(library.Root);
+        await publisher.PublishSparePartsAsync(library.Data, library.Root, state, Read, initial.AddMinutes(5), default);
+        Require(scans == 1, "Routine publishing should reuse a recent stockroom scan.");
+        await publisher.PublishSparePartsAsync(library.Data, library.Root, state, Read, initial.AddMinutes(30), default);
+        left = PdfText(firstParts);
+        Require(left.Contains("4 in stock") && left.Contains("0 in stock") && left.Contains("13:30 UTC") &&
+            left.Contains("13:00 UTC") && !left.Contains("90 in stock") && state.Units[first.Id].SpareParts!.Id == firstParts &&
+            state.Units[first.Id].Folder!.Id == firstFolder && state.Units[first.Id].Guide!.Id == firstGuide,
+            "A partial scan should update the matched count, date older counts individually and preserve the Drive IDs.");
+
+        int requests = drive.Requests;
+        await publisher.PublishSparePartsAsync(library.Data, library.Root, state, Read, initial.AddHours(1), default);
+        Require(scans == 3 && drive.Requests == requests && PdfText(firstParts) == left &&
+            state.StockroomScans["02"].Message?.Contains("Plant network unavailable") == true,
+            "A failed scan must preserve the previous PDF and its dates.");
     }
 
     private static async Task ResumablePdfAsync()

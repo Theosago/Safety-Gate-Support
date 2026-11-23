@@ -30,6 +30,17 @@
     <Button x:Name="EnableDocsButton" Content="Open Google Docs API settings" Click="EnableDocs_Click" Visibility="Collapsed" HorizontalAlignment="Left"/>
    </StackPanel>
 
+   <Expander Header="Spare parts and stockroom refresh" Margin="0,14,0,0">
+    <StackPanel Margin="4,8,0,0">
+     <TextBlock Text="Stockroom shown in QR folders"/>
+     <ComboBox x:Name="PartsStockroomPicker" DisplayMemberPath="Name" AutomationProperties.Name="Stockroom shown in QR folders"
+               SelectionChanged="PartsStockroom_Changed" HorizontalAlignment="Left" MinWidth="195" Margin="0,5,0,5"/>
+     <TextBlock x:Name="StockroomStatusLabel" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground536E81}"/>
+     <Button x:Name="EnablePartsScheduleButton" Content="Refresh every 30 minutes with app closed" Click="EnablePartsSchedule_Click"
+             HorizontalAlignment="Left" Margin="0,8,0,0"/>
+    </StackPanel>
+   </Expander>
+
    <Expander x:Name="IssuesPanel" Header="Publishing issues" Visibility="Collapsed" Margin="0,12,0,0">
     <ListBox x:Name="IssuesList" MaxHeight="160" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
      <ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="2"/></DataTemplate></ListBox.ItemTemplate>

@@ -52,9 +52,11 @@ public partial class MainWindow : Window
     public MainWindow(DataService data, Func<string, CancellationToken, Task<StockroomService.Snapshot>>? stockroomReader = null)
     {
         InitializeComponent();
-        _data = data; _stockroomReader = stockroomReader ?? ((url, token) => { var ids = _parts.Select(p => p.PartNumber).Where(id => id.Length > 0).Distinct().ToArray(); return Task.Run(() => StockroomService.FetchCatalogAsync(ids,
-            ct => StockroomService.FetchAsync(url, ct, requested: ids, interactiveReader: StockroomWebViewReader.FetchAsync),
-            (id, ct) => StockroomWebViewReader.SearchAsync(url, id, ct), token), token); });
+        _data = data; _stockroomReader = stockroomReader ?? ((url, token) =>
+        {
+            var ids = _parts.Select(part => part.PartNumber).Where(id => id.Length > 0).Distinct().ToArray();
+            return Task.Run(() => StockroomWebViewReader.FetchCatalogAsync(url, ids, token), token);
+        });
         InitializeStockroomPlants(); InitializeReplacementParts(); InitializeTheme();
         InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsOnboardingDemo)

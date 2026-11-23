@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using QRCoder;
+using SafetyGateSupport.Models;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Actions;
 using UglyToad.PdfPig.Annotations;
@@ -121,6 +122,46 @@ internal static class OperatorPublishingPdf
         Text(page, item.Label, 36, 666, 34, bold, White, 536);
         Text(page, "No electrical drawing is assigned to this unit.", 36, 601, 16, bold, Ink, 536);
         Footer(page, folderLink, normal, "Unit files");
+        return document.Build();
+    }
+
+    internal static byte[] SpareParts(OperatorPublicationUnit item, UnitSpareParts report, string folderLink)
+    {
+        using var document = new PdfDocumentBuilder();
+        document.DocumentInformation.Title = item.Label + " - Spare parts";
+        var normal = document.AddTrueTypeFont(RegularFont.Value);
+        var bold = document.AddTrueTypeFont(BoldFont.Value);
+        const int pageSize = 9;
+        int pageCount = Math.Max(1, (report.Parts.Count + pageSize - 1) / pageSize);
+        string scan = report.LastConfirmedUtc is { } last ? OperatorSpareParts.ScanTime(last) : "No confirmed count yet";
+        for (int index = 0; index < pageCount; index++)
+        {
+            var page = document.AddPage(Width, Height);
+            Fill(page, 0, 644, Width, 148, Ink);
+            Text(page, "SPARE PARTS", 36, 715, 15, bold, (182, 221, 222), 536);
+            Text(page, item.Label, 36, 666, 32, bold, White, 536);
+            Text(page, "Last successful stockroom scan", 36, 616, 11, bold, Accent, 536);
+            Text(page, scan, 36, 596, 17, bold, Ink, 536);
+            Text(page, report.Plant is null ? "Stockroom plant not selected" : report.Plant + " stockroom", 36, 576, 11, normal, Muted, 536);
+            if (report.Parts.Count == 0)
+                Text(page, "No spare parts are assigned to this unit.", 36, 529, 14, normal, Ink, 536);
+
+            int row = 0;
+            foreach (var part in report.Parts.Skip(index * pageSize).Take(pageSize))
+            {
+                double y = 551 - 52 * row++;
+                Fill(page, 36, y - 45, 540, 47, Pale);
+                Text(page, part.Description, 46, y - 12, 12, bold, Ink, 518);
+                string bin = !string.IsNullOrWhiteSpace(part.Stock?.Bin) ? "   |   Bin " + part.Stock.Bin :
+                    part.CatalogBin.Length > 0 ? "   |   Catalog bin " + part.CatalogBin : "";
+                Text(page, "Item ID " + (part.ItemId.Length > 0 ? part.ItemId : "unlisted") + bin, 46, y - 26, 10, normal, Ink, 518);
+                string quantity = part.Stock is { } stock
+                    ? $"{PartRecord.FormatQuantity(stock.Quantity)} in stock   |   Checked {OperatorSpareParts.ScanTime(stock.CheckedUtc)}"
+                    : "Quantity unknown";
+                Text(page, quantity, 46, y - 39, 10, normal, Muted, 518);
+            }
+            Footer(page, folderLink, normal, $"{index + 1} of {pageCount}");
+        }
         return document.Build();
     }
 

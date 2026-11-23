@@ -242,6 +242,18 @@ public partial class DataService
         var parts = LoadList<PartRecord>(PartsFile);
         return File.Exists(PartsCatalogMarker) ? parts : MergePartsCatalog(parts);
     }
+
+    internal List<PartRecord> LoadPartsForPublishing()
+    {
+        var parts = JsonSerializer.Deserialize<List<PartRecord>>(File.ReadAllText(PartsFile), _read)
+            ?? throw new InvalidDataException("The shared parts catalog is unavailable.");
+        return File.Exists(PartsCatalogMarker) ? parts : MergePartsCatalog(parts);
+    }
+
+    internal static IEnumerable<PartRecord> ReplacementPartsFor(SafetySystem unit, IEnumerable<PartRecord> parts) =>
+        parts.Where(part => unit.ReplacementPartIds is { } ids
+            ? ids.Contains(part.Id, StringComparer.OrdinalIgnoreCase)
+            : part.AppliesTo(unit.GateId, unit.Id)).OrderBy(part => part.Description);
     public List<ManualRecord> LoadManualRecords() => LoadList<ManualRecord>(ManualsIndexFile);
     public List<TroubleshootingFlow> LoadTroubleshootingFlows() => GuidedTroubleshooting.Merge(LoadList<TroubleshootingFlow>(TroubleshootingFile));
 

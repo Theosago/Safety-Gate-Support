@@ -16,6 +16,9 @@ internal sealed class OperatorUnitPublication
     public DriveFolder? Folder { get; set; }
     public DrivePdf? Electrical { get; set; }
     public DrivePdf? Guide { get; set; }
+    public DrivePdf? SpareParts { get; set; }
+    public string? SparePartsFingerprint { get; set; }
+    public string? SparePartsError { get; set; }
     public string? NotesId { get; set; }
     public string? NotesLink { get; set; }
     public SharedNotesCheckpoint? NotesCheckpoint { get; set; }
@@ -115,6 +118,9 @@ internal sealed class OperatorPublishingState
     public string? NotesError { get; set; }
     public Dictionary<string, DriveFolder> Assets { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, OperatorUnitPublication> Units { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public string? StockroomPlantId { get; set; }
+    public Dictionary<string, OperatorStockroomScan> StockroomScans { get; set; } = [];
+    public string? SparePartsCatalogError { get; set; }
 
     internal static OperatorPublishingState Load(string root) =>
         Read<OperatorPublishingState>(StatePath(root)) ?? new();

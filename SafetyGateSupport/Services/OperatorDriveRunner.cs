@@ -25,11 +25,12 @@ internal static class OperatorDriveRunner
     internal static bool IsSupported(DataService data) => !data.IsHomePreview && !data.IsOnboardingDemo;
 
     internal static async Task<string> RunAsync(DataService data, bool publishNow = false, string? requestedRoot = null,
-        IProgress<OperatorPublishProgress>? progress = null, CancellationToken token = default, bool? syncSharedNotes = null)
+        IProgress<OperatorPublishProgress>? progress = null, CancellationToken token = default, bool? syncSharedNotes = null,
+        string? stockroomPlantId = null, bool sparePartsOnly = false)
     {
         if (!IsSupported(data)) return "";
         string root = Path.GetFullPath(data.SharedRoot);
-        if (!publishNow && !syncSharedNotes.HasValue)
+        if (!publishNow && !syncSharedNotes.HasValue && stockroomPlantId is null)
         {
             if (!CanPublish || !File.Exists(OperatorPublishingState.StatePath(root)) &&
                 !File.Exists(OperatorPublishingState.LegacyPath)) return "";
@@ -73,9 +74,18 @@ internal static class OperatorDriveRunner
                     state.Save(root);
                 }
                 if (!CanPublish || !state.PublishAll && !state.Units.Values.Any(unit => !unit.Paused)) return "";
+                var stockroom = stockroomPlantId is not null ? StockroomPlant.Find(stockroomPlantId)
+                    ?? throw new InvalidOperationException("Choose a stockroom plant for the QR spare-parts list.")
+                    : StockroomPlant.Find(state.StockroomPlantId) ?? StockroomPlant.Find(data.Settings.StockroomPlantId);
+                if (stockroom is not null && state.StockroomPlantId != stockroom.Id)
+                {
+                    state.StockroomPlantId = stockroom.Id;
+                    state.Save(root);
+                }
                 var publisher = new OperatorDrivePublisher(drive, LoadPhotoAsync);
-                var summary = await publisher.RunAsync(data, root, state, publishNow, progress, token);
-                if (state.SyncSharedNotes)
+                OperatorPublishSummary? summary = sparePartsOnly ? null :
+                    await publisher.RunAsync(data, root, state, publishNow, progress, token);
+                if (state.SyncSharedNotes && !sparePartsOnly)
                 {
                     using var notesTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
                     notesTimeout.CancelAfter(TimeSpan.FromSeconds(45));
@@ -87,11 +97,17 @@ internal static class OperatorDriveRunner
                         state.Save(root);
                     }
                 }
-                return summary.Message;
+                await publisher.PublishSparePartsAsync(data, root, state, StockroomWebViewReader.FetchCatalogAsync,
+                    DateTimeOffset.UtcNow, token);
+                if (!sparePartsOnly) return summary!.Message;
+                var issue = state.SparePartsCatalogError ?? state.Units.Values.FirstOrDefault(unit => unit.SparePartsError is not null)?.SparePartsError;
+                if (issue is not null) throw new IOException(issue);
+                var scan = stockroom is null ? null : state.StockroomScans.GetValueOrDefault(stockroom.Id);
+                return scan?.Message ?? "Spare-parts PDFs are up to date.";
             }, token);
         }
-        catch (OperationCanceledException) { Status = "Publishing stopped. Pending units will be retried automatically."; }
-        catch (Exception error) { Status = error.Message; }
+        catch (OperationCanceledException) when (!sparePartsOnly) { Status = "Publishing stopped. Pending units will be retried automatically."; }
+        catch (Exception error) when (!sparePartsOnly) { Status = error.Message; }
         finally { Mutex.Release(); }
         return Status;
     }

@@ -21,6 +21,107 @@ internal sealed class OperatorDrivePublisher(
     internal const string ElectricalName = "01 Electrical drawing.pdf";
     internal const string GuideName = "02 Unit guide.pdf";
 
+    internal async Task PublishSparePartsAsync(DataService data, string sharedRoot, OperatorPublishingState state,
+        Func<string, IReadOnlyCollection<string>, CancellationToken, Task<StockroomService.Snapshot>> reader,
+        DateTimeOffset now, CancellationToken token)
+    {
+        if (state.Root is not { Pending: false } boundRoot) return;
+        OperatorPublicationUnit[] units;
+        List<PartRecord> catalog;
+        try
+        {
+            using var library = data.AcquireAssetWriteLock();
+            units = OperatorPublicationSources.ListUnits(data).Where(item =>
+                state.Units.TryGetValue(item.Unit.Id, out var entry) &&
+                entry.Folder is { Pending: false } && entry.GateId == item.Gate.Id &&
+                (state.PublishAll || !entry.Paused)).ToArray();
+            catalog = data.LoadPartsForPublishing();
+            SetCatalogError(null);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+        {
+            SetCatalogError("Spare parts could not be read from the shared library. " + error.Message);
+            return;
+        }
+
+        var targets = units.Select(item => (Item: item, Parts: DataService.ReplacementPartsFor(item.Unit, catalog).ToArray())).ToArray();
+        var plant = StockroomPlant.Find(state.StockroomPlantId);
+        OperatorStockroomScan? scan = null;
+        if (plant is not null)
+        {
+            var ids = targets.SelectMany(target => target.Parts).Select(part => part.PartNumber.Trim())
+                .Where(StockroomService.IsItemId).DistinctBy(StockroomService.StockKey).ToArray();
+            scan = state.StockroomScans.GetValueOrDefault(plant.Id);
+            if (ids.Length > 0)
+            {
+                var latest = await OperatorSpareParts.ScanAsync(plant, ids, scan, reader, now, token);
+                if (!ReferenceEquals(latest, scan))
+                {
+                    scan = latest;
+                    state.StockroomScans[plant.Id] = latest;
+                    state.Save(sharedRoot);
+                }
+            }
+        }
+
+        OperatorDriveClient.Item? root = null;
+        var assets = new Dictionary<string, OperatorDriveClient.Item>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (item, parts) in targets)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!Path.GetFullPath(data.SharedRoot).Equals(sharedRoot, StringComparison.OrdinalIgnoreCase))
+                throw new IOException("The shared library changed while publishing spare parts.");
+            var entry = state.Units[item.Unit.Id];
+            if (parts.Length == 0 && entry.SpareParts is null) continue;
+            var report = OperatorSpareParts.ForUnit(parts, plant, scan);
+            string fingerprint = report.Fingerprint(item.Label);
+            if (entry.SparePartsError is null && entry.SparePartsFingerprint == fingerprint) continue;
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                timeout.CancelAfter(TimeSpan.FromMinutes(2));
+                var requestToken = timeout.Token;
+                root ??= await drive.GetAsync(boundRoot.Id, requestToken);
+                if (!assets.TryGetValue(item.Gate.Id, out var asset))
+                {
+                    if (state.Assets.GetValueOrDefault(item.Gate.Id) is not { Pending: false } binding)
+                        throw new IOException("Publish the asset's Drive folder before adding spare parts.");
+                    asset = await drive.GetAsync(binding.Id, requestToken);
+                    if (root.Trashed || root.MimeType != OperatorDriveClient.FolderMime || !IsChildFolder(asset, root))
+                        throw new IOException("Restore the asset folder in the publishing folder before updating spare parts.");
+                    assets.Add(item.Gate.Id, asset);
+                }
+                var unit = await drive.GetAsync(entry.Folder!.Id, requestToken);
+                if (!IsChildFolder(unit, asset))
+                    throw new IOException("Restore the unit folder under its asset before updating spare parts.");
+                var pdf = OperatorPublishingPdf.SpareParts(item, report, OperatorDriveClient.FolderLink(unit));
+                await PublishPdfAsync(unit, OperatorSpareParts.FileName, pdf, entry.SpareParts,
+                    record => { entry.SpareParts = record; state.Save(sharedRoot); }, requestToken);
+                entry.SparePartsFingerprint = fingerprint;
+                entry.SparePartsError = null;
+                state.Save(sharedRoot);
+            }
+            catch (Exception error) when (!token.IsCancellationRequested && error is not DriveAuthenticationException and not OutOfMemoryException)
+            {
+                string message = error is OperationCanceledException ? "The spare-parts upload timed out." : error.Message;
+                if (entry.SparePartsError == message) continue;
+                entry.SparePartsError = message;
+                state.Save(sharedRoot);
+            }
+        }
+
+        void SetCatalogError(string? message)
+        {
+            if (state.SparePartsCatalogError == message) return;
+            state.SparePartsCatalogError = message;
+            state.Save(sharedRoot);
+        }
+    }
+
+    private static bool IsChildFolder(OperatorDriveClient.Item folder, OperatorDriveClient.Item parent) =>
+        !folder.Trashed && folder.MimeType == OperatorDriveClient.FolderMime && folder.DriveId == parent.DriveId &&
+        folder.Parents?.Contains(parent.Id) == true;
+
     internal async Task<OperatorPublishSummary> RunAsync(DataService data, string sharedRoot, OperatorPublishingState state,
         bool force, IProgress<OperatorPublishProgress>? progress, CancellationToken token)
     {

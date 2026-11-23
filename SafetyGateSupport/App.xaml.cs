@@ -9,15 +9,20 @@ public partial class App : Application
 {
     protected override async void OnStartup(StartupEventArgs e)
     {
-        if (e.Args.Length == 0 || e.Args[0] is not ("--validate-pdf-preview" or "--validate-drawing-orientation" or "--validate-stockroom-webview" or "--validate-stockroom-item")) { base.OnStartup(e); return; }
-        // Package verification is explicit and isolated: never create the normal
-        // window or read its shared-root settings when validating the bundled engine.
+        bool refreshParts = e.Args is [OperatorPartsSchedule.Argument];
+        if (!refreshParts && (e.Args.Length == 0 || e.Args[0] is not ("--validate-pdf-preview" or "--validate-drawing-orientation" or "--validate-stockroom-webview" or "--validate-stockroom-item"))) { base.OnStartup(e); return; }
+        // The scheduled refresh and package verification use the dispatcher without opening the normal window.
         Navigating += (_, navigation) => navigation.Cancel = true;
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         base.OnStartup(e);
         int exitCode = 1;
         try
         {
+            if (refreshParts)
+            {
+                exitCode = await OperatorPartsSchedule.RunAsync();
+                return;
+            }
             if (e.Args.Length != (e.Args[0] == "--validate-stockroom-item" ? 4 : 3)) throw new ArgumentException("Supply an input PDF and a new verification-result path.");
             if (e.Args[0] is "--validate-stockroom-webview" or "--validate-stockroom-item")
             {

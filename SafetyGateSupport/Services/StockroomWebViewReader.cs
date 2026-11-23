@@ -11,6 +11,11 @@ public static class StockroomWebViewReader
     public static string LastSearchDiagnostics { get; private set; } = "";
     private static readonly SemaphoreSlim Slot = new(1);
     public static Task<StockroomService.Snapshot> FetchAsync(string url, CancellationToken token) => ReadSearchAsync(url, "Safe2Cross", false, token);
+
+    internal static Task<StockroomService.Snapshot> FetchCatalogAsync(string url, IReadOnlyCollection<string> ids, CancellationToken token) =>
+        StockroomService.FetchCatalogAsync(ids,
+            ct => StockroomService.FetchAsync(url, ct, requested: ids, interactiveReader: FetchAsync),
+            (id, ct) => SearchAsync(url, id, ct), token);
     public static Task<StockroomService.Snapshot> SearchAsync(string url, string term, CancellationToken token)
     {
         if (!StockroomService.IsItemId(term)) throw new InvalidOperationException("Enter a valid Item ID.");
