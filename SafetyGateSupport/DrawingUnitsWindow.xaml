@@ -8,7 +8,7 @@
   <StackPanel>
    <TextBlock x:Name="AssetText" FontSize="23" FontWeight="SemiBold"/>
    <TextBlock x:Name="FilesText" TextWrapping="Wrap" Margin="0,4,0,15" Foreground="{DynamicResource ThemeForeground536E81}"/>
-   <TextBlock Text="Select the units covered" FontWeight="SemiBold" Margin="0,0,0,6"/>
+   <TextBlock x:Name="SelectionHeading" Text="Select the units covered" FontWeight="SemiBold" Margin="0,0,0,6"/>
   </StackPanel>
   <ScrollViewer Grid.Row="1" MaxHeight="260" MinHeight="48" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
    <StackPanel x:Name="UnitOptions" Margin="0,0,8,0"/>

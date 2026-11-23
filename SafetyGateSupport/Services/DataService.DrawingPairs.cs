@@ -30,8 +30,6 @@ public partial class DataService
         if (AssetFileLayout.Category(record) != "Electrical Drawings") throw new InvalidOperationException("Use the electrical drawing collection for print pairs.");
         if (unit.GateId != gate.Id || record.GateId != gate.Id) throw new InvalidOperationException("The selected unit and drawing collection must belong to this asset.");
         var eligible = AssetFileUnits(gate, record);
-        if (replaceFile is not null && unitIds is not null)
-            throw new InvalidOperationException("Change unit links separately from a drawing replacement.");
         var scope = replaceFile is null ? ValidateFileUnits(unitIds ?? new[] { unit.Id }, eligible) : null;
         string pdfSource = files.Single(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase));
         string dwgSource = files.Single(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase));
@@ -70,6 +68,14 @@ public partial class DataService
             throw new InvalidOperationException("Use Units covered to link this drawing to a current unit before replacing it.");
         if (expectedReplacementUnits is not null && !SameFileScope(affectedUnits, expectedReplacementUnits))
             throw new InvalidOperationException("The units covered by this drawing changed. Review the current drawing before replacing it.");
+        if (replaceFile is not null && unitIds is not null)
+        {
+            var selected = ValidateFileUnits(unitIds, eligible);
+            if (affectedUnits.Except(selected, StringComparer.OrdinalIgnoreCase).Any())
+                throw new InvalidOperationException("Keep the currently linked units selected. Use Units covered to unlink a unit.");
+            if (scope.Count > 0) scope = scope.Union(selected, StringComparer.OrdinalIgnoreCase).ToList();
+            affectedUnits = selected;
+        }
         var names = new[] { Path.GetFileName(pdfSource), Path.GetFileName(dwgSource) };
         foreach (string name in names)
             if (File.Exists(Path.Combine(folder, name)) && !oldNames.Contains(name, StringComparer.OrdinalIgnoreCase)) throw new IOException("The filename already belongs to another current sheet: " + name + ". Select that sheet for replacement, or use distinct filenames for a separate print.");

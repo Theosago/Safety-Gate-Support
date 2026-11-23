@@ -219,14 +219,23 @@ internal static class OperatorDriveChecks
         var state = new OperatorPublishingState { PublishAll = true };
         var units = library.Units;
         var ids = units.Select(u => u.Id).ToArray();
-        var shared = library.AddPair(units[0], "Common print", 0, unitIds: ids);
+        var shared = library.AddPair(units[0], "Common print", 0, unitIds: [ids[0]]);
         var first = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
-        Require(first.Published == 2, "One upload should publish both linked units.");
+        Require(first.Published == 2, "Both QR folders should be created, including the unit without a drawing.");
         var left = state.Units[ids[0]];
         var right = state.Units[ids[1]];
         string leftFolder = left.Folder!.Id, rightFolder = right.Folder!.Id;
-        string leftPdf = left.Electrical!.Id, rightPdf = right.Electrical!.Id;
+        string leftPdf = left.Electrical!.Id;
         string leftGuide = left.Guide!.Id, rightGuide = right.Guide!.Id;
+        Require(right.Electrical is null, "A revision should link a new unit only when selected.");
+        shared = library.AddPair(units[0], "Common print now shared", 270, shared.PdfPath,
+            unitIds: ids, expectedReplacementUnits: [ids[0]]);
+        var expanded = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        string rightPdf = right.Electrical!.Id;
+        byte[] sharedPdf = File.ReadAllBytes(shared.PdfPath);
+        Require(shared.UnitIds.ToHashSet().SetEquals(ids) && expanded.Published == 2 && left.Electrical.Id == leftPdf &&
+            drive.Items[leftPdf].Bytes!.SequenceEqual(sharedPdf) && drive.Items[rightPdf].Bytes!.SequenceEqual(sharedPdf),
+            "Adding a unit during replacement should publish the revised pair to both units and retain the original PDF link.");
         var extra = library.AddPair(units[0], "Extra print", 90, unitIds: [ids[0]]);
         var extraResult = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
         Require(extraResult.Published == 1 && extraResult.Current == 1, "The extra print should update only its unit.");
@@ -339,14 +348,14 @@ internal static class OperatorDriveChecks
         }
 
         internal DataService.PairUploadResult AddPair(SafetySystem unit, string filename, int rotation, string? previous = null,
-            IReadOnlyCollection<string>? unitIds = null)
+            IReadOnlyCollection<string>? unitIds = null, IReadOnlyCollection<string>? expectedReplacementUnits = null)
         {
             string pdf = Path.Combine(DirectoryPath, filename + ".pdf"), dwg = Path.Combine(DirectoryPath, filename + ".dwg");
             File.WriteAllBytes(pdf, DrawingPdfFixture.TextPage(rotation));
             File.WriteAllText(dwg, filename);
             var drawing = Data.LoadResources().FirstOrDefault(r => r.GateId == Gate.Id && r.StorageCategory == "Electrical Drawings")
                 ?? AssetFileLayout.Create(Gate, "Electrical Drawings");
-            return Data.SaveDrawingPair(drawing.ForUnit(unit.Id), Gate, unit, [pdf, dwg], previous, unitIds: unitIds);
+            return Data.SaveDrawingPair(drawing.ForUnit(unit.Id), Gate, unit, [pdf, dwg], previous, unitIds, expectedReplacementUnits);
         }
 
         public void Dispose() => Directory.Delete(DirectoryPath, recursive: true);

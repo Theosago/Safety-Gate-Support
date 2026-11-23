@@ -619,6 +619,23 @@ internal static class Program
         File.WriteAllBytes(pdf, TestDrawingPdf());
         File.WriteAllText(dwg, "Fixture DWG");
         var pair = fixture.Data.SaveDrawingPair(resource.ForUnit(fixture.RedUnit.Id), gate, fixture.RedUnit, [pdf, dwg]);
+        var revisionPicker = Track(new DrawingUnitsWindow(gate, units, "Replacing Shared print.pdf", [fixture.RedUnit.Id],
+            "Replace drawing", replacing: true));
+        ShowOffscreen(revisionPicker);
+        var revisionChoices = Control<StackPanel>(revisionPicker, "UnitOptions").Children.OfType<CheckBox>().ToArray();
+        Require(!revisionChoices[0].IsEnabled && revisionChoices[0].IsChecked == true &&
+            revisionChoices[1].IsEnabled && revisionChoices[1].IsChecked == false,
+            "A replacement should keep previously linked units selected and let the user choose another unit.");
+        var revisionSelectAll = Control<CheckBox>(revisionPicker, "SelectAllBox");
+        revisionSelectAll.IsChecked = true;
+        revisionSelectAll.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Require(revisionChoices.All(choice => choice.IsChecked == true), "A replacement should support selecting all units.");
+        revisionSelectAll.IsChecked = false;
+        revisionSelectAll.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Require(revisionChoices[0].IsChecked == true && revisionChoices[1].IsChecked == false,
+            "Clearing additional units during replacement should keep the existing unit.");
+        revisionPicker.Close();
+
         var view = Track(new ResourceWindow(fixture.Data, gate, fixture.BlueUnit, resource, pair.PdfPath, assetWideDrawings: true));
         ShowOffscreen(view);
         var list = Control<ListBox>(view, "FileList");

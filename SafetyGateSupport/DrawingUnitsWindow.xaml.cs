@@ -11,27 +11,32 @@ public partial class DrawingUnitsWindow : Window
     internal IReadOnlyList<string> UnitIds { get; private set; } = [];
 
     internal DrawingUnitsWindow(SafetyGate gate, IReadOnlyList<SafetySystem> units, string files,
-        IEnumerable<string> selectedIds, string action)
+        IEnumerable<string> selectedIds, string action, bool replacing = false)
     {
         InitializeComponent();
         AssetText.Text = gate.AssetDisplay;
         FilesText.Text = files;
         SaveButton.Content = action;
-        SelectAllBox.Visibility = units.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         var selected = selectedIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (replacing) SelectionHeading.Text = "Apply this revision to";
         foreach (var unit in units)
         {
             string label = string.IsNullOrWhiteSpace(unit.DisplayName) ? unit.UnitDisplay : $"{unit.UnitDisplay} · {unit.DisplayName}";
+            bool linked = selected.Contains(unit.Id);
+            bool required = replacing && linked;
             var option = new CheckBox
             {
-                Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap },
-                IsChecked = selected.Contains(unit.Id),
+                Content = new TextBlock { Text = required ? label + " (already linked)" : label, TextWrapping = TextWrapping.Wrap },
+                IsChecked = linked,
+                IsEnabled = !required,
                 Margin = new Thickness(2, 6, 2, 6)
             };
             option.Click += (_, _) => RefreshSelection();
             _choices.Add((unit, option));
             UnitOptions.Children.Add(option);
         }
+        SelectAllBox.Visibility = _choices.Count > 1 && _choices.Any(choice => choice.Option.IsEnabled)
+            ? Visibility.Visible : Visibility.Collapsed;
         RefreshSelection();
     }
 
@@ -59,7 +64,8 @@ public partial class DrawingUnitsWindow : Window
 
     private void SelectAll_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var choice in _choices) choice.Option.IsChecked = SelectAllBox.IsChecked;
+        foreach (var choice in _choices.Where(choice => choice.Option.IsEnabled))
+            choice.Option.IsChecked = SelectAllBox.IsChecked;
         RefreshSelection();
     }
 

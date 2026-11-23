@@ -169,9 +169,12 @@ public partial class ResourceWindow : Window
                 var scope = record.FileScope(oldName) ?? throw new InvalidOperationException("Select a current drawing from the file list.");
                 expected = eligible.Where(unit => scope.Count == 0 || scope.Contains(unit.Id, StringComparer.OrdinalIgnoreCase))
                     .Select(unit => unit.Id).ToArray();
-                string message = $"Replace {oldName} for {_gate.AssetDisplay}?\n\nThe revision will apply to {DrawingUnitsWindow.UnitNames(eligible, scope)}.";
-                if (MessageBox.Show(owner, message, "Replace drawing pair", MessageBoxButton.YesNo,
-                    MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return null;
+                if (expected.Count == 0)
+                    throw new InvalidOperationException("Use Units covered to link this drawing to a current unit before replacing it.");
+                var picker = new DrawingUnitsWindow(_gate, eligible, $"Replacing {oldName}", expected,
+                    "Replace drawing", replacing: true) { Owner = owner };
+                if (picker.ShowDialog() != true) return null;
+                selected = picker.UnitIds;
             }
 
             _fileUpdateBusy = true;

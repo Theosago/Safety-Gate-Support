@@ -26,9 +26,10 @@
   **Select all listed units** for a common print and check only the relevant
   units for a supplemental or unit-specific print. The library stores one pair.
 - To update a revision, select the drawing on any linked unit and click
-  **Replace selected drawing…**. The confirmation lists the units using that
-  print. The app archives the previous PDF and DWG and updates the same pair
-  for every linked unit.
+  **Replace selected drawing…**. Units already linked start checked. Check
+  any additional units this revision covers, then select **Replace drawing**.
+  The app archives the previous PDF and DWG and saves one revised pair for
+  all checked units.
 - To change which units use a pair you already uploaded, open
   **Manage drawings…**, select the print, and click **Units covered…**. Check
   or uncheck units and save. Both companions follow the same selection.
