@@ -10,6 +10,7 @@ internal static class SupportLibraryChecks
     [
         ("Library import retains portable software layout without running it", PortableLayout),
         ("Library import deduplicates bytes and retains different revisions", Deduplication),
+        ("Batch PDF and Word imports appear in the shared manual catalog without duplicating records", ReferenceDocuments),
         ("Library import rejects traversal, drive paths, ADS, reserved names, and collisions", UnsafePaths),
         ("Canceled library import leaves no published or temporary files", Cancellation),
         ("Library import rejects symbolic links", SymbolicLink),
@@ -56,6 +57,32 @@ internal static class SupportLibraryChecks
         File.WriteAllText(a, "revision two"); SupportLibraryService.Import(library, a);
         var files = SupportLibraryService.List(library);
         Require(files.Count == 2 && files.Select(f => File.ReadAllText(f.FullPath)).ToHashSet().SetEquals(["revision one", "revision two"]), "A different revision overwrote the old version.");
+    });
+    private static void ReferenceDocuments() => WithRoot(root =>
+    {
+        var data = new DataService(false, Path.Combine(root, "settings"));
+        data.CreateBlankPlantLibrary(Path.Combine(root, "share"), "Assembly");
+        var existing = new ManualRecord { Title = "Existing unit reference", AppliesToUnitIds = ["unit1"], FilePath = "Library/Manuals/existing.pdf" };
+        data.SaveManualRecords([existing]);
+        var sources = new[] { Path.Combine(root, "Spare_parts.pdf"), Path.Combine(root, "Troubleshooting.docx") };
+        foreach (string source in sources) File.WriteAllText(source, Path.GetFileName(source));
+        string package = Zip(root, ("Unit schematic.pdf", "fixture"));
+        SupportLibraryService.Import(SupportLibraryService.Root(data), package);
+
+        var first = SupportLibraryService.ImportDocuments(data, sources.Append(package));
+        var records = data.LoadManualRecords();
+        Require(first.Added == 2 && first.Existing == 0 && first.Errors.Count == 1 &&
+            records.Select(m => m.Title).ToHashSet().SetEquals(["Existing unit reference", "Spare parts", "Troubleshooting"]),
+            "The reference catalog lost a file or included a drawing from a configuration archive.");
+        Require(records.Single(m => m.Id == existing.Id).AppliesToUnitIds.SequenceEqual(existing.AppliesToUnitIds),
+            "Importing reference documents changed a unit assignment.");
+        foreach (var m in records.Where(m => m.Id != existing.Id))
+            Require(m.AppliesTo("unknown gate", "unknown unit") &&
+                File.ReadAllText(data.Resolve(m.FilePath)) == Path.GetFileName(m.FilePath), "A reference is missing or changed bytes.");
+        var retry = SupportLibraryService.ImportDocuments(data, sources);
+        Require(retry.Added == 0 && retry.Existing == 2 && retry.Errors.Count == 0 &&
+            data.LoadManualRecords().Select(m => m.Id).SequenceEqual(records.Select(m => m.Id)),
+            "Reimporting the same files duplicated an entry or changed an existing identity.");
     });
     private static void UnsafePaths() => WithRoot(root =>
     {

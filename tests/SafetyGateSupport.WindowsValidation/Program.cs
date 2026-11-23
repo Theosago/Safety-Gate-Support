@@ -586,6 +586,7 @@ internal static class Program
         var image = Control<Image>(main, "DrawingImage");
         await WaitUntil(() => HasColor(image.Source, Colors.Red), "Drawing did not display automatically after selecting the unit.");
         Require(Control<TextBlock>(main, "DrawingFileText").Text.Contains("inline-own.pdf"), "Displayed drawing belongs to another unit.");
+        Equal("Covers " + fixture.BlueUnit.UnitDisplay, Control<TextBlock>(main, "DrawingCoverageText").Text, "Selected print coverage");
         var notes = Control<TextBox>(main, "SharedNotesBox");
         Require(notes.IsVisible && notes.Text == "Visible drawing test note", "Shared notes still require expanding or show the wrong unit.");
         fixture.Data.SaveSystemNotes(fixture.BlueUnit, "Synced operator note");

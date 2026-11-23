@@ -110,7 +110,7 @@ public sealed class SupportLibraryWindow : Window
             {
                 _all = await Task.Run(() => SupportLibraryService.List(SupportLibraryService.Root(_data)));
                 // Standalone documents become searchable manuals. ZIP drawings stay unassigned until reviewed.
-                await Task.Run(() => IndexStandaloneDocuments()); Filter();
+                await Task.Run(() => _data.IndexImportedDocuments(_all)); Filter();
             }
             catch (Exception error) { messages.Add("Unable to refresh/index library: " + error.Message); }
             _status.Text = string.Join("\n", messages);
@@ -118,18 +118,6 @@ public sealed class SupportLibraryWindow : Window
             _actions.IsEnabled = true; _units.IsEnabled = true; _operation = null;
             if (_closeAfterOperation) Close();
         }
-    }
-    private void IndexStandaloneDocuments()
-    {
-        var manuals = _data.LoadManualRecords(); var paths = manuals.Select(m => m.FilePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        bool changed = false;
-        foreach (var f in _all.Where(f => !f.SourceName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && Path.GetExtension(f.FullPath).ToLowerInvariant() is ".pdf" or ".docx"))
-        {
-            string path = _data.ToRelative(f.FullPath);
-            if (!paths.Add(path)) continue;
-            manuals.Add(new ManualRecord { Title = Path.GetFileNameWithoutExtension(f.Name), FilePath = path, Keywords = "Imported documentation " + f.SourceName }); changed = true;
-        }
-        if (changed) _data.SaveManualRecords(manuals);
     }
     private void OpenSelected()
     {

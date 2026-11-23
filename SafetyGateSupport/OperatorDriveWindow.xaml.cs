@@ -18,6 +18,7 @@ public partial class OperatorDriveWindow : Window
     private bool _busy;
     private bool _refreshing;
     private string? _message;
+    internal bool GuidePdfsChanged { get; private set; }
 
     public OperatorDriveWindow(DataService data, string? selectedUnitId = null)
     {
@@ -205,12 +206,22 @@ public partial class OperatorDriveWindow : Window
     private async void AddGuide_Click(object sender, RoutedEventArgs e)
     {
         if (_busy || GuideUnitPicker.SelectedItem is not OperatorPublicationUnit item) return;
-        var picker = new OpenFileDialog { Title = $"Add a PDF to {item.Label}", Filter = "PDF document|*.pdf" };
+        var picker = new OpenFileDialog { Title = $"Choose a guide PDF for {item.AssetFolder}", Filter = "PDF document|*.pdf" };
         if (picker.ShowDialog(this) != true) return;
-        await RunActionAsync("Saving the guide PDF…", async () =>
+        string name = Path.GetFileName(picker.FileName);
+        await RunActionAsync("Checking unit coverage…", async () =>
         {
-            await OperatorDriveRunner.SaveGuidePdfAsync(_data, item.Unit, picker.FileName);
-            return $"Added {Path.GetFileName(picker.FileName)} to {item.Label}.";
+            var previous = await Task.Run(() => OperatorPublishingState.LoadGuidePdfs(_root, item.Gate.Id)
+                .SingleOrDefault(pdf => pdf.FileName.Equals(name, StringComparison.OrdinalIgnoreCase)), _closed.Token);
+            _closed.Token.ThrowIfCancellationRequested();
+            var eligible = _units.Where(unit => unit.Gate.Id == item.Gate.Id).Select(unit => unit.Unit).ToArray();
+            var selection = new DrawingUnitsWindow(item.Gate, eligible, previous is null ? name : $"Replacing {name}",
+                previous?.UnitIds ?? [item.Unit.Id], previous is null ? "Save guide PDF" : "Replace guide PDF") { Owner = this };
+            if (selection.ShowDialog() != true) return "";
+            StatusLabel.Text = "Saving the guide PDF…";
+            await OperatorDriveRunner.SaveGuidePdfAsync(_data, _root, item.Gate.Id, selection.UnitIds, picker.FileName, previous);
+            GuidePdfsChanged = true;
+            return $"Saved {name} for {DrawingUnitsWindow.UnitNames(eligible, selection.UnitIds)}.";
         });
     }
 

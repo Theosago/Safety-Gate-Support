@@ -75,7 +75,7 @@ public partial class MainWindow
         _settingDrawingFiles = true; DrawingFileBox.ItemsSource = null; _settingDrawingFiles = false;
         _drawingOrientationCancellation?.Cancel(); DrawingOrientationText.Text = "";
         _drawingPath = ""; _drawingBytes = null; _drawingPage = _drawingPageCount = 0;
-        DrawingImage.Source = null; DrawingFileText.Text = ""; DrawingPageText.Text = ""; DrawingAssignmentText.Text = "";
+        DrawingImage.Source = null; DrawingFileText.Text = ""; DrawingCoverageText.Text = ""; DrawingPageText.Text = ""; DrawingAssignmentText.Text = "";
         DrawingMessage.Text = "Select a unit to see its assigned electrical drawing."; DrawingMessage.Visibility = Visibility.Visible;
         DrawingFileBox.Visibility = Visibility.Collapsed;
         UpdateDrawingUploadButtons(false);
@@ -89,15 +89,28 @@ public partial class MainWindow
         DrawingMessage.Text = "Loading this unit’s assigned electrical drawings…";
         try
         {
-            var resources = await Task.Run(_data.LoadResources, token);
-            var listing = await Task.Run(() => AssignedDrawings.List(_data, gate, unit, resources, token), token);
+            var listing = await Task.Run(() =>
+            {
+                var assigned = AssignedDrawings.List(_data, gate, unit, _data.LoadResources(), token);
+                try
+                {
+                    var guideFiles = OperatorPublishingState.GuidePdfsFor(_data.SharedRoot, gate.Id, unit.Id)
+                        .Select(pdf => new AssignedDrawings.FileItem(Path.GetFileName(pdf.Path), pdf.Path) { GuideUnitIds = pdf.UnitIds });
+                    return new AssignedDrawings.Listing(assigned.Files.Concat(guideFiles).ToArray(), assigned.Unavailable);
+                }
+                catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or System.Text.Json.JsonException)
+                {
+                    return assigned with { Unavailable = [.. assigned.Unavailable, "Guide PDFs"] };
+                }
+            }, token);
             if (_isClosed || token.IsCancellationRequested) return;
             DrawingFileBox.Visibility = listing.Files.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
             _settingDrawingFiles = true; DrawingFileBox.ItemsSource = listing.Files; _settingDrawingFiles = false;
             if (listing.Files.Count == 0)
                 DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The drawing folder is unavailable. Check the shared library connection." : "No drawing assigned. Use Add drawing pair to upload the PDF and DWG.";
             else DrawingFileBox.SelectedIndex = 0;
-            DrawingAssignmentText.Text = listing.Unavailable.Count > 0 ? "Unavailable drawing folders: " + string.Join(", ", listing.Unavailable) : listing.Files.Count > 1 ? $"{listing.Files.Count} assigned drawings. Select another above if needed." : "";
+            DrawingAssignmentText.Text = listing.Unavailable.Count > 0 ? "Unavailable files: " + string.Join(", ", listing.Unavailable)
+                : listing.Files.Count > 1 ? $"{listing.Files.Count} files assigned to this unit." : "";
         }
         catch (OperationCanceledException) { }
         catch (Exception error) { if (!_isClosed && !token.IsCancellationRequested) DrawingMessage.Text = "Could not load the assigned drawing: " + error.Message; }
@@ -119,6 +132,12 @@ public partial class MainWindow
         _drawingPairCheck?.Cancel(); _drawingDwg = null; _drawingDwgAvailable = false; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
         _drawingPath = file.Path; _drawingBytes = null; _drawingPage = 0; _drawingPageCount = 0;
         DrawingFileText.Text = file.Name; DrawingFileText.ToolTip = file.Path;
+        if (SelectedGate is { } gate)
+        {
+            var eligible = _systems.Where(unit => unit.GateId == gate.Id && (file.Resource?.AppliesTo(unit.Id) ?? true));
+            var scope = file.GuideUnitIds ?? file.Resource?.FileScope(Path.GetFileName(file.Path)) ?? [];
+            DrawingCoverageText.Text = "Covers " + DrawingUnitsWindow.UnitNames(eligible, scope);
+        }
         if (_drawingListing is null) UpdateDrawingUploadButtons(UploadDrawingButton.IsEnabled);
         await RenderDrawingPageAsync();
         if (!_isClosed && ReferenceEquals(DrawingFileBox.SelectedItem, file)) CheckDrawingPair(file);

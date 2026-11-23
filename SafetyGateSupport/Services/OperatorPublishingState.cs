@@ -1,10 +1,14 @@
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
+using UglyToad.PdfPig;
 
 namespace SafetyGateSupport.Services;
 
 internal sealed record DriveFolder(string Id, string? Link = null, bool Pending = false);
 internal sealed record DrivePdf(string Id, string? Checksum = null, string? PendingChecksum = null, string? Link = null);
+internal sealed record SharedGuidePdf(string FileName, string Hash, string[] UnitIds);
+internal sealed record AssignedGuidePdf(string Path, IReadOnlyList<string> UnitIds);
 
 internal sealed class OperatorUnitPublication
 {
@@ -35,6 +39,75 @@ internal sealed class OperatorPublishingState
     internal static string StatePath(string root) => Path.Combine(root, "_AppData", "Operator Publishing", "publishing.json");
     internal static string AttachmentsPath(string root, string unitId) => Path.Combine(root, "_AppData",
         "Operator Publishing", "Guide PDFs", MobileSupportExporter.FileKey(unitId));
+    private static string AssetGuideFolder(string root, string gateId) =>
+        Path.Combine(root, "_AppData", "Operator Publishing", "Shared Guide PDFs", MobileSupportExporter.FileKey(gateId));
+
+    internal static List<SharedGuidePdf> LoadGuidePdfs(string root, string gateId)
+    {
+        var records = Read<List<SharedGuidePdf>>(Path.Combine(AssetGuideFolder(root, gateId), "attachments.json")) ?? [];
+        if (records.Any(pdf => pdf is null || string.IsNullOrWhiteSpace(pdf.FileName) ||
+            Path.GetFileName(pdf.FileName) != pdf.FileName || pdf.FileName.Contains('\\') || pdf.FileName.Contains(':') ||
+            !OperatorPublicationSources.IsPdf(pdf.FileName) || pdf.Hash is not { Length: 64 } ||
+            pdf.Hash.Any(c => !char.IsAsciiHexDigit(c)) || pdf.UnitIds is not { Length: > 0 }))
+            throw new InvalidDataException("The saved guide attachment index could not be read.");
+        return records;
+    }
+
+    internal static IEnumerable<AssignedGuidePdf> GuidePdfsFor(string root, string gateId, string unitId)
+    {
+        string folder = AssetGuideFolder(root, gateId);
+        var shared = LoadGuidePdfs(root, gateId)
+            .Where(pdf => pdf.UnitIds.Contains(unitId, StringComparer.OrdinalIgnoreCase)).ToArray();
+        var names = shared.Select(pdf => pdf.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var legacy = AttachmentsPath(root, unitId);
+        if (Directory.Exists(legacy))
+            foreach (string path in Directory.EnumerateFiles(legacy).Where(OperatorPublicationSources.IsPdf).Order(StringComparer.OrdinalIgnoreCase))
+                if (!names.Contains(Path.GetFileName(path)))
+                    yield return new(OperatorPublicationSources.RequireSharedFile(root, path), [unitId]);
+        foreach (var pdf in shared.OrderBy(pdf => pdf.FileName, StringComparer.OrdinalIgnoreCase))
+        {
+            string path = Path.Combine(folder, pdf.Hash, pdf.FileName);
+            if (!File.Exists(path)) throw new IOException($"The guide PDF {pdf.FileName} is unavailable in the shared library.");
+            yield return new(OperatorPublicationSources.RequireSharedFile(root, path), pdf.UnitIds);
+        }
+    }
+
+    internal static void SaveGuidePdf(DataService data, string root, string gateId, IReadOnlyCollection<string> unitIds,
+        string source, SharedGuidePdf? previous)
+    {
+        string name = Path.GetFileName(source);
+        if (!OperatorPublicationSources.IsPdf(name)) throw new InvalidDataException("Choose a PDF for the unit guides.");
+        byte[] bytes = OperatorPublicationSources.ReadPdf(source);
+        using (var document = PdfDocument.Open(bytes))
+            if (document.NumberOfPages == 0) throw new InvalidDataException("The selected PDF has no pages.");
+        string hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+
+        using var lease = data.AcquireAssetWriteLock();
+        if (!data.IsReady || !Path.GetFullPath(data.SharedRoot).Equals(root, StringComparison.OrdinalIgnoreCase))
+            throw new IOException("Connect the original shared library before saving this PDF.");
+        var eligible = data.LoadSystems().Where(unit => unit.GateId == gateId).Select(unit => unit.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (unitIds.Count == 0 || unitIds.Any(id => !eligible.Contains(id)))
+            throw new InvalidOperationException("Choose the units covered by this PDF on the same asset.");
+        var records = LoadGuidePdfs(root, gateId);
+        var existing = records.SingleOrDefault(pdf => pdf.FileName.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (existing?.Hash != previous?.Hash || existing is not null && previous is not null &&
+            !existing.UnitIds.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(previous.UnitIds))
+            throw new IOException("This guide PDF changed while you were selecting units. Choose the PDF again.");
+
+        string folder = AssetGuideFolder(root, gateId);
+        string destination = Path.Combine(folder, hash, name);
+        if (File.Exists(destination))
+        {
+            using var stored = File.OpenRead(OperatorPublicationSources.RequireSharedFile(root, destination));
+            if (Convert.ToHexStringLower(SHA256.HashData(stored)) != hash)
+                throw new IOException("The stored guide PDF differs from its saved revision.");
+        }
+        else WriteFile(destination, bytes);
+        if (existing is not null) records.Remove(existing);
+        records.Add(new(name, hash, unitIds.Distinct(StringComparer.OrdinalIgnoreCase).ToArray()));
+        WriteFile(Path.Combine(folder, "attachments.json"), JsonSerializer.SerializeToUtf8Bytes(records));
+    }
 
     public DriveFolder? Root { get; set; }
     public bool PublishAll { get; set; }

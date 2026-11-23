@@ -178,13 +178,17 @@ public partial class MainWindow : Window
 
     private void PublishDrive_Click(object sender, RoutedEventArgs e)
     {
-        if (_sharedDataReady && OperatorDriveRunner.IsSupported(_data))
-            new OperatorDriveWindow(_data, SelectedUnit?.Id) { Owner = this }.ShowDialog();
+        if (!_sharedDataReady || !OperatorDriveRunner.IsSupported(_data)) return;
+        var publishing = new OperatorDriveWindow(_data, SelectedUnit?.Id) { Owner = this };
+        publishing.ShowDialog();
+        if (publishing.GuidePdfsChanged && SelectedGate is { } gate && SelectedUnit is { } unit) LoadDrawings(gate, unit);
     }
 
     private void UpdateConnectionStatus()
     {
         PublishDriveNav.Visibility = _sharedDataReady && OperatorDriveRunner.IsSupported(_data) ? Visibility.Visible : Visibility.Collapsed;
+        ImportManualsButton.Visibility = _data.IsHomePreview ? Visibility.Collapsed : Visibility.Visible;
+        ImportManualsButton.IsEnabled = _sharedDataReady;
         if (_data.IsOnboardingDemo)
         {
             ConnectionText.Text = "Fictional example";
@@ -705,6 +709,38 @@ public partial class MainWindow : Window
     private void OpenManual_Click(object sender, RoutedEventArgs e) => OpenSelectedManual();
     private void OpenSelectedManual() { if (ManualList.SelectedItem is ManualFileItem m && File.Exists(m.Path)) FileLauncherService.Open(m.Path); }
     private void OpenManualFolder_Click(object sender, RoutedEventArgs e) { Directory.CreateDirectory(_data.ManualLibraryFolder); FileLauncherService.Open(_data.ManualLibraryFolder); }
+
+    private async void ImportManuals_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_sharedDataReady || _data.IsHomePreview) return;
+        var picker = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose documents to add to the shared library",
+            Filter = "PDF and Word documents|*.pdf;*.docx",
+            Multiselect = true
+        };
+        if (picker.ShowDialog(this) != true) return;
+
+        IsEnabled = false;
+        ManualImportStatus.Text = "Importing documents into the shared library…";
+        try
+        {
+            string[] files = picker.FileNames;
+            var result = await Task.Run(() => SupportLibraryService.ImportDocuments(_data, files));
+            if (_isClosed) return;
+            _manualFilterGateId = _manualFilterUnitId = "";
+            ManualSearchBox.Clear();
+            await ReloadDataAsync();
+            if (_isClosed) return;
+            var summary = $"{result.Added} imported. {result.Existing} already in the library.";
+            ManualImportStatus.Text = string.Join(Environment.NewLine, result.Errors.Prepend(summary));
+        }
+        catch (Exception error)
+        {
+            if (!_isClosed) ManualImportStatus.Text = "Document import could not finish. " + error.Message;
+        }
+        finally { if (!_isClosed) IsEnabled = true; }
+    }
 
     private void RefreshParts()
     {

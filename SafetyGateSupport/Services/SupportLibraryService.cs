@@ -28,6 +28,31 @@ public static class SupportLibraryService
     private sealed record Manifest(string SourceName, string Sha256, DateTimeOffset ImportedUtc, List<string> Files);
     public static string Root(DataService data) => Path.Combine(data.SharedRoot, "Library", "Imports");
 
+    internal static bool IsDocument(string path) => Path.GetExtension(path).ToLowerInvariant() is ".pdf" or ".docx";
+
+    internal static (int Added, int Existing, IReadOnlyList<string> Errors) ImportDocuments(DataService data, IEnumerable<string> sources)
+    {
+        if (!data.IsReady) throw new IOException("Connect the shared library before importing documents.");
+        string root = Root(data);
+        int added = 0, existing = 0;
+        var errors = new List<string>();
+        foreach (string source in sources)
+        {
+            try
+            {
+                if (!IsDocument(source)) throw new NotSupportedException("Choose a PDF or Word document.");
+                if (Import(root, source).AlreadyImported) existing++;
+                else added++;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException)
+            {
+                errors.Add($"{Path.GetFileName(source)} — {error.Message}");
+            }
+        }
+        data.IndexImportedDocuments(List(root));
+        return (added, existing, errors);
+    }
+
     public static LibraryImportResult Import(string root, string source, CancellationToken token = default, Action<string>? progress = null)
     {
         source = Path.GetFullPath(source); root = Path.GetFullPath(root);

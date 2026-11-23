@@ -4,7 +4,6 @@ using System.Windows.Media.Imaging;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Responses;
 using SafetyGateSupport.Models;
-using UglyToad.PdfPig;
 
 namespace SafetyGateSupport.Services;
 
@@ -150,25 +149,11 @@ internal static class OperatorDriveRunner
         catch (Exception error) { return error.Message; }
     }
 
-    internal static async Task SaveGuidePdfAsync(DataService data, SafetySystem unit, string source)
+    internal static async Task SaveGuidePdfAsync(DataService data, string root, string gateId, IReadOnlyCollection<string> unitIds,
+        string source, SharedGuidePdf? previous)
     {
         if (!IsSupported(data)) throw new InvalidOperationException("Use a connected plant library to add a guide PDF.");
-        await Task.Run(() =>
-        {
-            var bytes = OperatorPublicationSources.ReadPdf(source);
-            using (var document = PdfDocument.Open(bytes))
-                if (document.NumberOfPages == 0) throw new InvalidDataException("The selected PDF has no pages.");
-            using var lease = data.AcquireAssetWriteLock();
-            string folder = OperatorPublishingState.AttachmentsPath(data.SharedRoot, unit.Id);
-            string destination = Path.Combine(folder, Path.GetFileName(source));
-            if (File.Exists(destination))
-            {
-                string archive = Path.Combine(folder, "Archive");
-                Directory.CreateDirectory(archive);
-                File.Copy(destination, Path.Combine(archive, Guid.NewGuid().ToString("N") + "-" + Path.GetFileName(source)));
-            }
-            OperatorPublishingState.WriteFile(destination, bytes);
-        });
+        await Task.Run(() => OperatorPublishingState.SaveGuidePdf(data, root, gateId, unitIds, source, previous));
         _ = RunAsync(data);
     }
 

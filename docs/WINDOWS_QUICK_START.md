@@ -1,10 +1,10 @@
-# Safety Gate Support 8.4.1 — Windows quick start
+# Safety Gate Support — Windows quick start
 
 ## Upgrade
 
-1. Download **SafetyGateSupport-Windows-x64** from the successful GitHub Actions run for version 8.4.1. Extract the **whole ZIP** to a new folder on the PC.
+1. Download **SafetyGateSupport-Windows-x64** from the successful GitHub Actions run for the version you want. Extract the **whole ZIP** to a new folder on the PC.
 2. Close the older app and run **SafetyGateSupport.exe**. No SDK, installer, or Siemens Configurator is required for the built-in light tool.
-3. Confirm **v8.4.1** in the sidebar. Existing local settings, shared data, photos, and site troubleshooting edits remain in use. Keep the old executable folder until the new version has been checked at the site.
+3. Check the version in the sidebar. The app reuses the existing local settings and shared library.
 
 On a new PC, choose **Set up this plant** or press **Ctrl+Shift+Alt+A**. Setup opens
 **Start here**. Connect an existing library, or select an empty folder and create
@@ -15,6 +15,10 @@ the new-plant default. See [the guided setup walkthrough](V8_4_1.md).
 Local settings live at `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
 
 ## Import the supplied support files
+
+From **Manuals → Import documents…**, select the PDFs and Word files together.
+The app copies the originals to the connected shared library. Coworkers can
+find them in **Manuals** or **Search everything** by their titles.
 
 1. Click **Support library → Import files / ZIPs**. Select the original manuals, parts PDFs, troubleshooting DOCX, **Schematics and Light Config - Copy.zip**, **Omni Sensors - Copy.zip**, and **BusLink 2 M2 - Copy.zip** from the PC. Multiple selections are supported.
 2. Wait for the import summary. Exact duplicate sources are recognized by SHA-256, even if renamed. Different revisions are retained separately. The large schematics ZIP can be imported on the PC despite the cloud attachment transfer limit.

@@ -36,9 +36,9 @@
     </ListBox>
    </Expander>
 
-   <Expander Header="Add a PDF to a unit guide" Margin="0,14,0,0">
+   <Expander Header="Add PDF to unit guides" Margin="0,14,0,0">
     <StackPanel Margin="4,8,0,0">
-     <TextBlock Text="Optional documents, such as a signal column configuration PDF, appear after the electrical drawing." TextWrapping="Wrap"/>
+     <TextBlock Text="Choose a unit on the asset, pick a PDF, then check the units it covers." TextWrapping="Wrap"/>
      <DockPanel Margin="0,7,0,0">
       <Button x:Name="AddGuideButton" DockPanel.Dock="Right" Content="Choose PDF…" Click="AddGuide_Click" Margin="8,0,0,0"/>
       <ComboBox x:Name="GuideUnitPicker" DisplayMemberPath="Label" AutomationProperties.Name="Unit for additional guide PDF"/>

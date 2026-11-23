@@ -80,10 +80,10 @@ internal static class OperatorPublishingPdf
             detailY -= 46;
         }
 
-        Text(cover, "In this guide", 36, 319, 20, bold, Ink, 536);
-        if (entries.Count == 0 || !entries[0].Title.Equals("Electrical drawing", StringComparison.Ordinal))
+        Text(cover, "Files for this unit", 36, 319, 20, bold, Ink, 536);
+        if (drawingLink is null)
             Text(cover, "No electrical PDF is assigned to this unit.", 36, 290, 12, normal, Muted, 536);
-        double firstEntry = entries.Count == 0 || entries[0].Title != "Electrical drawing" ? 253 : 276;
+        double firstEntry = drawingLink is null ? 253 : 276;
         for (int i = 0; i < Math.Min(3, entries.Count); i++) Entry(cover, entries[i], firstEntry - 35 * i, normal, bold);
         if (contentsPages > 0)
         {
@@ -100,7 +100,7 @@ internal static class OperatorPublishingPdf
         {
             var page = document.Pages[i + 2];
             Text(page, item.Label, 36, 731, 14, bold, Accent, 540);
-            Text(page, "In this guide", 36, 697, 28, bold, Ink, 540);
+            Text(page, "Files for this unit", 36, 697, 28, bold, Ink, 540);
             int row = 0;
             foreach (var entry in entries.Skip(3 + i * 19).Take(19)) Entry(page, entry, 657 - 31 * row++, normal, bold);
             Footer(page, folderLink, normal, "Contents");

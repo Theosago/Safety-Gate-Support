@@ -74,16 +74,13 @@ internal sealed record OperatorPublicationSources(OperatorGuideSection? Primary,
             string photoSource = data.Resolve(item.Unit.PrimaryPhoto);
             if (File.Exists(photoSource)) photo = RequireSharedFile(data.SharedRoot, photoSource);
         }
-        string attachmentFolder = OperatorPublishingState.AttachmentsPath(data.SharedRoot, item.Unit.Id);
-        var attachments = Directory.Exists(attachmentFolder)
-            ? Directory.EnumerateFiles(attachmentFolder).Where(IsPdf).Order(StringComparer.OrdinalIgnoreCase)
-                .Select(p => new OperatorGuideSection(Path.GetFileNameWithoutExtension(p), RequireSharedFile(data.SharedRoot, p)))
-            : Enumerable.Empty<OperatorGuideSection>();
+        var attachments = OperatorPublishingState.GuidePdfsFor(data.SharedRoot, item.Gate.Id, item.Unit.Id)
+            .Select(pdf => new OperatorGuideSection(Path.GetFileNameWithoutExtension(pdf.Path), pdf.Path));
         var sections = drawings.Where(f => f != primary).Concat(attachments).ToList();
-        if (primary is not null) sections.Insert(0, primary with { Title = "Electrical drawing" });
+        if (primary is not null) sections.Insert(0, primary);
         var fingerprint = JsonSerializer.SerializeToUtf8Bytes(new
         {
-            LayoutVersion = 2,
+            LayoutVersion = 3,
             item.Label,
             item.Gate.Category,
             item.Gate.Location,

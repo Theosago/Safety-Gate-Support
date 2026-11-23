@@ -546,6 +546,31 @@ public partial class DataService
         return dest;
     }
 
+    internal void IndexImportedDocuments(IEnumerable<LibraryFile> files)
+    {
+        var documents = files.Where(file => SupportLibraryService.IsDocument(file.FullPath) &&
+            !file.SourceName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (documents.Length == 0) return;
+        using var lease = AcquireAssetWriteLock();
+        var manuals = File.Exists(ManualsIndexFile)
+            ? JsonSerializer.Deserialize<List<ManualRecord>>(File.ReadAllText(ManualsIndexFile), _read)
+                ?? throw new InvalidDataException("The shared manual index could not be read.")
+            : [];
+        var paths = manuals.Select(manual => Resolve(manual.FilePath)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int originalCount = manuals.Count;
+        foreach (var document in documents)
+        {
+            if (!paths.Add(document.FullPath)) continue;
+            manuals.Add(new()
+            {
+                Title = Path.GetFileNameWithoutExtension(document.Name).Replace('_', ' '),
+                FilePath = ToRelative(document.FullPath),
+                Keywords = "Imported documentation " + document.SourceName
+            });
+        }
+        if (manuals.Count != originalCount) SaveManualRecords(manuals);
+    }
+
     public string AddOrUpdatePartDocument(string sourceFile)
     {
         EnsureSharedDefaults();

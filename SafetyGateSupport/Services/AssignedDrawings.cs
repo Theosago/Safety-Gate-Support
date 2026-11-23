@@ -5,7 +5,11 @@ namespace SafetyGateSupport.Services;
 
 public static class AssignedDrawings
 {
-    public sealed record FileItem(string Name, string Path) { public ResourceDefinition? Resource { get; init; } }
+    public sealed record FileItem(string Name, string Path)
+    {
+        public ResourceDefinition? Resource { get; init; }
+        internal IReadOnlyList<string>? GuideUnitIds { get; init; }
+    }
     public sealed record Listing(IReadOnlyList<FileItem> Files, IReadOnlyList<string> Unavailable);
     public static bool IsDrawing(ResourceDefinition r) => r.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) &&
         (r.StorageCategory == "Electrical Drawings" || new[] { "drawing", "schematic", "wiring diagram" }.Any(word => $"{r.Label} {r.Keywords}".Contains(word, StringComparison.OrdinalIgnoreCase)));

@@ -42,11 +42,13 @@ The unit folder contains the standalone electrical drawing, a **Unit guide**
 PDF, and **Operator notes**. The guide starts with the unit's identification photo,
 asset and unit numbers, location, equipment details, and a linked contents list.
 The first assigned drawing starts the drawing section unless a previously
-published main drawing is already linked. Additional assigned drawing PDFs
-follow it. Use **Add a PDF to a unit guide** in the publishing window to attach
-an optional document, such as an exported signal column configuration. Attach
-the same filename again to replace that attachment. Supplemental PDFs appear
-as separate sections in the guide. DWG files stay in the engineering library.
+published main drawing is already linked. The guide lists the assigned PDFs
+by name under **Files for this unit**. Use **Add PDF to unit guides** in the
+publishing window to attach a PDF-only print or configuration. Choose a unit
+on the asset, pick the PDF, and check all the units it covers. The same file
+appears in each selected unit's **Drawings and guide PDFs** list and QR guide.
+Choose the same filename again to replace the attachment and review its
+coverage. DWG files stay in the engineering library.
 
 ## Sync shared notes with phones
 

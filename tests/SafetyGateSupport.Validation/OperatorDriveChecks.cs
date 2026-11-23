@@ -21,6 +21,7 @@ internal static class OperatorDriveChecks
         ("Drive publishing creates and updates unit folders, guides and original electrical PDFs in place", () => PublishLibraryAsync().GetAwaiter().GetResult()),
         ("The previous pilot's Drive folder, drawing and notes IDs survive upgrade and a renamed upload", () => ImportPilotAsync().GetAwaiter().GetResult()),
         ("Shared drawing coverage updates every linked Drive guide and clears removed drawings", () => SharedDrawingPublicationAsync().GetAwaiter().GetResult()),
+        ("A shared supplemental PDF appears in exactly the selected units and updates their guides in place", () => SharedGuidePdfAsync().GetAwaiter().GetResult()),
         ("Operator notes sync to and from the phone document while preserving previous edits", SharedNotesSyncAsyncTest),
         ("Batch QR sheets contain every stable unit URL across multiple print pages", CheckQrLabels),
         ("Larger electrical PDFs open a resumable upload and preserve their file ID on update", () => ResumablePdfAsync().GetAwaiter().GetResult())
@@ -263,6 +264,51 @@ internal static class OperatorDriveChecks
         Require(unlinked.Issues == 0 && emptyPdf.GetPage(1).Text.Contains("No electrical drawing is assigned") &&
             emptyGuide.NumberOfPages == 1 && left.Folder.Id == leftFolder && right.Folder.Id == rightFolder,
             "Removing the last drawing should clear the obsolete PDF and retain the unit's QR link.");
+    }
+
+    private static async Task SharedGuidePdfAsync()
+    {
+        using var library = new Fixture();
+        using var drive = new FakeDrive();
+        using var http = new HttpClient(drive);
+        var publisher = new OperatorDrivePublisher(new(http, _ => Task.FromResult("fixture")), (_, _) => Task.FromResult<UnitGuidePhoto?>(null));
+        var state = new OperatorPublishingState { PublishAll = true };
+        var first = library.Units[0];
+        var second = library.Units[1];
+        var third = new SafetySystem { Id = "unit4", GateId = library.Gate.Id, UnitNumber = "4" };
+        library.Data.SaveSystems([first, second, third]);
+        library.AddPair(first, "Primary wiring", 0);
+        await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        var firstGuide = state.Units[first.Id].Guide!.Id;
+        var secondGuide = state.Units[second.Id].Guide!.Id;
+        var firstPdf = state.Units[first.Id].Electrical!.Id;
+        string pdf = Path.Combine(library.DirectoryPath, "Shared supplemental print.pdf");
+        File.WriteAllBytes(pdf, DrawingPdfFixture.TextPage(90));
+        OperatorPublishingState.SaveGuidePdf(library.Data, library.Root, library.Gate.Id, [first.Id, second.Id], pdf, null);
+
+        var left = OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, first.Id).Single();
+        var right = OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, second.Id).Single();
+        Require(left.Path == right.Path && File.ReadAllBytes(left.Path).SequenceEqual(File.ReadAllBytes(pdf)) &&
+            left.UnitIds.SequenceEqual([first.Id, second.Id]) &&
+            !OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, third.Id).Any(),
+            "The desktop listing should show one shared original for the selected units only.");
+        var initial = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        using (var leftDocument = PdfDocument.Open(drive.Items[firstGuide].Bytes!))
+        using (var rightDocument = PdfDocument.Open(drive.Items[secondGuide].Bytes!))
+            Require(initial.Published == 2 && initial.Current == 1 &&
+                leftDocument.GetPage(1).Text.Contains("Primary wiring") &&
+                leftDocument.GetPage(1).Text.Contains("Shared supplemental print") &&
+                rightDocument.GetPage(1).Text.Contains("Shared supplemental print") &&
+                state.Units[second.Id].Electrical is null,
+                "The guide index should list the actual names in both units with no extra standalone electrical file.");
+
+        var previous = OperatorPublishingState.LoadGuidePdfs(library.Root, library.Gate.Id).Single();
+        File.WriteAllBytes(pdf, DrawingPdfFixture.TextPage(180));
+        OperatorPublishingState.SaveGuidePdf(library.Data, library.Root, library.Gate.Id, previous.UnitIds, pdf, previous);
+        var revised = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        Require(revised.Published == 2 && revised.Current == 1 && File.Exists(left.Path) &&
+            state.Units[first.Id].Guide!.Id == firstGuide && state.Units[second.Id].Guide!.Id == secondGuide &&
+            state.Units[first.Id].Electrical!.Id == firstPdf, "Revising the shared PDF should preserve earlier bytes and the Drive IDs.");
     }
 
     private static async Task ResumablePdfAsync()
