@@ -159,10 +159,13 @@ public sealed class SupportLibraryWindow : Window
         if (selected.Any(f => Path.GetExtension(f.FullPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(f.FullPath).Equals(".dwg", StringComparison.OrdinalIgnoreCase)))
         {
             if (string.IsNullOrWhiteSpace(gate.AssetFolder)) throw new InvalidOperationException("Organize asset folders in Setup first. Drawing updates now use one PDF/DWG pair in the asset’s Electrical Drawings folder.");
-            if (selected.Length != 2 || selected.Count(f => Path.GetExtension(f.FullPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 || selected.Count(f => Path.GetExtension(f.FullPath).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1) throw new InvalidOperationException("Select both the PDF and DWG for this print using Ctrl+click, then assign the pair to the exact unit.");
+            if (selected.Length != 2 || selected.Count(f => Path.GetExtension(f.FullPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 || selected.Count(f => Path.GetExtension(f.FullPath).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1) throw new InvalidOperationException("Select both the PDF and DWG for this print using Ctrl+click, then choose the units covered by the pair.");
             var resource = _data.LoadResources().FirstOrDefault(r => r.GateId == gate.Id && r.StorageCategory == "Electrical Drawings") ?? throw new InvalidOperationException("The asset drawing collection is missing. Refresh the storage layout first.");
-            if (MessageBox.Show(this, "Assign this PDF/DWG pair to " + gate.AssetDisplay + " / " + unit.UnitDisplay + "?\n\nExisting identical pairs are shared without another copy. To update a previous revision, use Replace selected print pair in its file list.", "Assign print pair", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            AssignPairAsync(resource, gate, unit, selected.Select(f => f.FullPath).ToArray()); return;
+            var files = selected.Select(f => f.FullPath).ToArray();
+            var eligible = _data.AssetFileUnits(gate, resource);
+            var ids = DrawingUnitsWindow.PickForNewPair(this, gate, unit, eligible, files);
+            if (ids is not null) AssignPairAsync(resource, gate, unit, files, eligible, ids);
+            return;
         }
         var extension = Path.GetExtension(file.FullPath).ToLowerInvariant();
         string type = extension switch { ".signal" => "Light Configuration", ".hux" => "Scanner Configuration", ".pdf" => "Electrical Drawings", _ => throw new NotSupportedException("Assign a .signal, .hux, or PDF drawing. Other documents remain available from the library.") };
@@ -172,14 +175,16 @@ public sealed class SupportLibraryWindow : Window
         _data.AssignAssetFile(gate, unit, file.FullPath, category);
         _status.Text = $"Assigned {file.Name} to {gate.AssetDisplay} / {unit.UnitDisplay}. Open the unit resource to compare/upload; no USB device was opened.";
     }
-    private async void AssignPairAsync(ResourceDefinition resource, SafetyGate gate, SafetySystem unit, string[] files)
+    private async void AssignPairAsync(ResourceDefinition resource, SafetyGate gate, SafetySystem unit, string[] files,
+        IReadOnlyList<SafetySystem> eligible, IReadOnlyList<string> unitIds)
     {
         _pairUpdateBusy = true; IsEnabled = false; _status.Text = "Staging and checking both companions…";
         try
         {
-            var result = await Task.Run(() => _data.SaveDrawingPair(resource.ForUnit(unit.Id), gate, unit, files));
-            string drive = await OperatorDriveRunner.AfterDrawingSavedAsync(_data, unit.Id);
-            _status.Text = string.Join(" ", new[] { "Drawing pair linked to the unit.", result.ReviewNote, drive }.Where(part => part.Length > 0));
+            var result = await Task.Run(() => _data.SaveDrawingPair(resource.ForUnit(unit.Id), gate, unit, files, unitIds: unitIds));
+            string drive = await OperatorDriveRunner.AfterDrawingSavedAsync(_data, result.UnitIds);
+            _status.Text = string.Join(" ", new[] { $"Drawing pair linked to {DrawingUnitsWindow.UnitNames(eligible, result.UnitIds)}.",
+                result.ReviewNote, drive }.Where(part => part.Length > 0));
         }
         catch (Exception error) { MessageBox.Show(this, error.Message, "Unable to assign print pair", MessageBoxButton.OK, MessageBoxImage.Warning); }
         finally { _pairUpdateBusy = false; IsEnabled = true; }

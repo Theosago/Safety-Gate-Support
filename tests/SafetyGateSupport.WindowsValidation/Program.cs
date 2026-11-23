@@ -127,6 +127,7 @@ internal static class Program
             ("Unit equipment choices hide optional configuration actions without removing files", UnitEquipmentActions),
             ("Electrical drawing displays immediately, pages work, notes remain visible and assignments stay isolated", InlineDrawingAndNotes),
             ("Organized shared print pairs display their PDF automatically and detect independent DWG changes", PairedDrawingPreview),
+            ("Drawing management can link an existing pair across units without another upload", SharedDrawingManager),
             ("Scanned drawings use bundled local OCR to detect upside-down and sideways reading direction", ScannedDrawingOrientation),
             ("Bundled PDF engine renders landscape and portrait pages without editing the source", NativePdfRendering),
             ("Guided troubleshooting choices, back, and restart still work", TroubleshootingNavigation),
@@ -596,6 +597,60 @@ internal static class Program
         await WaitUntil(() => Control<TextBlock>(main, "DrawingFileText").Text.Contains("inline-other.pdf") && HasColor(image.Source, Colors.Red), "Unit switch left the previous drawing visible.");
         Control<ListBox>(main, "UnitList").SelectedItem = null; await DispatcherSettled();
         Require(image.Source is null, "Deselection retained a previous unit’s drawing.");
+    }
+
+    private static async Task SharedDrawingManager()
+    {
+        var fixture = NewFixture();
+        var gate = fixture.Gate;
+        var units = new[] { fixture.RedUnit, fixture.BlueUnit };
+        gate.AssetFolder = AssetFileLayout.SuggestedRoot(gate);
+        fixture.Data.SaveGates([gate]);
+        fixture.Data.SaveSystems([.. units]);
+        var resource = AssetFileLayout.Create(gate, "Electrical Drawings");
+        fixture.Data.SaveResources([resource]);
+        string incoming = NewDirectory();
+        string pdf = Path.Combine(incoming, "Shared print.pdf"), dwg = Path.Combine(incoming, "Shared print.dwg");
+        File.WriteAllBytes(pdf, TestDrawingPdf());
+        File.WriteAllText(dwg, "Fixture DWG");
+        var pair = fixture.Data.SaveDrawingPair(resource.ForUnit(fixture.RedUnit.Id), gate, fixture.RedUnit, [pdf, dwg]);
+        var view = Track(new ResourceWindow(fixture.Data, gate, fixture.BlueUnit, resource, pair.PdfPath, assetWideDrawings: true));
+        ShowOffscreen(view);
+        var list = Control<ListBox>(view, "FileList");
+        Require(list.Items.Count == 2 && list.SelectedItem is not null,
+            "The asset manager should show a pair that is linked to a different unit.");
+        var edit = Control<Button>(view, "FileUnitsButton");
+        Require(edit.IsVisible && edit.IsEnabled, "The existing drawing should have a visible Units covered action.");
+
+        Exception? dialogError = null;
+        _ = Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+        {
+            var picker = Application.Current.Windows.OfType<DrawingUnitsWindow>().FirstOrDefault(w => w.IsVisible);
+            if (picker is null) { dialogError = new InvalidOperationException("The unit picker did not open."); return; }
+            try
+            {
+                var choices = Control<StackPanel>(picker, "UnitOptions").Children.OfType<CheckBox>().ToArray();
+                Require(choices.Length == 2 && choices.Count(choice => choice.IsChecked == true) == 1,
+                    "Only the unit already linked should start checked.");
+                var selectAll = Control<CheckBox>(picker, "SelectAllBox");
+                selectAll.IsChecked = true;
+                selectAll.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Require(choices.All(choice => choice.IsChecked == true), "Select all should include each eligible unit.");
+                Click(Control<Button>(picker, "SaveButton"));
+            }
+            catch (Exception error) { dialogError = error; picker.Close(); }
+        }));
+        Click(edit);
+        if (dialogError is not null) throw dialogError;
+        var status = Control<TextBlock>(view, "StatusText");
+        await WaitUntil(() => status.Text.Contains("Unit links saved"), "Changing unit links did not finish.");
+        var updated = fixture.Data.LoadResources().Single(r => r.Id == resource.Id);
+        foreach (var unit in units)
+        {
+            var files = fixture.Data.GetResourceFiles(updated.ForUnit(unit.Id), gate);
+            Require(files.Contains(pair.PdfPath) && files.Contains(pair.DwgPath), "Both original companions should appear in each unit.");
+        }
+        Require(list.Items.Count == 2, "Linking another unit should reuse the two existing files.");
     }
 
     private static async Task PairedDrawingPreview()

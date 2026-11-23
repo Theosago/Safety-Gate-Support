@@ -1,0 +1,25 @@
+<Window x:Class="SafetyGateSupport.DrawingUnitsWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Units covered" Width="480" SizeToContent="Height" ResizeMode="NoResize"
+ ShowInTaskbar="False" WindowStartupLocation="CenterOwner" Style="{StaticResource {x:Type Window}}">
+ <Grid Margin="24">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel>
+   <TextBlock x:Name="AssetText" FontSize="23" FontWeight="SemiBold"/>
+   <TextBlock x:Name="FilesText" TextWrapping="Wrap" Margin="0,4,0,15" Foreground="{DynamicResource ThemeForeground536E81}"/>
+   <TextBlock Text="Select the units covered" FontWeight="SemiBold" Margin="0,0,0,6"/>
+  </StackPanel>
+  <ScrollViewer Grid.Row="1" MaxHeight="260" MinHeight="48" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+   <StackPanel x:Name="UnitOptions" Margin="0,0,8,0"/>
+  </ScrollViewer>
+  <CheckBox Grid.Row="2" x:Name="SelectAllBox" Content="Select all listed units" Click="SelectAll_Click" Margin="0,12,0,0"/>
+  <DockPanel Grid.Row="3" Margin="0,18,0,0">
+   <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+    <Button Content="Cancel" IsCancel="True"/>
+    <Button x:Name="SaveButton" Content="Save" Style="{StaticResource PrimaryButton}" Click="Save_Click" IsDefault="True"/>
+   </StackPanel>
+   <TextBlock x:Name="SelectionText" VerticalAlignment="Center" Foreground="{DynamicResource ThemeForeground536E81}"/>
+  </DockPanel>
+ </Grid>
+</Window>

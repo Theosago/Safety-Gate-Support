@@ -20,6 +20,7 @@ internal static class OperatorDriveChecks
     [
         ("Drive publishing creates and updates unit folders, guides and original electrical PDFs in place", () => PublishLibraryAsync().GetAwaiter().GetResult()),
         ("The previous pilot's Drive folder, drawing and notes IDs survive upgrade and a renamed upload", () => ImportPilotAsync().GetAwaiter().GetResult()),
+        ("Shared drawing coverage updates every linked Drive guide and clears removed drawings", () => SharedDrawingPublicationAsync().GetAwaiter().GetResult()),
         ("Batch QR sheets contain every stable unit URL across multiple print pages", CheckQrLabels),
         ("Larger electrical PDFs open a resumable upload and preserve their file ID on update", () => ResumablePdfAsync().GetAwaiter().GetResult())
     ];
@@ -141,6 +142,52 @@ internal static class OperatorDriveChecks
         Require(state.Units[library.Units[1].Id].Folder!.Id != unit.Id, "Bulk publish should create additional folders under the existing root.");
     }
 
+    private static async Task SharedDrawingPublicationAsync()
+    {
+        using var library = new Fixture();
+        using var drive = new FakeDrive();
+        using var http = new HttpClient(drive);
+        var publisher = new OperatorDrivePublisher(new(http, _ => Task.FromResult("fixture")), (_, _) => Task.FromResult<UnitGuidePhoto?>(null));
+        var state = new OperatorPublishingState { PublishAll = true };
+        var units = library.Units;
+        var ids = units.Select(u => u.Id).ToArray();
+        var shared = library.AddPair(units[0], "Common print", 0, unitIds: ids);
+        var first = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        Require(first.Published == 2, "One upload should publish both linked units.");
+        var left = state.Units[ids[0]];
+        var right = state.Units[ids[1]];
+        string leftFolder = left.Folder!.Id, rightFolder = right.Folder!.Id;
+        string leftPdf = left.Electrical!.Id, rightPdf = right.Electrical!.Id;
+        string leftGuide = left.Guide!.Id, rightGuide = right.Guide!.Id;
+        var extra = library.AddPair(units[0], "Extra print", 90, unitIds: [ids[0]]);
+        var extraResult = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        Require(extraResult.Published == 1 && extraResult.Current == 1, "The extra print should update only its unit.");
+        using (var leftDoc = PdfDocument.Open(drive.Items[leftGuide].Bytes!))
+        using (var rightDoc = PdfDocument.Open(drive.Items[rightGuide].Bytes!))
+            Require(leftDoc.NumberOfPages == 3 && rightDoc.NumberOfPages == 2, "A unit-specific print appeared in a different unit's guide.");
+
+        var revision = library.AddPair(units[1], "Common print revised", 180, shared.PdfPath);
+        var batch = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        byte[] revisedPdf = File.ReadAllBytes(revision.PdfPath);
+        Require(batch.Published == 2 && drive.Items[leftPdf].Bytes!.SequenceEqual(revisedPdf) &&
+            drive.Items[rightPdf].Bytes!.SequenceEqual(revisedPdf) && left.Guide.Id == leftGuide && right.Guide.Id == rightGuide,
+            "A single shared replacement should update both Drive PDFs and guides in place.");
+
+        var record = library.Data.LoadResources().Single(r => r.StorageCategory == "Electrical Drawings");
+        var affected = library.Data.SetAssetFileUnits(record, library.Gate, Path.GetFileName(revision.PdfPath), [ids[1]]);
+        var moved = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        Require(affected.ToHashSet().SetEquals(ids) && moved.Issues == 0 && drive.Items[leftPdf].Bytes!.SequenceEqual(File.ReadAllBytes(extra.PdfPath)) &&
+            drive.Items[rightPdf].Bytes!.SequenceEqual(revisedPdf), "Unlinking the main shared drawing should promote the other assigned print for the affected unit.");
+
+        library.Data.SetAssetFileUnits(record, library.Gate, Path.GetFileName(extra.PdfPath), [ids[1]]);
+        var unlinked = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        using var emptyPdf = PdfDocument.Open(drive.Items[leftPdf].Bytes!);
+        using var emptyGuide = PdfDocument.Open(drive.Items[leftGuide].Bytes!);
+        Require(unlinked.Issues == 0 && emptyPdf.GetPage(1).Text.Contains("No electrical drawing is assigned") &&
+            emptyGuide.NumberOfPages == 1 && left.Folder.Id == leftFolder && right.Folder.Id == rightFolder,
+            "Removing the last drawing should clear the obsolete PDF and retain the unit's QR link.");
+    }
+
     private static async Task ResumablePdfAsync()
     {
         using var drive = new FakeDrive();
@@ -223,14 +270,15 @@ internal static class OperatorDriveChecks
             Data.SaveSystems([.. Units]);
         }
 
-        internal DataService.PairUploadResult AddPair(SafetySystem unit, string filename, int rotation, string? previous = null)
+        internal DataService.PairUploadResult AddPair(SafetySystem unit, string filename, int rotation, string? previous = null,
+            IReadOnlyCollection<string>? unitIds = null)
         {
             string pdf = Path.Combine(DirectoryPath, filename + ".pdf"), dwg = Path.Combine(DirectoryPath, filename + ".dwg");
             File.WriteAllBytes(pdf, DrawingPdfFixture.TextPage(rotation));
             File.WriteAllText(dwg, filename);
             var drawing = Data.LoadResources().FirstOrDefault(r => r.GateId == Gate.Id && r.StorageCategory == "Electrical Drawings")
                 ?? AssetFileLayout.Create(Gate, "Electrical Drawings");
-            return Data.SaveDrawingPair(drawing.ForUnit(unit.Id), Gate, unit, [pdf, dwg], previous);
+            return Data.SaveDrawingPair(drawing.ForUnit(unit.Id), Gate, unit, [pdf, dwg], previous, unitIds: unitIds);
         }
 
         public void Dispose() => Directory.Delete(DirectoryPath, recursive: true);

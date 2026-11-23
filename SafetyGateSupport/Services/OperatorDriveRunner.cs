@@ -78,7 +78,7 @@ internal static class OperatorDriveRunner
         return Status;
     }
 
-    internal static async Task<string> AfterDrawingSavedAsync(DataService data, string unitId)
+    internal static async Task<string> AfterDrawingSavedAsync(DataService data, IReadOnlyCollection<string> unitIds)
     {
         if (!IsSupported(data)) return "";
         try
@@ -88,7 +88,7 @@ internal static class OperatorDriveRunner
                 string root = Path.GetFullPath(data.SharedRoot);
                 var state = OperatorPublishingState.Load(root);
                 state.ImportPilot(root);
-                return state.PublishAll || state.Units.TryGetValue(unitId, out var unit) && !unit.Paused;
+                return unitIds.Any(id => IsPublishingUnit(state, id));
             });
             if (!enabled) return "";
             if (CanPublish) _ = RunAsync(data);
@@ -97,22 +97,34 @@ internal static class OperatorDriveRunner
         catch (Exception error) { return "Drive publication status unavailable. " + error.Message; }
     }
 
-    internal static async Task<string?> DrawingStatusAsync(DataService data, string unitId)
+    private static bool IsPublishingUnit(OperatorPublishingState state, string unitId) =>
+        state.PublishAll || state.Units.TryGetValue(unitId, out var unit) && !unit.Paused;
+
+    internal static async Task<string?> DrawingStatusAsync(DataService data, IReadOnlyCollection<string> unitIds)
     {
         try
         {
             return await Task.Run<string?>(() =>
             {
                 var state = OperatorPublishingState.Load(data.SharedRoot);
-                if (!state.Units.TryGetValue(unitId, out var entry)) return null;
-                if (entry.Error is not null) return entry.Error;
-                if (entry.Fingerprint is null) return null;
-
+                var pending = unitIds.Where(id => IsPublishingUnit(state, id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (pending.Count == 0) return null;
                 using var lease = data.AcquireAssetWriteLock();
-                var item = OperatorPublicationSources.ListUnits(data).FirstOrDefault(item => item.Unit.Id == unitId);
-                if (item is null || item.Gate.Id != entry.GateId) return null;
-                var current = OperatorPublicationSources.Read(data, item, data.LoadResources(), entry, default);
-                return current.Fingerprint == entry.Fingerprint ? PublishedMessage : null;
+                var items = OperatorPublicationSources.ListUnits(data).Where(item => pending.Contains(item.Unit.Id)).ToArray();
+                var resources = data.LoadResources();
+                bool allCurrent = items.Length == pending.Count;
+                foreach (var item in items)
+                {
+                    if (!state.Units.TryGetValue(item.Unit.Id, out var entry) || item.Gate.Id != entry.GateId)
+                    {
+                        allCurrent = false;
+                        continue;
+                    }
+                    if (entry.Error is not null) return $"{item.Unit.UnitDisplay} · {entry.Error}";
+                    var current = OperatorPublicationSources.Read(data, item, resources, entry, default);
+                    allCurrent &= current.Fingerprint == entry.Fingerprint;
+                }
+                return allCurrent ? PublishedMessage : null;
             });
         }
         catch (IOException) { return null; }

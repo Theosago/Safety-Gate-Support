@@ -109,6 +109,21 @@ internal static class OperatorPublishingPdf
         return document.Build();
     }
 
+    internal static byte[] NoAssignedDrawing(OperatorPublicationUnit item, string folderLink)
+    {
+        using var document = new PdfDocumentBuilder();
+        document.DocumentInformation.Title = item.Label + " - Electrical drawing";
+        var normal = document.AddTrueTypeFont(RegularFont.Value);
+        var bold = document.AddTrueTypeFont(BoldFont.Value);
+        var page = document.AddPage(Width, Height);
+        Fill(page, 0, 644, Width, 148, Ink);
+        Text(page, "ELECTRICAL DRAWING", 36, 714, 13, bold, White, 536);
+        Text(page, item.Label, 36, 666, 34, bold, White, 536);
+        Text(page, "No electrical drawing is assigned to this unit.", 36, 601, 16, bold, Ink, 536);
+        Footer(page, folderLink, normal, "Unit files");
+        return document.Build();
+    }
+
     private static ExplicitDestination Destination(int page) =>
         new(page, ExplicitDestinationType.FitPage, ExplicitDestinationCoordinates.Empty);
 

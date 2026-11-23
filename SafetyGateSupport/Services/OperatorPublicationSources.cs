@@ -13,7 +13,7 @@ internal sealed record OperatorPublicationUnit(SafetyGate Gate, SafetySystem Uni
 internal sealed record OperatorGuideSection(string Title, string Path, string? PairId = null, string? ReplacedPath = null, string? PairHash = null);
 
 internal sealed record OperatorPublicationSources(OperatorGuideSection? Primary, IReadOnlyList<OperatorGuideSection> Sections,
-    string? PhotoPath, string Fingerprint)
+    string? PhotoPath, string Fingerprint, bool PrimaryReassigned)
 {
     internal const int MaximumPdfBytes = 80 * 1024 * 1024;
 
@@ -60,9 +60,11 @@ internal sealed record OperatorPublicationSources(OperatorGuideSection? Primary,
         var primary = drawings.FirstOrDefault(f => published.DrawingPairId is not null && f.PairId == published.DrawingPairId)
             ?? drawings.FirstOrDefault(f => previous is not null &&
                 (f.Path.Equals(previous, StringComparison.OrdinalIgnoreCase) || string.Equals(f.ReplacedPath, previous, StringComparison.OrdinalIgnoreCase)));
-        if (primary is null && published.ImportedPilot && previous is not null && IsPdf(previous) && File.Exists(previous))
+        bool reassigned = primary is null && previous is not null &&
+            IsAssignedElsewhere(data, item, resources, published.DrawingPairId, previous);
+        if (primary is null && !reassigned && published.ImportedPilot && previous is not null && IsPdf(previous) && File.Exists(previous))
             primary = new(Path.GetFileNameWithoutExtension(previous), RequireSharedFile(data.SharedRoot, previous));
-        if (primary is null && published.Electrical is not null && previous is not null)
+        if (primary is null && !reassigned && published.Electrical is not null && previous is not null)
             throw new IOException("The published electrical drawing is missing. Restore it or replace its pair through the app.");
         primary ??= drawings.FirstOrDefault();
 
@@ -92,7 +94,27 @@ internal sealed record OperatorPublicationSources(OperatorGuideSection? Primary,
             Photos = photo is null ? null : Stamp(photo),
             Pages = sections.Select(f => new { f.Title, f.PairId, f.PairHash, Source = Stamp(f.Path) })
         });
-        return new(primary, sections, photo, Convert.ToHexString(SHA256.HashData(fingerprint)));
+        return new(primary, sections, photo, Convert.ToHexString(SHA256.HashData(fingerprint)), reassigned);
+    }
+
+    // A recorded assignment to other units is different from an unavailable file. Follow the new
+    // coverage only when the library still has the previous drawing indexed under this asset.
+    private static bool IsAssignedElsewhere(DataService data, OperatorPublicationUnit item,
+        IReadOnlyList<ResourceDefinition> resources, string? previousPairId, string previousPath)
+    {
+        foreach (var resource in resources.Where(r => r.GateId == item.Gate.Id && r.StorageMode == "Asset" && AssignedDrawings.IsDrawing(r)))
+        {
+            string folder = data.ResourceCurrentFolder(resource, item.Gate);
+            var pair = resource.DrawingPairs.FirstOrDefault(p => previousPairId is not null && p.Id == previousPairId);
+            bool sameFolder = Path.GetFullPath(folder).Equals(Path.GetDirectoryName(previousPath), StringComparison.OrdinalIgnoreCase);
+            string oldName = Path.GetFileName(previousPath);
+            if (pair is null && sameFolder)
+                pair = resource.DrawingPairs.FirstOrDefault(p => p.ReplacedPdf.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+            var scope = pair is not null ? resource.FileScope(pair.Pdf) : sameFolder ? resource.FileScope(oldName) : null;
+            if (scope is not null)
+                return !resource.AppliesTo(item.Unit.Id) || scope.Count > 0 && !scope.Contains(item.Unit.Id, StringComparer.OrdinalIgnoreCase);
+        }
+        return false;
     }
 
     internal static bool IsPdf(string path) => Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase);

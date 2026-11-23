@@ -36,7 +36,7 @@
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Plant setup" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0" ToolTip="Open Plant setup (Ctrl+Alt+Shift+A)"/>
      <Button x:Name="CloseDemoButton" Content="Close demo" Click="CloseDemo_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.5.0" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.5.1" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -205,8 +205,9 @@
          <TextBlock x:Name="DrawingOrientationText" Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12" TextWrapping="Wrap"/>
          <TextBlock x:Name="DrawingAssignmentText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12"/>
          <WrapPanel Margin="0,8,0,0">
-          <Button x:Name="UploadDrawingButton" Content="Upload drawing pair…" Click="UpdateDrawing_Click" Style="{StaticResource PrimaryButton}"/>
-          <Button x:Name="FilesButton" Content="Drawing files" Click="FindFiles_Click"/>
+          <Button x:Name="ReplaceDrawingButton" Content="Replace selected drawing…" Click="ReplaceDrawing_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False" Visibility="Collapsed"/>
+          <Button x:Name="UploadDrawingButton" Content="Add drawing pair…" Click="AddDrawing_Click"/>
+          <Button x:Name="FilesButton" Content="Manage drawings…" Click="FindFiles_Click"/>
           <TextBlock FontSize="12" VerticalAlignment="Center" Margin="6,4"><Hyperlink x:Name="DownloadPdfLink" Click="DownloadDrawing_Click" IsEnabled="False">Download PDF</Hyperlink><Run Text="   ·   "/><Hyperlink x:Name="DownloadDwgLink" Click="DownloadDrawing_Click" IsEnabled="False">Download DWG</Hyperlink></TextBlock>
          </WrapPanel>
          <TextBlock x:Name="DrawingPublishStatus" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}"/>

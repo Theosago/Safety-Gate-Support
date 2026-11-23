@@ -18,6 +18,8 @@ internal static class AssetStorageChecks
         ("Drawing updates require both PDF and DWG before publishing", PairRequired),
         ("Drawing companion status detects external one-sided updates and missing files", PairStatus),
         ("Shared print unit changes apply to both companions without affecting separate prints", PairUnits),
+        ("One upload can cover multiple units while other prints have their own coverage", SharedUploadCoverage),
+        ("Reusing identical drawing companions adds links without duplicating the files", ReuseSharedPair),
         ("Repeated folder organization preserves recorded nonmatching PDF and DWG filenames", RetainPair)
     ];
     private sealed class Fixture : IDisposable
@@ -126,11 +128,16 @@ internal static class AssetStorageChecks
         var links = f.Data.LoadTroubleshootingFlows().Single(x => x.Id == "site-flow").Nodes.Single().ResourceIds;
         Require(links.SequenceEqual([f.Drawings.Id]), "Site troubleshooting links were dropped or duplicated.");
     }
-    private static DataService.PairUploadResult Publish(Fixture f, string pdf = "pdf-revision-one", string dwg = "dwg-revision-one", bool replacing = true)
+    private static DataService.PairUploadResult Publish(Fixture f, string pdf = "pdf-revision-one", string dwg = "dwg-revision-one",
+        bool replacing = true, IReadOnlyCollection<string>? unitIds = null, string? filename = null)
     {
         string folder = Path.Combine(f.Root, "incoming"); Directory.CreateDirectory(folder);
-        string p = Path.Combine(folder, "Print export.pdf"), d = Path.Combine(folder, "CAD source.dwg"); File.WriteAllText(p, pdf); File.WriteAllText(d, dwg);
-        return f.Data.SaveDrawingPair(f.Drawings.ForUnit(f.Units[0].Id), f.Data.LoadGates().Single(), f.Units[0], [p, d], replacing ? f.FilesFor(0).First(x => x.EndsWith(".pdf")) : null);
+        string p = Path.Combine(folder, (filename ?? "Print export") + ".pdf");
+        string d = Path.Combine(folder, (filename ?? "CAD source") + ".dwg");
+        File.WriteAllText(p, pdf);
+        File.WriteAllText(d, dwg);
+        return f.Data.SaveDrawingPair(f.Drawings.ForUnit(f.Units[0].Id), f.Data.LoadGates().Single(), f.Units[0],
+            [p, d], replacing ? f.FilesFor(0).First(x => x.EndsWith(".pdf")) : null, unitIds: unitIds);
     }
     private static void PairRequired()
     {
@@ -161,6 +168,63 @@ internal static class AssetStorageChecks
         Require(f.FilesFor(0).Length == 0 && f.FilesFor(1).Contains(pair.PdfPath) && f.FilesFor(1).Contains(pair.DwgPath), "Changing shared print scope split the companions.");
         Require(f.FilesFor(2).Length == 1, "An unrelated unit inherited the shared pair.");
     }
+    private static void SharedUploadCoverage()
+    {
+        using var f = new Fixture();
+        f.Convert();
+        var gate = f.Data.LoadGates().Single();
+        var ids = f.Units.Select(u => u.Id).ToArray();
+        var common = Publish(f, replacing: false, unitIds: ids, filename: "Common print");
+        var specific = Publish(f, "specific pdf", "specific dwg", replacing: false, unitIds: [ids[1]],
+            filename: "Unit specific print");
+
+        Require(common.UnitIds.SequenceEqual(ids) && specific.UnitIds.SequenceEqual([ids[1]]), "The result did not report the chosen units.");
+        for (int i = 0; i < f.Units.Count; i++)
+        {
+            var files = f.FilesFor(i);
+            Require(files.Contains(common.PdfPath) && files.Contains(common.DwgPath), "A common pair was missing from a selected unit.");
+            Require(files.Contains(specific.PdfPath) == (i == 1) && files.Contains(specific.DwgPath) == (i == 1),
+                "The unit-specific print leaked to another unit or split the companions.");
+        }
+
+        var affected = f.Data.SetAssetFileUnits(f.Drawings.ForUnit(""), gate, Path.GetFileName(common.PdfPath),
+            [ids[0], ids[2]], expectedScope: ids);
+        Require(affected.ToHashSet().SetEquals(ids) && !f.FilesFor(1).Contains(common.PdfPath) &&
+            !f.FilesFor(1).Contains(common.DwgPath) && f.FilesFor(1).Contains(specific.PdfPath),
+            "Unlinking a unit should remove both companions and retain unrelated prints.");
+        string before = File.ReadAllText(f.Data.ResourcesFile);
+        try
+        {
+            Publish(f, replacing: false, unitIds: [ids[0], "another-asset-unit"], filename: "Invalid coverage");
+            throw new Exception("An invalid unit selection should be rejected.");
+        }
+        catch (InvalidOperationException e) when (e.Message.Contains("this asset")) { }
+        Require(File.ReadAllText(f.Data.ResourcesFile) == before && !f.FilesFor(0).Any(path => path.Contains("Invalid coverage")),
+            "A rejected selection created a partial upload.");
+    }
+
+    private static void ReuseSharedPair()
+    {
+        using var f = new Fixture();
+        f.Convert();
+        var gate = f.Data.LoadGates().Single();
+        var ids = f.Units.Select(u => u.Id).ToArray();
+        var original = Publish(f, replacing: false, unitIds: [ids[0], ids[1]], filename: "Common");
+        var relinked = Publish(f, replacing: false, unitIds: [ids[2]], filename: "Same bytes");
+        Require(relinked.Reused && relinked.PdfPath == original.PdfPath && relinked.DwgPath == original.DwgPath &&
+            relinked.UnitIds.ToHashSet().SetEquals(ids) && f.Drawings.DrawingPairs.Count == 1,
+            "Reusing a pair should extend coverage without adding duplicate files or dropping old links.");
+
+        string pdf = Path.Combine(f.Root, "Revision.pdf"), dwg = Path.Combine(f.Root, "Revision.dwg");
+        File.WriteAllText(pdf, "revised pdf");
+        File.WriteAllText(dwg, "revised dwg");
+        var revision = f.Data.SaveDrawingPair(f.Drawings.ForUnit(ids[1]), gate, f.Units[1], [pdf, dwg], original.PdfPath,
+            expectedReplacementUnits: ids);
+        Require(revision.UnitIds.ToHashSet().SetEquals(ids) && Enumerable.Range(0, 3)
+            .All(i => f.FilesFor(i).Contains(revision.PdfPath) && f.FilesFor(i).Contains(revision.DwgPath)),
+            "A revision uploaded from a linked unit should be visible to every linked unit.");
+    }
+
     private static void RetainPair()
     {
         using var f = new Fixture(); f.Convert(); Publish(f); var before = f.Drawings.DrawingPairs.Single();

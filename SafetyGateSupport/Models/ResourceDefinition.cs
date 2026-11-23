@@ -32,8 +32,10 @@ public class ResourceDefinition
         if (StorageMode != "Asset") return this;
         var view = (ResourceDefinition)MemberwiseClone(); view.ViewUnitId = unitId; return view;
     }
+    public List<string>? FileScope(string name) => FileAssignments.TryGetValue(name, out var scope)
+        ? scope : FileAssignments.FirstOrDefault(pair => pair.Key.Equals(name, StringComparison.OrdinalIgnoreCase)).Value;
     public bool IncludesFile(string name) => StorageMode != "Asset" || ViewUnitId.Length == 0 ||
-        FileAssignments.Any(pair => pair.Key.Equals(name, StringComparison.OrdinalIgnoreCase) && (pair.Value.Count == 0 || pair.Value.Contains(ViewUnitId, StringComparer.OrdinalIgnoreCase)));
+        FileScope(name) is { } scope && (scope.Count == 0 || scope.Contains(ViewUnitId, StringComparer.OrdinalIgnoreCase));
 
     public string AdminDisplay => $"{Label}  [{Kind}]";
     public bool AppliesTo(string unitId) => AppliesToUnitIds.Count == 0 || AppliesToUnitIds.Contains(unitId, StringComparer.OrdinalIgnoreCase);

@@ -22,7 +22,7 @@ public partial class MainWindow
         UnitOverview.Visibility = Visibility.Collapsed; InlineToolPanel.Visibility = Visibility.Visible;
         window.Closed += (_, _) => { if (ReferenceEquals(_inlineWindow, window)) { _inlineWindow = null; InlineToolContent.Content = null; InlineToolPanel.Visibility = Visibility.Collapsed; UnitOverview.Visibility = Visibility.Visible; } };
     }
-    private async void ShowInlineResource(string category, bool filesOnly = false)
+    private async void ShowInlineResource(string category, bool filesOnly = false, bool assetWideDrawings = false)
     {
         if (SelectedGate is not { } gate || SelectedUnit is not { } unit || !CloseInlineTool()) return;
         try
@@ -38,12 +38,18 @@ public partial class MainWindow
                 var panel = new DockPanel(); var files = new Button { Content = "Add / update saved column configurations…", HorizontalAlignment = HorizontalAlignment.Left };
                 files.Click += (_, _) => ShowInlineResource(category, true); DockPanel.SetDock(files, Dock.Top); panel.Children.Add(files); panel.Children.Add(column.CreateEmbeddedView(this)); HostInline(column, panel); return;
             }
-            if (assigned.FirstOrDefault() is not { } resource)
+            var selectedDrawing = assetWideDrawings ? DrawingFileBox.SelectedItem as AssignedDrawings.FileItem : null;
+            var assetDrawings = assetWideDrawings
+                ? resources.Where(r => r.GateId == gate.Id && r.StorageMode == "Asset" && r.IsVisible && AssignedDrawings.IsDrawing(r)).ToArray()
+                : [];
+            var resource = assetDrawings.FirstOrDefault(r => r.Id == selectedDrawing?.Resource?.Id)
+                ?? assetDrawings.FirstOrDefault() ?? assigned.FirstOrDefault();
+            if (resource is null)
             {
                 if (category == "Scanner Configurations") { ShowInlineScanner(); return; }
                 MessageBox.Show(this, "No file collection is assigned to this unit. Add the collection in Setup."); return;
             }
-            var view = new ResourceWindow(_data, gate, unit, resource) { Owner = this };
+            var view = new ResourceWindow(_data, gate, unit, resource, selectedDrawing?.Path, assetWideDrawings) { Owner = this };
             view.EmbeddedColumnRequested = () => ShowInlineResource("Light Configurations"); view.EmbeddedScannerRequested = ShowInlineScanner;
             var content = (FrameworkElement)view.Content; view.Content = null; HostInline(view, content);
         }

@@ -23,14 +23,18 @@
   <GroupBox Grid.Row="2" Header="Files">
    <Grid Margin="8">
     <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <ListBox x:Name="FileList" MouseDoubleClick="FileList_DoubleClick">
+    <ListBox x:Name="FileList" MouseDoubleClick="FileList_DoubleClick" SelectionChanged="FileList_SelectionChanged">
      <ListBox.ItemTemplate>
       <DataTemplate>
        <Grid Margin="3">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="150"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
         <TextBlock Grid.Column="1" Text="{Binding Modified}" Foreground="{DynamicResource ThemeForeground666666}"/>
         <TextBlock Grid.Column="2" Text="{Binding Size}" Foreground="{DynamicResource ThemeForeground666666}" HorizontalAlignment="Right"/>
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Coverage}" Foreground="{DynamicResource ThemeForeground536E81}" FontSize="12" TextWrapping="Wrap">
+         <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding Coverage}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+        </TextBlock>
        </Grid>
       </DataTemplate>
      </ListBox.ItemTemplate>
@@ -40,7 +44,8 @@
      <WrapPanel>
       <Button Content="Open selected file" Click="OpenSelected_Click"/>
       <Button x:Name="UpdateButton" Content="Add files…" Click="Update_Click" Visibility="Collapsed"/>
-      <Button x:Name="ReplaceFileButton" Content="Replace selected file…" Click="ReplaceFile_Click" Visibility="Collapsed"/>
+      <Button x:Name="ReplaceFileButton" Content="Replace selected file…" Click="ReplaceFile_Click" IsEnabled="False" Visibility="Collapsed"/>
+      <Button x:Name="FileUnitsButton" Content="Units covered…" Click="FileUnits_Click" IsEnabled="False" Visibility="Collapsed"/>
       <Button x:Name="UamDiagnosticsButton" Content="Read scanner USB status…" Click="UamDiagnostics_Click" Visibility="Collapsed"/>
       <Button x:Name="SignalColumnButton" Content="Check / configure column…" Click="SignalColumn_Click" Visibility="Collapsed"/>
       <Button x:Name="LaunchButton" Click="Launch_Click" Visibility="Collapsed"/>
@@ -49,7 +54,6 @@
       <WrapPanel Margin="0,4,0,0">
        <Button Content="Open current folder" Click="OpenCurrentFolder_Click"/>
        <Button Content="View archive" Click="OpenArchive_Click"/>
-       <Button x:Name="FileUnitsButton" Content="Applies to units…" Click="FileUnits_Click" Visibility="Collapsed"/>
       </WrapPanel>
      </Expander>
     </StackPanel>

@@ -503,6 +503,7 @@ public partial class MainWindow : Window
         var gate = GateFor(unit); if (gate is null) { ClearUnit(); return; }
         NoUnitPanel.Visibility = Visibility.Collapsed; UnitDetailPanel.Visibility = Visibility.Visible;
         DrawingPublishStatus.Text = "";
+        _drawingPublicationUnits = [];
         string asset = gate.AssetKey == "Unassigned" ? gate.Display : gate.AssetDisplay;
         UnitTitleText.Text = $"{asset} · {unit.UnitDisplay}";
         UnitAreaText.Text = string.Join(" • ", new[] { gate.Category, gate.Location }.Where(s => !string.IsNullOrWhiteSpace(s)));
@@ -514,7 +515,7 @@ public partial class MainWindow : Window
     {
         CancelPhotoLoad();
         ClearDrawings();
-        UnitTitleText.Text = "Select a unit"; UnitAreaText.Text = ""; DrawingPublishStatus.Text = "";
+        UnitTitleText.Text = "Select a unit"; UnitAreaText.Text = ""; DrawingPublishStatus.Text = ""; _drawingPublicationUnits = [];
         SaveSharedNotesNow(); _notesSystem = null; _sharedNotesDirty = false; _loadingSharedNotes = true; SharedNotesBox.Text = ""; _loadingSharedNotes = false;
         NoUnitPanel.Visibility = Visibility.Visible; UnitDetailPanel.Visibility = Visibility.Collapsed; GateImage.Source = null;
         UnitPartsButton.IsEnabled = false;
@@ -637,7 +638,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void FindFiles_Click(object sender, RoutedEventArgs e) => ShowInlineResource("Electrical Drawings");
+    private void FindFiles_Click(object sender, RoutedEventArgs e) => ShowInlineResource("Electrical Drawings", assetWideDrawings: true);
 
     private void StartGuidedTroubleshooting_Click(object sender, RoutedEventArgs e)
     {

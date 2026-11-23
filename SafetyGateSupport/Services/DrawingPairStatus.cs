@@ -24,7 +24,7 @@ public static class DrawingPairStatus
         var pdfScope = resource.FileAssignments.FirstOrDefault(p => p.Key.Equals(pair.Pdf, StringComparison.OrdinalIgnoreCase)).Value;
         var dwgScope = resource.FileAssignments.FirstOrDefault(p => p.Key.Equals(pair.Dwg, StringComparison.OrdinalIgnoreCase)).Value;
         if (pdfScope is null || dwgScope is null || !pdfScope.Order(StringComparer.OrdinalIgnoreCase).SequenceEqual(dwgScope.Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
-            return new("PDF and DWG have different unit assignments. Use Applies to units to set both companions to the units covered by this print.", true, dwg);
+            return new("PDF and DWG have different unit assignments. Use Units covered to set both companions to the units covered by this print.", true, dwg);
         string pdfHash = AssetStorageMigration.Hash(pdf); token.ThrowIfCancellationRequested();
         string dwgHash = AssetStorageMigration.Hash(dwg); token.ThrowIfCancellationRequested();
         bool changedPdf = pdfHash != pair.PdfHash, changedDwg = dwgHash != pair.DwgHash;

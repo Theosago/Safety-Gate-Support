@@ -95,13 +95,22 @@ internal sealed class OperatorDrivePublisher(
                 }
 
                 if (sourceProblem is not null) throw sourceProblem;
+                if (sources!.PrimaryReassigned && sources.Primary is null && entry.Electrical is not null)
+                {
+                    var notice = OperatorPublishingPdf.NoAssignedDrawing(item, folderLink);
+                    await PublishPdfAsync(folder, ElectricalName, notice, entry.Electrical,
+                        record => { entry.Electrical = record; state.Save(sharedRoot); }, driveToken);
+                    entry.PrimaryPdf = null;
+                    entry.DrawingPairId = null;
+                }
                 var notes = await drive.NotesAsync(folder, entry.NotesId, driveToken);
                 entry.NotesId = notes.Id;
                 entry.NotesLink = notes.WebViewLink ?? $"https://docs.google.com/document/d/{notes.Id}/edit";
                 state.Save(sharedRoot);
 
                 var photo = sources!.PhotoPath is null ? null : await loadPhoto(sources.PhotoPath, driveToken);
-                var guide = OperatorPublishingPdf.Guide(item, photo, guideSources, folderLink, entry.Electrical?.Link, entry.NotesLink);
+                var guide = OperatorPublishingPdf.Guide(item, photo, guideSources, folderLink,
+                    sources.Primary is null ? null : entry.Electrical?.Link, entry.NotesLink);
                 await PublishPdfAsync(folder, GuideName, guide, entry.Guide,
                     record => { entry.Guide = record; state.Save(sharedRoot); }, driveToken);
 

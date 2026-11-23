@@ -99,19 +99,58 @@ public partial class DataService
         view.FileAssignments = resource.FileAssignments; WriteAssetFileIndex(gate);
         LogAudit("Asset file replaced", gate.Id, resourceId: resource.Id, details: $"{name} -> {replacementName}; all linked units updated"); return target;
     }
-    public void SetAssetFileUnits(ResourceDefinition view, SafetyGate gate, string filename, IEnumerable<string> unitIds)
+    internal List<SafetySystem> AssetFileUnits(SafetyGate gate, ResourceDefinition resource) =>
+        LoadSystems().Where(u => u.GateId == gate.Id && resource.AppliesTo(u.Id))
+            .OrderBy(u => int.TryParse(u.UnitNumber, out int number) ? number : int.MaxValue)
+            .ThenBy(u => u.UnitDisplay, StringComparer.OrdinalIgnoreCase).ToList();
+
+    private static List<string> ValidateFileUnits(IEnumerable<string> requested, IReadOnlyList<SafetySystem> eligible)
+    {
+        var selection = requested.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var ids = eligible.Where(unit => selection.Contains(unit.Id)).Select(unit => unit.Id).ToList();
+        if (ids.Count == 0 || ids.Count != selection.Count)
+            throw new InvalidOperationException("Select at least one unit from this asset's file collection.");
+        return ids;
+    }
+
+    private static List<string> ExpandFileScope(IReadOnlyCollection<string> scope, IReadOnlyList<SafetySystem> units) =>
+        units.Where(unit => scope.Count == 0 || scope.Contains(unit.Id, StringComparer.OrdinalIgnoreCase))
+            .Select(unit => unit.Id).ToList();
+
+    private static bool SameFileScope(IEnumerable<string> left, IEnumerable<string> right) =>
+        left.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(right);
+
+    private static void WriteFileScope(ResourceDefinition record, string name, List<string> ids)
+    {
+        string key = record.FileAssignments.Keys.FirstOrDefault(k => k.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? name;
+        record.FileAssignments[key] = ids.ToList();
+    }
+
+    public IReadOnlyList<string> SetAssetFileUnits(ResourceDefinition view, SafetyGate gate, string filename,
+        IEnumerable<string> unitIds, IReadOnlyCollection<string>? expectedScope = null)
     {
         using var lease = AcquireAssetWriteLock();
-        var ids = unitIds.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var known = LoadSystems().Where(u => u.GateId == gate.Id).Select(u => u.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (ids.Count == 0 || ids.Any(id => !known.Contains(id))) throw new InvalidOperationException("Select at least one unit belonging to this asset.");
-        var resources = LoadResources(); var record = resources.Single(r => r.Id == view.Id);
-        string key = record.FileAssignments.Keys.First(k => k.Equals(filename, StringComparison.OrdinalIgnoreCase));
-        record.FileAssignments[key] = ids;
-        var pair = record.DrawingPairs.FirstOrDefault(p => p.Contains(key));
-        if (pair is not null) { record.FileAssignments[pair.Pdf] = ids.ToList(); record.FileAssignments[pair.Dwg] = ids.ToList(); }
-        SaveResources(resources); view.FileAssignments = record.FileAssignments;
-        WriteAssetFileIndex(gate); LogAudit("Asset file unit links changed", gate.Id, resourceId: record.Id, details: filename);
+        var resources = LoadResources();
+        var record = resources.SingleOrDefault(r => r.Id == view.Id && r.GateId == gate.Id && r.StorageMode == "Asset")
+            ?? throw new InvalidOperationException("The file collection is no longer available.");
+        var eligible = AssetFileUnits(gate, record);
+        var ids = ValidateFileUnits(unitIds, eligible);
+        var prior = record.FileScope(filename) ?? throw new InvalidOperationException("The file is no longer in the asset index.");
+        if (expectedScope is not null && !SameFileScope(prior, expectedScope))
+            throw new InvalidOperationException("The unit links changed while this window was open. Open Units covered again.");
+        var pair = record.DrawingPairs.FirstOrDefault(p => p.Contains(filename));
+        var files = pair is null ? new[] { filename } : new[] { pair.Pdf, pair.Dwg };
+        var affected = files.SelectMany(name => ExpandFileScope(record.FileScope(name) ?? ids, eligible))
+            .Concat(ids).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        // Keep the existing all-unit rule if the user leaves that selection as it was.
+        var newScope = ids.Count == eligible.Count && files.All(name => record.FileScope(name) is { Count: 0 }) ? [] : ids;
+        foreach (string name in files) WriteFileScope(record, name, newScope);
+        SaveResources(resources);
+        view.FileAssignments = record.FileAssignments;
+        view.DrawingPairs = record.DrawingPairs;
+        WriteAssetFileIndex(gate);
+        LogAudit("Asset file unit links changed", gate.Id, resourceId: record.Id, details: filename);
+        return affected;
     }
 
     // The index is a readable companion, not the authoritative unit assignment record.
@@ -134,7 +173,7 @@ public partial class DataService
             foreach (var pair in resource.FileAssignments.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
                 lines.Add(string.Join(",", Csv(AssetFileLayout.Category(resource)), Csv(pair.Key), Csv(pair.Value.Count == 0 ? "All units" : string.Join("; ", pair.Value.Select(id => units.GetValueOrDefault(id, "Unrecognized unit"))))));
         WriteReadableIndex(Path.Combine(root, "File index.csv"), string.Join(Environment.NewLine, lines), new System.Text.UTF8Encoding(true));
-        WriteReadableIndex(Path.Combine(root, "READ ME.txt"), $"{gate.AssetDisplay} — {gate.ManufacturerDisplay}\n{gate.Category} • {gate.Location}\n\nActive files are in the named folders. File index.csv lists the units each file applies to.\nElectrical Drawings, Light Configurations, Scanner Configurations and PLC contain current files.\nPhotos and Notes have a folder for each unit. Archive contains previous revisions.\nUse only the approved configuration for the exact unit. A shared print is one PDF/DWG pair linked to the units it covers.\nIn the app, Add PDF + DWG adds a print; Replace selected print pair archives both old companions and retains existing unit links. Upload both companions together. Warnings identify missing or independently changed files; file checks do not prove that a PDF was plotted from its DWG.\n");
+        WriteReadableIndex(Path.Combine(root, "READ ME.txt"), $"{gate.AssetDisplay} — {gate.ManufacturerDisplay}\n{gate.Category} • {gate.Location}\n\nActive files are in the named folders. File index.csv lists the units each file applies to.\nElectrical Drawings, Light Configurations, Scanner Configurations and PLC contain current files.\nPhotos and Notes have a folder for each unit. Archive contains previous revisions.\nUse only the approved configuration for the exact unit. A shared print is one PDF/DWG pair linked to the units it covers.\nIn the app, Add drawing pair saves one PDF and DWG for the selected units. Units covered changes links on an existing print. Replacing a pair archives both old companions and retains unit links. Warnings identify missing or independently changed files; file checks do not prove that a PDF was plotted from its DWG.\n");
     }
 
     private static void WriteReadableIndex(string destination, string content, System.Text.Encoding? encoding = null)

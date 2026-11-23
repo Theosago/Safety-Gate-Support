@@ -18,18 +18,29 @@ public partial class ResourceWindow : Window
     private readonly SafetyGate _gate;
     private readonly SafetySystem _unit;
     private readonly ResourceDefinition _resource;
+    private readonly bool _assetWideDrawings;
+    internal sealed record DrawingUploadReceipt(string Status, IReadOnlyList<string> UnitIds);
 
-    public ResourceWindow(DataService data, SafetyGate gate, SafetySystem unit, ResourceDefinition resource, string? preselectedFile = null)
+    public ResourceWindow(DataService data, SafetyGate gate, SafetySystem unit, ResourceDefinition resource, string? preselectedFile = null, bool assetWideDrawings = false)
     {
         InitializeComponent();
         resource = data.LoadResources().FirstOrDefault(r => r.Id == resource.Id) ?? resource;
-        _data = data; _gate = gate; _unit = unit; _resource = resource.ForUnit(unit.Id);
-        ResourceTitleText.Text = resource.Label;
-        SystemText.Text = $"{gate.Display} - {unit.UnitDisplay}   •   {gate.Category}";
-        DescriptionText.Text = string.IsNullOrWhiteSpace(resource.Description) ? DefaultDescription(resource) : resource.Description;
+        _assetWideDrawings = assetWideDrawings && resource.StorageMode == "Asset" && AssignedDrawings.IsDrawing(resource);
+        _data = data;
+        _gate = gate;
+        _unit = unit;
+        _resource = resource.ForUnit(_assetWideDrawings ? "" : unit.Id);
+        ResourceTitleText.Text = _assetWideDrawings ? $"{gate.AssetDisplay} drawings" : resource.Label;
+        SystemText.Text = _assetWideDrawings ? $"{gate.Display}   •   {gate.Category}" : $"{gate.Display} - {unit.UnitDisplay}   •   {gate.Category}";
+        DescriptionText.Text = _assetWideDrawings ? "Select a drawing to see or change which units it covers."
+            : string.IsNullOrWhiteSpace(resource.Description) ? DefaultDescription(resource) : resource.Description;
         UpdateButton.Visibility = resource.AllowUserUpload && resource.Kind.Equals("ManagedFiles", StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         UpdateButton.Content = resource.StorageMode == "Asset" ? "Add files…" : resource.Label.Contains("Drawing", StringComparison.OrdinalIgnoreCase) ? "Upload / Update Drawing" : "Upload / Update File";
-        if (AssignedDrawings.IsDrawing(resource)) { UpdateButton.Content = "Add PDF + DWG…"; ReplaceFileButton.Content = "Replace selected print pair…"; }
+        if (AssignedDrawings.IsDrawing(resource))
+        {
+            UpdateButton.Content = "Add drawing pair…";
+            ReplaceFileButton.Content = "Replace selected drawing…";
+        }
         ReplaceFileButton.Visibility = resource.StorageMode == "Asset" && resource.AllowUserUpload ? Visibility.Visible : Visibility.Collapsed;
         FileUnitsButton.Visibility = resource.StorageMode == "Asset" ? Visibility.Visible : Visibility.Collapsed;
         if (resource.LaunchAction.Equals("Siemens", StringComparison.OrdinalIgnoreCase)) { LaunchButton.Content = "Launch Siemens 8WD46"; LaunchButton.Visibility = Visibility.Visible; }
@@ -60,14 +71,34 @@ public partial class ResourceWindow : Window
     {
         _data.EnsureResourceFolders(_resource, _gate);
         var folder = CurrentFolder(); Directory.CreateDirectory(folder);
-        var files = _data.GetResourceFiles(_resource, _gate).Where(f => !Path.GetFileName(f).Equals("desktop.ini", StringComparison.OrdinalIgnoreCase))
+        var units = _resource.StorageMode == "Asset" && AssignedDrawings.IsDrawing(_resource)
+            ? _data.AssetFileUnits(_gate, _resource) : [];
+        var files = _data.GetResourceFiles(_resource, _gate)
+            .Where(f => !Path.GetFileName(f).Equals("desktop.ini", StringComparison.OrdinalIgnoreCase))
+            .Where(f => !_assetWideDrawings || _resource.FileScope(Path.GetFileName(f)) is not null)
             .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
-            .Select(f => new ResourceFileItem { Name = Path.GetFileName(f), Path = f, Modified = File.GetLastWriteTime(f).ToString("g"), Size = FormatSize(new FileInfo(f).Length) }).ToList();
-        FileList.ItemsSource = files; EmptyText.Visibility = files.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        StatusText.Text = files.Count == 0 ? "No current file is assigned." : $"{files.Count} current file(s). Double-click a file to open it.";
+            .Select(f =>
+            {
+                string name = Path.GetFileName(f);
+                var scope = _resource.FileScope(name);
+                return new ResourceFileItem
+                {
+                    Name = name, Path = f, Modified = File.GetLastWriteTime(f).ToString("g"),
+                    Size = FormatSize(new FileInfo(f).Length),
+                    Coverage = units.Count > 0 && scope is not null ? DrawingUnitsWindow.UnitNames(units, scope) : ""
+                };
+            }).ToList();
+        string? selected = (FileList.SelectedItem as ResourceFileItem)?.Path;
+        FileList.ItemsSource = files;
+        FileList.SelectedItem = files.FirstOrDefault(f => f.Path.Equals(selected, StringComparison.OrdinalIgnoreCase));
+        EmptyText.Visibility = files.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        StatusText.Text = files.Count == 0 ? "No current files." : $"{files.Count} current files. Double-click a file to open it.";
     }
 
     private static string FormatSize(long bytes) => bytes >= 1024L * 1024L ? $"{bytes / (1024d * 1024d):0.0} MB" : bytes >= 1024L ? $"{bytes / 1024d:0.0} KB" : $"{bytes} B";
+    private void FileList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        FileUnitsButton.IsEnabled = ReplaceFileButton.IsEnabled = FileList.SelectedItem is ResourceFileItem;
+
     private void FileList_DoubleClick(object sender, MouseButtonEventArgs e) => OpenSelected();
     private void OpenSelected_Click(object sender, RoutedEventArgs e) => OpenSelected();
     private void OpenSelected() { if (FileList.SelectedItem is ResourceFileItem item && File.Exists(item.Path)) FileLauncherService.Open(item.Path); }
@@ -102,47 +133,60 @@ public partial class ResourceWindow : Window
         try { _data.ReplaceAssetFile(_resource, _gate, item.Path, dialog.FileName); RefreshFiles(); StatusText.Text = "Replacement saved. Previous revision archived; existing unit links preserved."; }
         catch (Exception error) { MessageBox.Show(Owner ?? this, error.Message, "Unable to replace file", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
-    internal async Task<string?> UploadDrawingPairAsync(string? replacing)
+    internal async Task<DrawingUploadReceipt?> UploadDrawingPairAsync(string? replacing)
     {
         if (_fileUpdateBusy) return null;
-        var dialog = new OpenFileDialog
-        {
-            Title = $"Choose the PDF and DWG for {_gate.AssetDisplay} / {_unit.UnitDisplay}",
-            Multiselect = true,
-            Filter = "Drawing pair (*.pdf, *.dwg)|*.pdf;*.dwg"
-        };
-        if (dialog.ShowDialog(Owner ?? this) != true) return null;
-        if (dialog.FileNames.Length != 2 ||
-            dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 ||
-            dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1)
-        {
-            MessageBox.Show(Owner ?? this, "Select one PDF and its matching DWG together.", "Both drawing files are required",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-            return null;
-        }
-
-        if (replacing is not null)
-        {
-            string oldName = Path.GetFileName(replacing);
-            string message = $"Replace {oldName} for {_gate.AssetDisplay} / {_unit.UnitDisplay}?";
-            if (_resource.FileAssignments.TryGetValue(oldName, out var links) && (links.Count == 0 || links.Count > 1))
-                message += "\n\nThis drawing is shared. Every linked unit will receive the replacement.";
-            if (MessageBox.Show(Owner ?? this, message, "Replace drawing pair", MessageBoxButton.YesNo,
-                MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return null;
-        }
-
-        _fileUpdateBusy = true;
-        IsEnabled = false;
-        StatusText.Text = "Saving both drawing files…";
         try
         {
-            var result = await Task.Run(() => _data.SaveDrawingPair(_resource, _gate, _unit, dialog.FileNames, replacing));
-            string drive = await OperatorDriveRunner.AfterDrawingSavedAsync(_data, _unit.Id);
-            string status = string.Join(" ", new[] { "PDF and DWG saved to the library.", result.ReviewNote, drive }
+            var owner = Owner ?? this;
+            var dialog = new OpenFileDialog
+            {
+                Title = $"Choose the PDF and DWG for {_gate.AssetDisplay}",
+                Multiselect = true,
+                Filter = "Drawing pair (*.pdf, *.dwg)|*.pdf;*.dwg"
+            };
+            if (dialog.ShowDialog(owner) != true) return null;
+            if (dialog.FileNames.Length != 2 ||
+                dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 ||
+                dialog.FileNames.Count(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1)
+            {
+                MessageBox.Show(owner, "Select one PDF and its matching DWG together.", "Both drawing files are required",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return null;
+            }
+
+            var record = _data.LoadResources().FirstOrDefault(r => r.Id == _resource.Id) ?? _resource;
+            var eligible = _data.AssetFileUnits(_gate, record);
+            IReadOnlyList<string>? selected = null, expected = null;
+            if (replacing is null)
+            {
+                selected = DrawingUnitsWindow.PickForNewPair(owner, _gate, _unit, eligible, dialog.FileNames);
+                if (selected is null) return null;
+            }
+            else
+            {
+                string oldName = Path.GetFileName(replacing);
+                var scope = record.FileScope(oldName) ?? throw new InvalidOperationException("Select a current drawing from the file list.");
+                expected = eligible.Where(unit => scope.Count == 0 || scope.Contains(unit.Id, StringComparer.OrdinalIgnoreCase))
+                    .Select(unit => unit.Id).ToArray();
+                string message = $"Replace {oldName} for {_gate.AssetDisplay}?\n\nThe revision will apply to {DrawingUnitsWindow.UnitNames(eligible, scope)}.";
+                if (MessageBox.Show(owner, message, "Replace drawing pair", MessageBoxButton.YesNo,
+                    MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return null;
+            }
+
+            _fileUpdateBusy = true;
+            IsEnabled = false;
+            StatusText.Text = "Saving both drawing files…";
+            var result = await Task.Run(() => _data.SaveDrawingPair(_resource, _gate, _unit, dialog.FileNames,
+                replacing, unitIds: selected, expectedReplacementUnits: expected));
+            string drive = await OperatorDriveRunner.AfterDrawingSavedAsync(_data, result.UnitIds);
+            string action = result.Reused ? "Existing drawing linked to" : "Drawing pair saved for";
+            string coverage = DrawingUnitsWindow.UnitNames(eligible, result.UnitIds);
+            string status = string.Join(" ", new[] { $"{action} {coverage}.", result.ReviewNote, drive }
                 .Where(part => part.Length > 0));
             RefreshFiles();
             StatusText.Text = status;
-            return status;
+            return new(status, result.UnitIds);
         }
         catch (Exception error)
         {
@@ -157,28 +201,29 @@ public partial class ResourceWindow : Window
         base.OnClosing(e);
     }
 
-    private void FileUnits_Click(object sender, RoutedEventArgs e)
+    private async void FileUnits_Click(object sender, RoutedEventArgs e)
     {
-        if (FileList.SelectedItem is not ResourceFileItem item) { StatusText.Text = "Select a file to view or change the units it covers."; return; }
-        var record = _data.LoadResources().Single(r => r.Id == _resource.Id);
-        var linked = record.FileAssignments.First(p => p.Key.Equals(item.Name, StringComparison.OrdinalIgnoreCase)).Value;
-        var window = new Window { Owner = Owner ?? this, Title = "Units covered by " + item.Name, Width = 540, Height = 520, WindowStartupLocation = WindowStartupLocation.CenterOwner };
-        var panel = new DockPanel { Margin = new Thickness(20) }; var save = new Button { Content = "Save unit links", HorizontalAlignment = HorizontalAlignment.Right };
-        var info = new TextBlock { Text = "Select only the units covered by this file. A shared drawing stays one physical file. Other units keep their own drawings.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
-        DockPanel.SetDock(info, Dock.Top); panel.Children.Add(info); DockPanel.SetDock(save, Dock.Bottom); panel.Children.Add(save);
-        var choices = new StackPanel(); var checks = new List<(SafetySystem Unit, System.Windows.Controls.CheckBox Check)>();
-        foreach (var unit in _data.LoadSystems().Where(u => u.GateId == _gate.Id).OrderBy(u => int.TryParse(u.UnitNumber, out var n) ? n : int.MaxValue))
+        if (_fileUpdateBusy || FileList.SelectedItem is not ResourceFileItem item) return;
+        try
         {
-            var check = new System.Windows.Controls.CheckBox { Content = unit.UnitDisplay, IsChecked = linked.Count == 0 || linked.Contains(unit.Id), Margin = new Thickness(4, 8, 4, 8) };
-            checks.Add((unit, check)); choices.Children.Add(check);
+            var record = _data.LoadResources().Single(r => r.Id == _resource.Id);
+            var linked = record.FileScope(item.Name) ?? throw new InvalidOperationException("This file is no longer in the asset index.");
+            var eligible = _data.AssetFileUnits(_gate, record);
+            var pair = record.DrawingPairs.FirstOrDefault(p => p.Contains(item.Name));
+            string files = pair is null ? item.Name : pair.Pdf + Environment.NewLine + pair.Dwg;
+            var selected = linked.Count == 0 ? eligible.Select(unit => unit.Id) : linked;
+            var picker = new DrawingUnitsWindow(_gate, eligible, files, selected, "Save unit links") { Owner = Owner ?? this };
+            if (picker.ShowDialog() != true) return;
+
+            _fileUpdateBusy = true;
+            IsEnabled = false;
+            var affected = await Task.Run(() => _data.SetAssetFileUnits(_resource, _gate, item.Name, picker.UnitIds, linked));
+            string drive = AssignedDrawings.IsDrawing(record) ? await OperatorDriveRunner.AfterDrawingSavedAsync(_data, affected) : "";
+            RefreshFiles();
+            StatusText.Text = $"Unit links saved for {DrawingUnitsWindow.UnitNames(eligible, picker.UnitIds)}. {drive}".TrimEnd();
         }
-        panel.Children.Add(new System.Windows.Controls.ScrollViewer { Content = choices, VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto }); window.Content = panel;
-        save.Click += (_, _) =>
-        {
-            try { _data.SetAssetFileUnits(_resource, _gate, item.Name, checks.Where(c => c.Check.IsChecked == true).Select(c => c.Unit.Id)); window.Close(); RefreshFiles(); StatusText.Text = "Unit links saved. The file was not duplicated."; }
-            catch (Exception error) { MessageBox.Show(window, error.Message, "Unit links", MessageBoxButton.OK, MessageBoxImage.Information); }
-        };
-        window.ShowDialog();
+        catch (Exception error) { MessageBox.Show(Owner ?? this, error.Message, "Units covered", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { _fileUpdateBusy = false; IsEnabled = true; }
     }
 
     private void Launch_Click(object sender, RoutedEventArgs e)
@@ -194,5 +239,5 @@ public partial class ResourceWindow : Window
     private void UamDiagnostics_Click(object sender, RoutedEventArgs e) { if (EmbeddedScannerRequested is { } show) show(); else new UamDiagnosticsWindow(_data, _gate, _unit) { Owner = Owner ?? this }.ShowDialog(); }
     private async void SignalColumn_Click(object sender, RoutedEventArgs e) { if (EmbeddedColumnRequested is { } show) show(); else await SignalColumnService.OpenAsync(this, _data, _gate, _unit, new[] { _resource }); }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
-    private sealed class ResourceFileItem { public string Name { get; set; } = ""; public string Path { get; set; } = ""; public string Modified { get; set; } = ""; public string Size { get; set; } = ""; }
+    private sealed class ResourceFileItem { public string Name { get; set; } = ""; public string Path { get; set; } = ""; public string Modified { get; set; } = ""; public string Size { get; set; } = ""; public string Coverage { get; set; } = ""; }
 }

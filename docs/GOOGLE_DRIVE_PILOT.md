@@ -19,15 +19,23 @@
    one US Letter PDF and opens it so you can print every label together.
    Print at actual size. Each label opens its unit folder in a phone browser.
 
-## Update a unit
+## Add, replace or share a drawing
 
-Select the unit in the regular app, then choose **Upload drawing pair…** to
-replace the displayed sheet or add its first pair. Choose the matching PDF and
-DWG together. To add a separate sheet while keeping the displayed sheet, use
-**Drawing files → Add PDF + DWG…**. The app saves both companions to the shared
-library and publishes the PDF to Drive automatically. A signed-in publisher
-running with the library connected checks pending changes about every 30 seconds.
-It also picks up changes from coworkers who saved pairs on another workstation.
+- To add a print, open any unit on the asset and select **Add drawing pair…**.
+  Pick the PDF and DWG together, then check the units the print covers. Use
+  **Select all listed units** for a common print and check only the relevant
+  units for a supplemental or unit-specific print. The library stores one pair.
+- To update a revision, select the drawing on any linked unit and click
+  **Replace selected drawing…**. The confirmation lists the units using that
+  print. The app archives the previous PDF and DWG and updates the same pair
+  for every linked unit.
+- To change which units use a pair you already uploaded, open
+  **Manage drawings…**, select the print, and click **Units covered…**. Check
+  or uncheck units and save. Both companions follow the same selection.
+
+The app publishes changes for the affected units automatically. A signed-in
+publisher running with the shared library connected checks pending changes
+about every 30 seconds, including changes saved on another workstation.
 
 The unit folder contains the standalone electrical drawing, a **Unit guide**
 PDF, and **Operator notes**. The guide starts with the unit's identification photo,

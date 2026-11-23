@@ -65,6 +65,7 @@ public partial class MainWindow
     private byte[]? _drawingBytes;
     private int _drawingPage, _drawingPageCount;
     private bool _settingDrawingFiles;
+    private IReadOnlyList<string> _drawingPublicationUnits = [];
 
     private void ClearDrawings()
     {
@@ -76,7 +77,9 @@ public partial class MainWindow
         _drawingPath = ""; _drawingBytes = null; _drawingPage = _drawingPageCount = 0;
         DrawingImage.Source = null; DrawingFileText.Text = ""; DrawingPageText.Text = ""; DrawingAssignmentText.Text = "";
         DrawingMessage.Text = "Select a unit to see its assigned electrical drawing."; DrawingMessage.Visibility = Visibility.Visible;
-        DrawingFileBox.Visibility = Visibility.Collapsed; UploadDrawingButton.IsEnabled = false; UpdateDrawingControls();
+        DrawingFileBox.Visibility = Visibility.Collapsed;
+        UpdateDrawingUploadButtons(false);
+        UpdateDrawingControls();
     }
 
     private async void LoadDrawings(SafetyGate gate, SafetySystem unit)
@@ -92,7 +95,7 @@ public partial class MainWindow
             DrawingFileBox.Visibility = listing.Files.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
             _settingDrawingFiles = true; DrawingFileBox.ItemsSource = listing.Files; _settingDrawingFiles = false;
             if (listing.Files.Count == 0)
-                DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The drawing folder is unavailable. Check the shared library connection." : "No drawing assigned. Use Upload drawing pair to add the PDF and DWG.";
+                DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The drawing folder is unavailable. Check the shared library connection." : "No drawing assigned. Use Add drawing pair to upload the PDF and DWG.";
             else DrawingFileBox.SelectedIndex = 0;
             DrawingAssignmentText.Text = listing.Unavailable.Count > 0 ? "Unavailable drawing folders: " + string.Join(", ", listing.Unavailable) : listing.Files.Count > 1 ? $"{listing.Files.Count} assigned drawings. Select another above if needed." : "";
         }
@@ -104,7 +107,7 @@ public partial class MainWindow
             {
                 _drawingListing = null;
                 if (!_isClosed && !token.IsCancellationRequested && SelectedUnit?.Id == unit.Id)
-                    UploadDrawingButton.IsEnabled = true;
+                    UpdateDrawingUploadButtons(true);
             }
             source.Dispose();
         }
@@ -116,6 +119,7 @@ public partial class MainWindow
         _drawingPairCheck?.Cancel(); _drawingDwg = null; _drawingDwgAvailable = false; _drawingFingerprint = ""; DrawingPairStatusText.Text = "";
         _drawingPath = file.Path; _drawingBytes = null; _drawingPage = 0; _drawingPageCount = 0;
         DrawingFileText.Text = file.Name; DrawingFileText.ToolTip = file.Path;
+        if (_drawingListing is null) UpdateDrawingUploadButtons(UploadDrawingButton.IsEnabled);
         await RenderDrawingPageAsync();
         if (!_isClosed && ReferenceEquals(DrawingFileBox.SelectedItem, file)) CheckDrawingPair(file);
     }
@@ -219,29 +223,45 @@ public partial class MainWindow
     private async void NextDrawingPage_Click(object sender, RoutedEventArgs e) { if (_drawingRendering is not null || _drawingPage + 1 >= _drawingPageCount) return; _drawingPage++; await RenderDrawingPageAsync(); }
     private async Task RefreshDrawingPublishStatusAsync()
     {
-        if (_isClosed || SelectedUnit is not { } unit ||
+        if (_isClosed || SelectedUnit is not { } unit || _drawingPublicationUnits.Count == 0 ||
             !DrawingPublishStatus.Text.Contains(OperatorDriveRunner.QueuedMessage, StringComparison.Ordinal)) return;
         string previous = DrawingPublishStatus.Text;
-        var status = await OperatorDriveRunner.DrawingStatusAsync(_data, unit.Id);
-        if (!_isClosed && SelectedUnit?.Id == unit.Id && DrawingPublishStatus.Text == previous && status is not null)
+        var affected = _drawingPublicationUnits;
+        var status = await OperatorDriveRunner.DrawingStatusAsync(_data, affected);
+        if (!_isClosed && SelectedUnit?.Id == unit.Id && DrawingPublishStatus.Text == previous &&
+            ReferenceEquals(affected, _drawingPublicationUnits) && status is not null)
         {
-            // Retain the local save result. The Drive status may improve after the next retry.
             DrawingPublishStatus.Text = previous.Split(OperatorDriveRunner.QueuedMessage, 2)[0] +
                 (status == OperatorDriveRunner.PublishedMessage ? status : OperatorDriveRunner.QueuedMessage + " " + status);
         }
     }
 
-    private async void UpdateDrawing_Click(object sender, RoutedEventArgs e)
+    private void UpdateDrawingUploadButtons(bool enabled)
+    {
+        UploadDrawingButton.IsEnabled = enabled;
+        bool canReplace = DrawingFileBox.SelectedItem is AssignedDrawings.FileItem { Resource: { StorageMode: "Asset", AllowUserUpload: true } };
+        ReplaceDrawingButton.Visibility = canReplace ? Visibility.Visible : Visibility.Collapsed;
+        ReplaceDrawingButton.IsEnabled = enabled && canReplace;
+    }
+
+    private async void AddDrawing_Click(object sender, RoutedEventArgs e) => await UploadDrawingAsync(replace: false);
+    private async void ReplaceDrawing_Click(object sender, RoutedEventArgs e) => await UploadDrawingAsync(replace: true);
+
+    private async Task UploadDrawingAsync(bool replace)
     {
         if (SelectedGate is not { } gate || SelectedUnit is not { } unit || InlineBusy || _drawingListing is not null) return;
-        UploadDrawingButton.IsEnabled = false;
+        UpdateDrawingUploadButtons(false);
         try
         {
             var selected = DrawingFileBox.SelectedItem as AssignedDrawings.FileItem;
+            if (replace && selected?.Resource is not { StorageMode: "Asset" }) return;
             var resources = await Task.Run(_data.LoadResources);
             if (_isClosed || SelectedUnit?.Id != unit.Id) return;
             var choices = _data.ResourcesFor(gate, unit, resources).Where(AssignedDrawings.IsDrawing).ToList();
-            var resource = choices.FirstOrDefault(r => r.Id == selected?.Resource?.Id) ?? choices.FirstOrDefault(r => r.StorageMode == "Asset");
+            var resource = choices.FirstOrDefault(r => r.Id == selected?.Resource?.Id && r.StorageMode == "Asset");
+            if (replace && resource is null)
+                throw new InvalidOperationException("Refresh the selected drawing before replacing it.");
+            resource ??= choices.FirstOrDefault(r => r.StorageMode == "Asset");
             if (resource is null && !string.IsNullOrWhiteSpace(gate.AssetFolder))
                 resource = AssetFileLayout.Create(gate, "Electrical Drawings").ForUnit(unit.Id);
             if (resource is null || resource.StorageMode != "Asset")
@@ -256,11 +276,11 @@ public partial class MainWindow
             HostInline(upload, content);
             try
             {
-                var replacement = selected?.Resource?.Id == resource.Id ? selected.Path : null;
-                string? status = await upload.UploadDrawingPairAsync(replacement);
-                if (!_isClosed && SelectedUnit?.Id == unit.Id && status is not null)
+                var receipt = await upload.UploadDrawingPairAsync(replace ? selected!.Path : null);
+                if (!_isClosed && SelectedUnit?.Id == unit.Id && receipt is not null)
                 {
-                    DrawingPublishStatus.Text = status;
+                    _drawingPublicationUnits = receipt.UnitIds;
+                    DrawingPublishStatus.Text = receipt.Status;
                     LoadDrawings(gate, unit);
                     _ = RefreshSearchIndexAsync();
                 }
@@ -276,7 +296,7 @@ public partial class MainWindow
         }
         finally
         {
-            if (!_isClosed && _drawingListing is null && SelectedUnit?.Id == unit.Id) UploadDrawingButton.IsEnabled = true;
+            if (!_isClosed && _drawingListing is null && SelectedUnit?.Id == unit.Id) UpdateDrawingUploadButtons(true);
         }
     }
 }

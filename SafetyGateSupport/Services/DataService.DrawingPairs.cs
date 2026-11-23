@@ -6,8 +6,11 @@ namespace SafetyGateSupport.Services;
 
 public partial class DataService
 {
-    public sealed record PairUploadResult(string PdfPath, string DwgPath, string ReviewNote);
-    public PairUploadResult SaveDrawingPair(ResourceDefinition view, SafetyGate gate, SafetySystem unit, IEnumerable<string> sources, string? replaceFile = null)
+    public sealed record PairUploadResult(string PdfPath, string DwgPath, string ReviewNote, IReadOnlyList<string> UnitIds, bool Reused = false);
+
+    public PairUploadResult SaveDrawingPair(ResourceDefinition view, SafetyGate gate, SafetySystem unit,
+        IEnumerable<string> sources, string? replaceFile = null, IReadOnlyCollection<string>? unitIds = null,
+        IReadOnlyCollection<string>? expectedReplacementUnits = null)
     {
         using var lease = AcquireAssetWriteLock();
         var files = sources.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -26,26 +29,47 @@ public partial class DataService
         }
         if (AssetFileLayout.Category(record) != "Electrical Drawings") throw new InvalidOperationException("Use the electrical drawing collection for print pairs.");
         if (unit.GateId != gate.Id || record.GateId != gate.Id) throw new InvalidOperationException("The selected unit and drawing collection must belong to this asset.");
+        var eligible = AssetFileUnits(gate, record);
+        if (replaceFile is not null && unitIds is not null)
+            throw new InvalidOperationException("Change unit links separately from a drawing replacement.");
+        var scope = replaceFile is null ? ValidateFileUnits(unitIds ?? new[] { unit.Id }, eligible) : null;
         string pdfSource = files.Single(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase));
         string dwgSource = files.Single(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase));
         string pdfHash = AssetStorageMigration.Hash(pdfSource), dwgHash = AssetStorageMigration.Hash(dwgSource);
         var identical = record.DrawingPairs.FirstOrDefault(p => p.PdfHash == pdfHash && p.DwgHash == dwgHash);
         string folder = ResourceCurrentFolder(record, gate); Directory.CreateDirectory(folder);
-        if (replaceFile is null && identical is not null && File.Exists(Path.Combine(folder, identical.Pdf)) && File.Exists(Path.Combine(folder, identical.Dwg)) && AssetStorageMigration.Hash(Path.Combine(folder, identical.Pdf)) == pdfHash && AssetStorageMigration.Hash(Path.Combine(folder, identical.Dwg)) == dwgHash)
+        if (scope is not null && identical is not null && File.Exists(Path.Combine(folder, identical.Pdf)) &&
+            File.Exists(Path.Combine(folder, identical.Dwg)) && AssetStorageMigration.Hash(Path.Combine(folder, identical.Pdf)) == pdfHash &&
+            AssetStorageMigration.Hash(Path.Combine(folder, identical.Dwg)) == dwgHash)
         {
-            foreach (string name in new[] { identical.Pdf, identical.Dwg })
+            var prior = DrawingPairScope(record, identical.Pdf, identical);
+            var combined = prior.Count == 0 ? prior : prior.Concat(scope).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (!SameFileScope(prior, combined))
             {
-                var links = record.FileAssignments[name]; if (links.Count != 0 && !links.Contains(unit.Id)) links.Add(unit.Id);
+                WriteFileScope(record, identical.Pdf, combined);
+                WriteFileScope(record, identical.Dwg, combined);
+                SaveResources(records);
+                LogAudit("Drawing pair unit links added", gate.Id, unit.Id, record.Id, identical.Pdf + " + " + identical.Dwg);
             }
-            SaveResources(records); view.FileAssignments = record.FileAssignments; view.DrawingPairs = record.DrawingPairs; WriteAssetFileIndex(gate);
-            return new(Path.Combine(folder, identical.Pdf), Path.Combine(folder, identical.Dwg), identical.ReviewNote);
+            view.FileAssignments = record.FileAssignments;
+            view.DrawingPairs = record.DrawingPairs;
+            string notice = WriteAssetFileIndex(gate);
+            return new(Path.Combine(folder, identical.Pdf), Path.Combine(folder, identical.Dwg),
+                string.Join(" ", new[] { identical.ReviewNote, notice }.Where(s => s.Length > 0)),
+                ExpandFileScope(combined, eligible), Reused: true);
         }
         if (replaceFile is not null && !Path.GetFullPath(replaceFile).Equals(Path.GetFullPath(Path.Combine(folder, Path.GetFileName(replaceFile))), StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Choose a current print from this collection for replacement.");
         var previousPair = replaceFile is null ? null : record.DrawingPairs.FirstOrDefault(p => p.Contains(Path.GetFileName(replaceFile)));
-        var oldNames = previousPair is not null ? new[] { previousPair.Pdf, previousPair.Dwg }.Where(n => n.Length > 0).ToArray() : replaceFile is not null ? [Path.GetFileName(replaceFile)] : Array.Empty<string>();
-        if (oldNames.Any(n => !view.IncludesFile(n))) throw new InvalidOperationException("Choose a print linked to the selected unit.");
-        List<string> scope = replaceFile is null ? [unit.Id] : record.FileAssignments.TryGetValue(oldNames[0], out var oldScope) ? oldScope.ToList() : throw new InvalidOperationException("The selected sheet is no longer in the current index. Refresh the file list.");
+        var oldNames = previousPair is not null ? new[] { previousPair.Pdf, previousPair.Dwg } : replaceFile is not null ? [Path.GetFileName(replaceFile)] : Array.Empty<string>();
+        if (oldNames.Any(n => !record.ForUnit(view.ViewUnitId).IncludesFile(n)))
+            throw new InvalidOperationException("Choose a print linked to the selected unit.");
+        scope ??= DrawingPairScope(record, oldNames[0], previousPair);
+        var affectedUnits = ExpandFileScope(scope, eligible);
+        if (affectedUnits.Count == 0)
+            throw new InvalidOperationException("Use Units covered to link this drawing to a current unit before replacing it.");
+        if (expectedReplacementUnits is not null && !SameFileScope(affectedUnits, expectedReplacementUnits))
+            throw new InvalidOperationException("The units covered by this drawing changed. Review the current drawing before replacing it.");
         var names = new[] { Path.GetFileName(pdfSource), Path.GetFileName(dwgSource) };
         foreach (string name in names)
             if (File.Exists(Path.Combine(folder, name)) && !oldNames.Contains(name, StringComparer.OrdinalIgnoreCase)) throw new IOException("The filename already belongs to another current sheet: " + name + ". Select that sheet for replacement, or use distinct filenames for a separate print.");
@@ -106,6 +130,14 @@ public partial class DataService
         view.FileAssignments = record.FileAssignments; view.DrawingPairs = record.DrawingPairs;
         string indexNotice = WriteAssetFileIndex(gate);
         LogAudit("Drawing pair published", gate.Id, unit.Id, record.Id, names[0] + " + " + names[1]);
-        return new(pdfTarget, dwgTarget, string.Join(" ", new[] { review, indexNotice }.Where(s => s.Length > 0)));
+        return new(pdfTarget, dwgTarget, string.Join(" ", new[] { review, indexNotice }.Where(s => s.Length > 0)), affectedUnits);
+    }
+
+    private static List<string> DrawingPairScope(ResourceDefinition record, string name, DrawingFilePair? pair)
+    {
+        var scope = record.FileScope(name) ?? throw new InvalidOperationException("The selected sheet is no longer in the current index.");
+        if (pair is not null && (record.FileScope(pair.Pdf) is not { } pdf || record.FileScope(pair.Dwg) is not { } dwg || !SameFileScope(pdf, dwg)))
+            throw new InvalidOperationException("The PDF and DWG have different unit links. Use Units covered to save one selection for both.");
+        return scope;
     }
 }
