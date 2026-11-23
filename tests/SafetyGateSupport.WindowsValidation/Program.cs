@@ -619,8 +619,9 @@ internal static class Program
         File.WriteAllBytes(pdf, TestDrawingPdf());
         File.WriteAllText(dwg, "Fixture DWG");
         var pair = fixture.Data.SaveDrawingPair(resource.ForUnit(fixture.RedUnit.Id), gate, fixture.RedUnit, [pdf, dwg]);
-        var revisionPicker = Track(new DrawingUnitsWindow(gate, units, "Replacing Shared print.pdf", [fixture.RedUnit.Id],
-            "Replace drawing", replacing: true));
+        var pickerConstructor = typeof(DrawingUnitsWindow).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
+        var revisionPicker = Track((DrawingUnitsWindow)pickerConstructor.Invoke(
+            [gate, units, "Replacing Shared print.pdf", new[] { fixture.RedUnit.Id }, "Replace drawing", true]));
         ShowOffscreen(revisionPicker);
         var revisionChoices = Control<StackPanel>(revisionPicker, "UnitOptions").Children.OfType<CheckBox>().ToArray();
         Require(!revisionChoices[0].IsEnabled && revisionChoices[0].IsChecked == true &&
