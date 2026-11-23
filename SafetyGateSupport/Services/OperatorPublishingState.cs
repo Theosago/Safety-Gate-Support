@@ -14,6 +14,8 @@ internal sealed class OperatorUnitPublication
     public DrivePdf? Guide { get; set; }
     public string? NotesId { get; set; }
     public string? NotesLink { get; set; }
+    public SharedNotesCheckpoint? NotesCheckpoint { get; set; }
+    public string? NotesError { get; set; }
     public string? PrimaryPdf { get; set; }
     public string? DrawingPairId { get; set; }
     public string? Fingerprint { get; set; }
@@ -36,6 +38,8 @@ internal sealed class OperatorPublishingState
 
     public DriveFolder? Root { get; set; }
     public bool PublishAll { get; set; }
+    public bool SyncSharedNotes { get; set; }
+    public string? NotesError { get; set; }
     public Dictionary<string, DriveFolder> Assets { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, OperatorUnitPublication> Units { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

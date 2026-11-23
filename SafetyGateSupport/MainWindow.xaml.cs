@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private bool _loadingSharedNotes;
     private bool _sharedNotesDirty;
     private DateTime _sharedNotesLastWriteUtc = DateTime.MinValue;
+    private string _sharedNotesBase = "";
     private List<SearchIndexEntry> _searchIndex = new();
     private bool _searchIndexReady;
     private readonly Dictionary<string, string> _searchNotesUpdates = new(StringComparer.Ordinal);
@@ -575,23 +576,53 @@ public partial class MainWindow : Window
     private void LoadSharedNotes(SafetySystem system)
     {
         _notesSystem = system; _sharedNotesDirty = false; _notesSaveTimer.Stop(); _loadingSharedNotes = true;
-        try { SharedNotesBox.Text = _data.LoadSystemNotes(system); _sharedNotesLastWriteUtc = _data.GetSystemNotesLastWriteUtc(system); SharedNotesStatusText.Text = "Shared notes • saved to Q: and visible to other users"; }
-        catch (Exception ex) { SharedNotesBox.Text = ""; _sharedNotesLastWriteUtc = DateTime.MinValue; SharedNotesStatusText.Text = "Unable to load shared notes: " + ex.Message; }
+        try { SharedNotesBox.Text = _sharedNotesBase = _data.LoadSystemNotes(system); _sharedNotesLastWriteUtc = _data.GetSystemNotesLastWriteUtc(system); SharedNotesStatusText.Text = "Shared notes • saved to Q: and visible to other users"; }
+        catch (Exception ex) { SharedNotesBox.Text = _sharedNotesBase = ""; _sharedNotesLastWriteUtc = DateTime.MinValue; SharedNotesStatusText.Text = "Unable to load shared notes: " + ex.Message; }
         finally { _loadingSharedNotes = false; }
     }
     private void SharedNotesBox_TextChanged(object sender, TextChangedEventArgs e) { if (_loadingSharedNotes || _notesSystem is null) return; _sharedNotesDirty = true; SharedNotesStatusText.Text = "Saving shared notes…"; _notesSaveTimer.Stop(); _notesSaveTimer.Start(); }
     private void SaveSharedNotesNow()
     {
         if (!_sharedNotesDirty || _notesSystem is null || _loadingSharedNotes) return;
-        try { _data.SaveSystemNotes(_notesSystem, SharedNotesBox.Text); _sharedNotesLastWriteUtc = _data.GetSystemNotesLastWriteUtc(_notesSystem); _sharedNotesDirty = false; UpdateSearchIndexSystemNotes(_notesSystem, SharedNotesBox.Text); SharedNotesStatusText.Text = "Shared notes • saved to Q: and visible to other users"; }
+        try
+        {
+            string draft = SharedNotesBox.Text;
+            if (!_data.TryUpdateSystemNotes(_notesSystem, _sharedNotesBase, draft))
+            {
+                _data.SaveNotesRecoveryCopy(_notesSystem, draft, draft: true);
+                LoadSharedNotes(_notesSystem);
+                UpdateSearchIndexSystemNotes(_notesSystem, _sharedNotesBase);
+                SharedNotesStatusText.Text = "Another edit arrived. Your draft is saved in the notes Archive folder.";
+                return;
+            }
+            _sharedNotesBase = draft;
+            _sharedNotesLastWriteUtc = _data.GetSystemNotesLastWriteUtc(_notesSystem);
+            _sharedNotesDirty = false;
+            UpdateSearchIndexSystemNotes(_notesSystem, draft);
+            SharedNotesStatusText.Text = "Shared notes • saved to Q: and visible to other users";
+        }
         catch (Exception ex) { SharedNotesStatusText.Text = "Shared notes could not be saved: " + ex.Message; }
     }
+
     private void NotesRefreshTimer_Tick(object? sender, EventArgs e)
     {
-        if (_notesSystem is null || _sharedNotesDirty || SharedNotesBox.IsKeyboardFocusWithin || _loadingSharedNotes) return;
-        try { var latest = _data.GetSystemNotesLastWriteUtc(_notesSystem); if (latest <= _sharedNotesLastWriteUtc) return; _loadingSharedNotes = true; SharedNotesBox.Text = _data.LoadSystemNotes(_notesSystem); _sharedNotesLastWriteUtc = latest; UpdateSearchIndexSystemNotes(_notesSystem, SharedNotesBox.Text); SharedNotesStatusText.Text = "Shared notes • updated from another user"; }
-        catch { } finally { _loadingSharedNotes = false; }
+        if (_notesSystem is null || _sharedNotesDirty || _loadingSharedNotes) return;
+        try
+        {
+            var latest = _data.GetSystemNotesLastWriteUtc(_notesSystem);
+            if (latest <= _sharedNotesLastWriteUtc) return;
+            _loadingSharedNotes = true;
+            int caret = SharedNotesBox.CaretIndex;
+            SharedNotesBox.Text = _sharedNotesBase = _data.LoadSystemNotes(_notesSystem);
+            SharedNotesBox.CaretIndex = Math.Min(caret, SharedNotesBox.Text.Length);
+            _sharedNotesLastWriteUtc = latest;
+            UpdateSearchIndexSystemNotes(_notesSystem, SharedNotesBox.Text);
+            SharedNotesStatusText.Text = "Shared notes • updated from another user";
+        }
+        catch { }
+        finally { _loadingSharedNotes = false; }
     }
+
     private void UpdateSearchIndexSystemNotes(SafetySystem unit, string notes)
     {
         var entry = _searchIndex.FirstOrDefault(x => x.Kind == "System" && x.SystemId == unit.Id); var gate = GateFor(unit); if (entry is null || gate is null) return;

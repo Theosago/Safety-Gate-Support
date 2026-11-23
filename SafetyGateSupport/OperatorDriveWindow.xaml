@@ -24,6 +24,12 @@
     </StackPanel>
    </Border>
 
+   <StackPanel Margin="0,14,0,0">
+    <CheckBox x:Name="SyncNotesBox" Content="Sync shared notes with phones" Click="SyncNotes_Click" IsEnabled="False" FontWeight="SemiBold"/>
+    <TextBlock x:Name="NotesStatusLabel" Foreground="{DynamicResource ThemeForeground536E81}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+    <Button x:Name="EnableDocsButton" Content="Open Google Docs API settings" Click="EnableDocs_Click" Visibility="Collapsed" HorizontalAlignment="Left"/>
+   </StackPanel>
+
    <Expander x:Name="IssuesPanel" Header="Publishing issues" Visibility="Collapsed" Margin="0,12,0,0">
     <ListBox x:Name="IssuesList" MaxHeight="160" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
      <ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="2"/></DataTemplate></ListBox.ItemTemplate>

@@ -93,11 +93,24 @@ public partial class OperatorDriveWindow : Window
         SwitchClientButton.IsEnabled = !_busy;
         OpenDriveButton.Visibility = MobileSupportExporter.ValidLink(_state.Root?.Link ?? "") ? Visibility.Visible : Visibility.Collapsed;
         ChooseFolderPanel.Visibility = _state.Root is null ? Visibility.Visible : Visibility.Collapsed;
-        var issues = _units.Where(item => _state.Units.GetValueOrDefault(item.Unit.Id)?.Error is not null)
-            .Select(item => $"{item.Label} — {_state.Units[item.Unit.Id].Error}").ToArray();
+        SyncNotesBox.IsChecked = _state.SyncSharedNotes;
+        SyncNotesBox.IsEnabled = !_busy && ready > 0 && (connected || _state.SyncSharedNotes);
+        NotesStatusLabel.Text = _state.SyncSharedNotes
+            ? _state.NotesError ?? "Open Operator notes from a unit's QR folder. Changes sync with the app while a publisher is running."
+            : ready > 0 ? "Copies existing shared notes to the QR folders under their current Drive sharing settings."
+                : "Publish a unit to make its notes available for sync.";
+        EnableDocsButton.Visibility = _state.SyncSharedNotes && _state.NotesError?.StartsWith("Enable the Google Docs API", StringComparison.Ordinal) == true
+            ? Visibility.Visible : Visibility.Collapsed;
+        var issues = new List<string>();
+        foreach (var item in _units)
+        {
+            if (!_state.Units.TryGetValue(item.Unit.Id, out var unit)) continue;
+            if (unit.Error is not null) issues.Add($"{item.Label} — {unit.Error}");
+            if (_state.SyncSharedNotes && unit.NotesError is not null) issues.Add($"{item.Label} · Shared notes — {unit.NotesError}");
+        }
         IssuesList.ItemsSource = issues;
-        IssuesPanel.Header = $"Publishing issues ({issues.Length})";
-        IssuesPanel.Visibility = issues.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        IssuesPanel.Header = $"Publishing issues ({issues.Count})";
+        IssuesPanel.Visibility = issues.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async void Connect_Click(object sender, RoutedEventArgs e) => await ConnectAsync(!OperatorDriveRunner.HasSavedClient);
@@ -151,6 +164,17 @@ public partial class OperatorDriveWindow : Window
             return await OperatorDriveRunner.RunAsync(_data, publishNow: true, requestedRoot: rootId, progress: progress, token: _closed.Token);
         });
     }
+
+    private async void SyncNotes_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        bool enabled = SyncNotesBox.IsChecked == true;
+        await RunActionAsync("Saving notes sync settings…", () =>
+            OperatorDriveRunner.RunAsync(_data, token: _closed.Token, syncSharedNotes: enabled));
+    }
+
+    private void EnableDocs_Click(object sender, RoutedEventArgs e) =>
+        FileLauncherService.Open("https://console.cloud.google.com/apis/library/docs.googleapis.com");
 
     private async void Print_Click(object sender, RoutedEventArgs e)
     {

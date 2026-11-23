@@ -586,7 +586,12 @@ internal static class Program
         var image = Control<Image>(main, "DrawingImage");
         await WaitUntil(() => HasColor(image.Source, Colors.Red), "Drawing did not display automatically after selecting the unit.");
         Require(Control<TextBlock>(main, "DrawingFileText").Text.Contains("inline-own.pdf"), "Displayed drawing belongs to another unit.");
-        Require(Control<TextBox>(main, "SharedNotesBox").IsVisible && Control<TextBox>(main, "SharedNotesBox").Text == "Visible drawing test note", "Shared notes still require expanding or show the wrong unit.");
+        var notes = Control<TextBox>(main, "SharedNotesBox");
+        Require(notes.IsVisible && notes.Text == "Visible drawing test note", "Shared notes still require expanding or show the wrong unit.");
+        fixture.Data.SaveSystemNotes(fixture.BlueUnit, "Synced operator note");
+        await WaitUntil(() => notes.Text == "Synced operator note", "Incoming shared notes did not refresh in the open unit.");
+        notes.Text = "Desktop reply";
+        await WaitUntil(() => fixture.Data.LoadSystemNotes(fixture.BlueUnit) == "Desktop reply", "Editing refreshed notes did not save the reply.");
         Click(Control<Button>(main, "NextDrawingPageButton"));
         await WaitUntil(() => HasColor(image.Source, Colors.Blue), "Next drawing page failed.");
         Equal("Page 2 of 2", Control<TextBlock>(main, "DrawingPageText").Text, "Drawing page indicator");

@@ -21,6 +21,7 @@ internal static class OperatorDriveChecks
         ("Drive publishing creates and updates unit folders, guides and original electrical PDFs in place", () => PublishLibraryAsync().GetAwaiter().GetResult()),
         ("The previous pilot's Drive folder, drawing and notes IDs survive upgrade and a renamed upload", () => ImportPilotAsync().GetAwaiter().GetResult()),
         ("Shared drawing coverage updates every linked Drive guide and clears removed drawings", () => SharedDrawingPublicationAsync().GetAwaiter().GetResult()),
+        ("Operator notes sync to and from the phone document while preserving previous edits", SharedNotesSyncAsyncTest),
         ("Batch QR sheets contain every stable unit URL across multiple print pages", CheckQrLabels),
         ("Larger electrical PDFs open a resumable upload and preserve their file ID on update", () => ResumablePdfAsync().GetAwaiter().GetResult())
     ];
@@ -140,6 +141,73 @@ internal static class OperatorDriveChecks
             drive.Items[pdf.Id].Bytes!.SequenceEqual(File.ReadAllBytes(replacement.PdfPath)),
             "Upgrade and an unpaired-source rename should keep the old folder, file and notes IDs.");
         Require(state.Units[library.Units[1].Id].Folder!.Id != unit.Id, "Bulk publish should create additional folders under the existing root.");
+    }
+
+    private static void SharedNotesSyncAsyncTest() => VerifySharedNotesAsync().GetAwaiter().GetResult();
+
+    private static async Task VerifySharedNotesAsync()
+    {
+        using var library = new Fixture();
+        using var handler = new FakeDrive();
+        using var http = new HttpClient(handler);
+        Func<CancellationToken, Task<string>> authorize = _ => Task.FromResult("fixture");
+        var drive = new OperatorDriveClient(http, authorize);
+        var sync = new OperatorNotesSynchronizer(drive, new OperatorNotesClient(http, authorize));
+        var publisher = new OperatorDrivePublisher(drive, (_, _) => Task.FromResult<UnitGuidePhoto?>(null));
+        var state = new OperatorPublishingState { PublishAll = true, SyncSharedNotes = true };
+        var unit = library.Units[0];
+        library.Data.EnsureUnitFolders(library.Gate, unit);
+        library.Data.SaveSystems([.. library.Units]);
+        library.Data.SaveSystemNotes(unit, "Existing desktop note");
+        var result = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        Require(result.Published == 2, "The unit folders and the Google notes documents should exist.");
+        var entry = state.Units[unit.Id];
+        string doc = entry.NotesId!;
+        handler.EditNotes(doc, "Existing phone note");
+
+        handler.NotesApiEnabled = false;
+        await sync.RunAsync(library.Data, library.Root, state, default);
+        Require(state.NotesError?.StartsWith("Enable the Google Docs API") == true &&
+            library.Data.LoadSystemNotes(unit) == "Existing desktop note", "Missing API setup should preserve both versions.");
+        handler.NotesApiEnabled = true;
+        await sync.RunAsync(library.Data, library.Root, state, default);
+        string common = "Existing desktop note\n\nExisting phone note";
+        Require(handler.Items[doc].Notes == common && library.Data.LoadSystemNotes(unit) == common &&
+            state.NotesError is null, "First sync should include the pre-existing Q and Drive notes.");
+
+        handler.EditNotes(doc, common + "\nPhone update");
+        await sync.RunAsync(library.Data, library.Root, state, default);
+        string received = common + "\nPhone update";
+        Require(library.Data.LoadSystemNotes(unit) == received, "A phone edit did not reach the Q notes file.");
+        string archive = Path.Combine(Path.GetDirectoryName(library.Data.SystemNotesPath(unit))!, "Archive");
+        Require(Directory.GetFiles(archive).Any(path => File.ReadAllText(path) == common), "Sync should retain the previous Q notes.");
+
+        string deskUpdate = received + "\nDesktop update";
+        library.Data.SaveSystemNotes(unit, deskUpdate);
+        handler.LoseNextNotesReply = true;
+        await sync.RunAsync(library.Data, library.Root, state, default);
+        Require(entry.NotesCheckpoint?.Transfer is not null && handler.Items[doc].Notes == deskUpdate,
+            "A write with a lost reply should hold the intended notes until checked.");
+        state = OperatorPublishingState.Load(library.Root);
+        entry = state.Units[unit.Id];
+        await sync.RunAsync(library.Data, library.Root, state, default);
+        Require(entry.NotesCheckpoint?.Transfer is null && entry.NotesError is null, "Rechecking a write should clear its pending state.");
+
+        library.Data.SaveSystemNotes(unit, deskUpdate + "\nDesktop added 🛠");
+        handler.EditNotes(doc, deskUpdate + "\nPhone added ✅");
+        await sync.RunAsync(library.Data, library.Root, state, default);
+        string bothAdded = deskUpdate + "\nDesktop added 🛠\nPhone added ✅";
+        Require(handler.Items[doc].Notes == bothAdded && library.Data.LoadSystemNotes(unit) == bothAdded,
+            "Independent note additions should keep both users' lines.");
+
+        library.Data.SaveSystemNotes(unit, "Rewritten on desktop");
+        handler.EditNotes(doc, "Rewritten on phone");
+        await sync.RunAsync(library.Data, library.Root, state, default);
+        Require(entry.NotesError?.Contains("edited in both places") == true &&
+            handler.Items[doc].Notes == "Rewritten on phone" && library.Data.LoadSystemNotes(unit) == "Rewritten on desktop",
+            "Overlapping edits should leave both originals intact.");
+        Require(!library.Data.TryUpdateSystemNotes(unit, bothAdded, "Stale desktop draft"),
+            "A stale desktop editor should not replace newer notes.");
     }
 
     private static async Task SharedDrawingPublicationAsync()
@@ -291,15 +359,27 @@ internal static class OperatorDriveChecks
         internal sealed record Item(string Id, string Name, string MimeType, string? Parent, string? DriveId)
         {
             internal byte[]? Bytes { get; set; }
+            internal string Notes { get; set; } = "";
+            internal int Revision { get; set; } = 1;
             internal object Fields => new
             {
                 id = Id, mimeType = MimeType, driveId = DriveId, parents = Parent is null ? null : new[] { Parent },
-                md5Checksum = Bytes is null ? null : Convert.ToHexStringLower(MD5.HashData(Bytes))
+                md5Checksum = Bytes is null ? null : Convert.ToHexStringLower(MD5.HashData(Bytes)),
+                version = Revision.ToString()
             };
         }
         internal Dictionary<string, Item> Items { get; } = new();
         internal bool LoseNextFolderReply { get; set; }
         internal bool LoseNextPdfReply { get; set; }
+        internal bool LoseNextNotesReply { get; set; }
+        internal bool NotesApiEnabled { get; set; } = true;
+
+        internal void EditNotes(string id, string text)
+        {
+            var item = Items[id];
+            item.Notes = text;
+            item.Revision++;
+        }
         internal int Requests { get; private set; }
         private int _nextId;
         private Item? _upload;
@@ -320,14 +400,18 @@ internal static class OperatorDriveChecks
             Requests++;
             Require(request.Headers.Authorization?.Parameter == "fixture", "Drive calls should carry publisher authentication.");
             string endpoint = request.RequestUri!.Segments[^1], query = Uri.UnescapeDataString(request.RequestUri.Query);
+            if (request.RequestUri.Host == "docs.googleapis.com") return await NotesRequestAsync(request, endpoint, token);
             if (request.Method == HttpMethod.Get && endpoint == "generateIds")
                 return Json(new { ids = new[] { "generated-" + ++_nextId } });
             if (request.Method == HttpMethod.Get && endpoint == "files")
             {
-                var parent = Items.Values.Single(item => query.Contains($"'{item.Id}' in parents"));
-                Require(parent.DriveId is null ? query.Contains("corpora=user") && !query.Contains("driveId=")
-                    : query.Contains("corpora=drive") && query.Contains("driveId=" + parent.DriveId), "Use the correct Drive search corpus.");
-                return Json(new { files = Items.Values.Where(item => item.Parent == parent.Id && query.Contains($"name = '{item.Name}'")).Select(item => item.Fields) });
+                var parents = Items.Values.Where(item => query.Contains($"'{item.Id}' in parents")).ToArray();
+                string? driveId = parents.Select(parent => parent.DriveId).Distinct().Single();
+                Require(driveId is null ? query.Contains("corpora=user") && !query.Contains("driveId=")
+                    : query.Contains("corpora=drive") && query.Contains("driveId=" + driveId), "Use the correct Drive search corpus.");
+                var results = Items.Values.Where(item => parents.Any(parent => item.Parent == parent.Id) &&
+                    (query.Contains($"name = '{item.Name}'") || query.Contains($"mimeType = '{item.MimeType}'")));
+                return Json(new { files = results.Select(item => item.Fields) });
             }
             if (request.Method == HttpMethod.Get) return Items.TryGetValue(endpoint, out var remote)
                 ? Json(remote.Fields) : new(HttpStatusCode.NotFound);
@@ -381,6 +465,57 @@ internal static class OperatorDriveChecks
                 return new(HttpStatusCode.ServiceUnavailable);
             }
             return Json(created.Fields);
+        }
+
+        private async Task<HttpResponseMessage> NotesRequestAsync(HttpRequestMessage request, string endpoint, CancellationToken token)
+        {
+            if (!NotesApiEnabled) return new(HttpStatusCode.Forbidden)
+            {
+                Content = JsonContent.Create(new { error = new { reason = "SERVICE_DISABLED" } })
+            };
+            string id = endpoint.Split(':')[0];
+            var item = Items[id];
+            Require(item.MimeType == Doc, "The Docs API should only edit the linked notes document.");
+            if (request.Method == HttpMethod.Get)
+                return Json(new
+                {
+                    documentId = id, revisionId = item.Revision.ToString(),
+                    body = new
+                    {
+                        content = new[]
+                        {
+                            new { paragraph = new { elements = new[] { new { textRun = new { content = item.Notes + "\n" } } } } }
+                        }
+                    }
+                });
+
+            using var content = JsonDocument.Parse(await request.Content!.ReadAsByteArrayAsync(token));
+            var body = content.RootElement;
+            Require(body.GetProperty("writeControl").GetProperty("requiredRevisionId").GetString() == item.Revision.ToString(),
+                "Assume the revision is current only if Google checks it.");
+            string edited = item.Notes;
+            foreach (var edit in body.GetProperty("requests").EnumerateArray())
+            {
+                if (edit.TryGetProperty("deleteContentRange", out var deletion))
+                {
+                    var range = deletion.GetProperty("range");
+                    int start = range.GetProperty("startIndex").GetInt32(), end = range.GetProperty("endIndex").GetInt32();
+                    edited = edited.Remove(start - 1, end - start);
+                }
+                else
+                {
+                    var insertion = edit.GetProperty("insertText");
+                    edited = edited.Insert(insertion.GetProperty("location").GetProperty("index").GetInt32() - 1,
+                        insertion.GetProperty("text").GetString()!);
+                }
+            }
+            EditNotes(id, edited);
+            if (LoseNextNotesReply)
+            {
+                LoseNextNotesReply = false;
+                return new(HttpStatusCode.ServiceUnavailable);
+            }
+            return Json(new { documentId = id });
         }
 
         private HttpResponseMessage StartUpload(Item item)

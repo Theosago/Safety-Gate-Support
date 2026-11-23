@@ -26,11 +26,11 @@ internal static class OperatorDriveRunner
     internal static bool IsSupported(DataService data) => !data.IsHomePreview && !data.IsOnboardingDemo;
 
     internal static async Task<string> RunAsync(DataService data, bool publishNow = false, string? requestedRoot = null,
-        IProgress<OperatorPublishProgress>? progress = null, CancellationToken token = default)
+        IProgress<OperatorPublishProgress>? progress = null, CancellationToken token = default, bool? syncSharedNotes = null)
     {
         if (!IsSupported(data)) return "";
         string root = Path.GetFullPath(data.SharedRoot);
-        if (!publishNow)
+        if (!publishNow && !syncSharedNotes.HasValue)
         {
             if (!CanPublish || !File.Exists(OperatorPublishingState.StatePath(root)) &&
                 !File.Exists(OperatorPublishingState.LegacyPath)) return "";
@@ -67,9 +67,28 @@ internal static class OperatorDriveRunner
                     state.PublishAll = true;
                     state.Save(root);
                 }
-                if (!state.PublishAll && !state.Units.Values.Any(unit => !unit.Paused)) return "";
+                if (syncSharedNotes.HasValue)
+                {
+                    state.SyncSharedNotes = syncSharedNotes.Value;
+                    state.NotesError = null;
+                    state.Save(root);
+                }
+                if (!CanPublish || !state.PublishAll && !state.Units.Values.Any(unit => !unit.Paused)) return "";
                 var publisher = new OperatorDrivePublisher(drive, LoadPhotoAsync);
-                return (await publisher.RunAsync(data, root, state, publishNow, progress, token)).Message;
+                var summary = await publisher.RunAsync(data, root, state, publishNow, progress, token);
+                if (state.SyncSharedNotes)
+                {
+                    using var notesTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    notesTimeout.CancelAfter(TimeSpan.FromSeconds(45));
+                    var notes = new OperatorNotesSynchronizer(drive, new(Http, AccessTokenAsync));
+                    try { await notes.RunAsync(data, root, state, notesTimeout.Token); }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                    {
+                        state.NotesError = "Notes sync timed out. It will continue on the next check.";
+                        state.Save(root);
+                    }
+                }
+                return summary.Message;
             }, token);
         }
         catch (OperationCanceledException) { Status = "Publishing stopped. Pending units will be retried automatically."; }

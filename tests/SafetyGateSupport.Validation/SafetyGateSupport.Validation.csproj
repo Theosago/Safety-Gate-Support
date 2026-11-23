@@ -27,6 +27,8 @@
     <Compile Include="../../SafetyGateSupport/Services/StockroomBrowserReader.cs" Link="Services/StockroomBrowserReader.cs" />
     <Compile Include="../../SafetyGateSupport/Services/MobileSupportExporter.cs" Link="Services/MobileSupportExporter.cs"/>
     <Compile Include="../../SafetyGateSupport/Services/OperatorDriveClient.cs" Link="Services/OperatorDriveClient.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/OperatorNotesClient.cs" Link="Services/OperatorNotesClient.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/OperatorNotesSynchronizer.cs" Link="Services/OperatorNotesSynchronizer.cs" />
     <Compile Include="../../SafetyGateSupport/Services/OperatorPublishingState.cs" Link="Services/OperatorPublishingState.cs" />
     <Compile Include="../../SafetyGateSupport/Services/OperatorPublicationSources.cs" Link="Services/OperatorPublicationSources.cs" />
     <Compile Include="../../SafetyGateSupport/Services/OperatorPublishingPdf.cs" Link="Services/OperatorPublishingPdf.cs" />

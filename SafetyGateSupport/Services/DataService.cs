@@ -492,6 +492,29 @@ public partial class DataService
         finally { if (File.Exists(temp)) File.Delete(temp); }
     }
 
+    internal bool TryUpdateSystemNotes(SafetySystem unit, string expected, string replacement, bool preservePrevious = false)
+    {
+        using var lease = AcquireAssetWriteLock();
+        string current = LoadSystemNotes(unit);
+        if (!string.Equals(current, expected, StringComparison.Ordinal)) return false;
+        if (current == replacement) return true;
+        if (preservePrevious && current.Length > 0) SaveNotesRecoveryCopy(unit, current, draft: false);
+        SaveSystemNotes(unit, replacement);
+        return true;
+    }
+
+    internal void SaveNotesRecoveryCopy(SafetySystem unit, string text, bool draft)
+    {
+        using var lease = AcquireAssetWriteLock();
+        var gate = GateFor(unit);
+        if (gate is not null) EnsureUnitFolders(gate, unit);
+        string folder = Path.Combine(Path.GetDirectoryName(SystemNotesPath(unit))!, "Archive");
+        Directory.CreateDirectory(folder);
+        string kind = draft ? "Shared notes draft" : "Shared notes previous";
+        string name = $"{kind} {DateTime.Now:yyyy-MM-dd HHmmssfff}-{Guid.NewGuid().ToString("N")[..6]}.txt";
+        File.WriteAllText(Path.Combine(folder, name), text);
+    }
+
     public void SetIdentificationPhoto(SafetySystem s, string sourceFile)
     {
         var gate = GateFor(s) ?? throw new InvalidOperationException("Gate record could not be found.");

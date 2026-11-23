@@ -45,15 +45,35 @@ published main drawing is already linked. Additional assigned drawing PDFs
 follow it. Use **Add a PDF to a unit guide** in the publishing window to attach
 an optional document, such as an exported signal column configuration. Attach
 the same filename again to replace that attachment. Supplemental PDFs appear
-as separate sections in the guide. DWG files and desktop shared notes stay in
-the engineering library.
+as separate sections in the guide. DWG files stay in the engineering library.
+
+## Sync shared notes with phones
+
+1. In the Google Cloud project you used for Drive sign-in, enable the
+   [Google Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com).
+   The app uses the existing publishing account and OAuth setup.
+2. On the publishing PC, open **Publish & print QR** and check
+   **Sync shared notes with phones**. This copies existing shared notes into
+   the published unit folders under their current Drive sharing settings.
+   The first sync keeps notes already entered in either place.
+3. Scan an existing unit QR and open **Operator notes**. Operators need
+   **Editor** access to save changes. To grant access across the published
+   units, set it on the publishing parent folder once. Google's mobile editor
+   may request sign-in or the Google Docs app.
+
+Plain-text edits in the desktop app and in the document's first tab sync both
+ways while a signed-in publisher can reach the shared library. If both places
+are edited at once, the app combines new lines. If both versions rewrite the
+same notes, the app keeps both and shows a publishing issue until the text
+matches. The previous desktop text is saved in the unit's notes Archive when
+an incoming edit changes it.
 
 ## Existing links and recovery
 
 Published unit folders and existing PDFs are addressed by their Drive IDs.
 Changing a drawing's filename or publishing another revision keeps the printed
-folder QR and any direct links to the primary PDF working. The app leaves
-the Operator notes document and its sharing permissions in Drive.
+folder QR and any direct links to the primary PDF working. Notes sync uses
+the existing Operator notes document and follows its sharing permissions.
 
 If Drive is unavailable, the drawing pair stays saved in the library. The
 publishing window shows individual issues, and the app retries. If someone
@@ -78,5 +98,5 @@ with access to their existing folder through `GOOGLE_APPLICATION_CREDENTIALS`.
 
 The publisher requests Drive access to create unit folders and update existing
 files by ID. The workstation needs access to Google sign-in,
-`oauth2.googleapis.com` and `www.googleapis.com`. Google Drive determines
-browser access and notes editing from the folder and document sharing settings.
+`oauth2.googleapis.com` and `www.googleapis.com`. Notes sync also uses
+`docs.googleapis.com`.

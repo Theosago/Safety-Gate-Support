@@ -14,6 +14,7 @@ public partial class SharedNotesWindow : Window
     private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private bool _loading;
     private bool _dirty;
+    private string _baseline = "";
     private DateTime _lastWriteUtc = DateTime.MinValue;
 
     public SharedNotesWindow(DataService data, SafetySystem system)
@@ -34,7 +35,7 @@ public partial class SharedNotesWindow : Window
         _loading = true;
         try
         {
-            NotesBox.Text = _data.LoadSystemNotes(_system);
+            NotesBox.Text = _baseline = _data.LoadSystemNotes(_system);
             _lastWriteUtc = _data.GetSystemNotesLastWriteUtc(_system);
             StatusText.Text = "Saved to shared Q: data";
             _dirty = false;
@@ -63,7 +64,15 @@ public partial class SharedNotesWindow : Window
         if (!_dirty || _loading) return;
         try
         {
-            _data.SaveSystemNotes(_system, NotesBox.Text);
+            string draft = NotesBox.Text;
+            if (!_data.TryUpdateSystemNotes(_system, _baseline, draft))
+            {
+                _data.SaveNotesRecoveryCopy(_system, draft, draft: true);
+                LoadNotes();
+                StatusText.Text = "Another edit arrived. Your draft is saved in the notes Archive folder.";
+                return;
+            }
+            _baseline = draft;
             _lastWriteUtc = _data.GetSystemNotesLastWriteUtc(_system);
             _dirty = false;
             StatusText.Text = "Saved to shared Q: data";
@@ -73,13 +82,15 @@ public partial class SharedNotesWindow : Window
 
     private void RefreshTimer_Tick(object? sender, EventArgs e)
     {
-        if (_dirty || _loading || NotesBox.IsKeyboardFocusWithin) return;
+        if (_dirty || _loading) return;
         try
         {
             var latest = _data.GetSystemNotesLastWriteUtc(_system);
             if (latest <= _lastWriteUtc) return;
             _loading = true;
-            NotesBox.Text = _data.LoadSystemNotes(_system);
+            int caret = NotesBox.CaretIndex;
+            NotesBox.Text = _baseline = _data.LoadSystemNotes(_system);
+            NotesBox.CaretIndex = Math.Min(caret, NotesBox.Text.Length);
             _lastWriteUtc = latest;
             StatusText.Text = "Updated from another user";
         }

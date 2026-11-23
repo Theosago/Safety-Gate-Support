@@ -11,6 +11,7 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
 {
     private const int MultipartLimit = 5 * 1024 * 1024;
     internal const string FolderMime = "application/vnd.google-apps.folder";
+    internal const string DocMime = "application/vnd.google-apps.document";
     private const string Api = "https://www.googleapis.com/drive/v3/";
     private const string Upload = "https://www.googleapis.com/upload/drive/v3/";
     private const string Fields = "id,parents,driveId,mimeType,trashed,md5Checksum,version,webViewLink,resourceKey";
@@ -59,28 +60,44 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
 
     internal async Task<Item?> FindAsync(Item parent, string name, CancellationToken token)
     {
-        string q = $"'{QueryLiteral(parent.Id)}' in parents and name = '{QueryLiteral(name)}' and trashed = false";
-        string corpus = parent.DriveId is null
+        string query = $"'{QueryLiteral(parent.Id)}' in parents and name = '{QueryLiteral(name)}' and trashed = false";
+        var matches = await ListAsync(parent.DriveId, query, token);
+        if (matches.Count > 1) throw new InvalidOperationException($"Multiple Drive items named {name}. Resolve the duplicate names to resume.");
+        return matches.Count == 0 ? null : await GetAsync(matches[0].Id, token);
+    }
+
+    internal async Task<IReadOnlyDictionary<string, Item>> ListNotesAsync(Item root, IEnumerable<string> folders,
+        CancellationToken token)
+    {
+        var notes = new Dictionary<string, Item>(StringComparer.Ordinal);
+        foreach (var batch in folders.Distinct(StringComparer.Ordinal).Chunk(20))
+        {
+            var parents = string.Join(" or ", batch.Select(id => $"'{QueryLiteral(id)}' in parents"));
+            string query = $"trashed = false and mimeType = '{DocMime}' and ({parents})";
+            foreach (var item in await ListAsync(root.DriveId, query, token)) notes[item.Id] = item;
+        }
+        return notes;
+    }
+
+    private async Task<List<Item>> ListAsync(string? driveId, string query, CancellationToken token)
+    {
+        string corpus = driveId is null
             ? "corpora=user"
-            : "corpora=drive&includeItemsFromAllDrives=true&driveId=" + Uri.EscapeDataString(parent.DriveId);
+            : "corpora=drive&includeItemsFromAllDrives=true&driveId=" + Uri.EscapeDataString(driveId);
         string url = Api + "files?" + corpus + "&supportsAllDrives=true&pageSize=100"
-            + "&q=" + Uri.EscapeDataString(q)
+            + "&q=" + Uri.EscapeDataString(query)
             + "&fields=nextPageToken,incompleteSearch,files(" + Fields + ")";
-        Item? item = null;
+        var files = new List<Item>();
         string? page = null;
         do
         {
             var results = await ReadAsync<FileList>(HttpMethod.Get,
                 url + (page is null ? "" : "&pageToken=" + Uri.EscapeDataString(page)), null, token);
             if (results.IncompleteSearch) throw new IOException("Drive search was incomplete. Sync will retry.");
-            foreach (var match in results.Files)
-            {
-                if (item is not null) throw new InvalidOperationException($"Multiple Drive items named {name}. Resolve the duplicate names to resume.");
-                item = match;
-            }
+            files.AddRange(results.Files);
             page = results.NextPageToken;
         } while (!string.IsNullOrEmpty(page));
-        return item is null ? null : await GetAsync(item.Id, token);
+        return files;
     }
 
     internal async Task<string> GenerateIdAsync(CancellationToken token) =>
@@ -123,7 +140,7 @@ internal sealed class OperatorDriveClient(HttpClient http, Func<CancellationToke
     internal async Task<Item> NotesAsync(Item unit, string? id, CancellationToken token)
     {
         const string name = "Operator notes";
-        const string mimeType = "application/vnd.google-apps.document";
+        const string mimeType = DocMime;
         var notes = id is null ? await FindAsync(unit, name, token) : await GetAsync(id, token);
         notes ??= await ReadAsync<Item>(HttpMethod.Post, Api + "files" + FileQuery,
             JsonContent.Create(new { name, mimeType, parents = new[] { unit.Id } }), token);
