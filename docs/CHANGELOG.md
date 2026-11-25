@@ -4,7 +4,7 @@ Release history for Safety Gate Support, newest first. This file consolidates th
 
 ## 8.8.2 — App icon
 
-- Safety Gate Support has its own icon (a light-curtain gate with a red, amber and green signal column) on `SafetyGateSupport.exe`, the taskbar, the title bar and Alt+Tab, replacing the generic Windows icon. The Siemens USB check tool uses the same icon. `tools/branding/make_icon.py` regenerates it.
+- Safety Gate Support has its own icon (a boom barrier with a striped arm, in Gränges red and white) on `SafetyGateSupport.exe`, the taskbar, the title bar and Alt+Tab, replacing the generic Windows icon. The Siemens USB check tool uses the same icon. `tools/branding/make_icon.py` regenerates it.
 
 ## 8.8.1 — Signal column names and true colours
 
