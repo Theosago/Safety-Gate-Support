@@ -117,6 +117,8 @@ public partial class MainWindow
                 units = picker.UnitIds;
             }
             await Task.Run(() => _data.SaveSignalPair(gate, unit, signals[0], pdfs[0], replacing, units));
+            // The light column chart and sheet are part of each covered unit's QR guide.
+            _ = OperatorDriveRunner.AfterDrawingSavedAsync(_data, units ?? new[] { unit.Id });
             if (!_isClosed && SelectedUnit?.Id == unit.Id && ReferenceEquals(_inlineWindow, column)) ShowInlineResource(DataService.SignalCategory);
         }
         catch (Exception error) { MessageBox.Show(this, "The configuration was not saved: " + error.Message, "Upload configuration pair", MessageBoxButton.OK, MessageBoxImage.Warning); }

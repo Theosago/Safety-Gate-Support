@@ -10,7 +10,8 @@ internal sealed record OperatorPublicationUnit(SafetyGate Gate, SafetySystem Uni
     internal string Label => $"{AssetFolder} / {UnitFolder}";
 }
 
-internal sealed record OperatorGuideSection(string Title, string Path, string? PairId = null, string? ReplacedPath = null, string? PairHash = null);
+/// <param name="LightChart">Path is a .signal configuration; the section is the chart drawn from it.</param>
+internal sealed record OperatorGuideSection(string Title, string Path, string? PairId = null, string? ReplacedPath = null, string? PairHash = null, bool LightChart = false);
 
 internal sealed record OperatorPublicationSources(OperatorGuideSection? Primary, IReadOnlyList<OperatorGuideSection> Sections,
     string? PhotoPath, string Fingerprint, bool PrimaryReassigned)
@@ -75,8 +76,9 @@ internal sealed record OperatorPublicationSources(OperatorGuideSection? Primary,
             if (File.Exists(photoSource)) photo = RequireSharedFile(data.SharedRoot, photoSource);
         }
         var attachments = OperatorPublishingState.GuidePdfsFor(data.SharedRoot, item.Gate.Id, item.Unit.Id)
-            .Select(pdf => new OperatorGuideSection(Path.GetFileNameWithoutExtension(pdf.Path), pdf.Path));
-        var sections = drawings.Where(f => f != primary).Concat(attachments).ToList();
+            .Select(pdf => new OperatorGuideSection(Path.GetFileNameWithoutExtension(pdf.Path), pdf.Path)).ToList();
+        var light = LightColumnSections(data, item, resources, attachments, token);
+        var sections = drawings.Where(f => f != primary).Concat(light).Concat(attachments).ToList();
         if (primary is not null) sections.Insert(0, primary);
         var fingerprint = JsonSerializer.SerializeToUtf8Bytes(new
         {
@@ -89,9 +91,38 @@ internal sealed record OperatorPublicationSources(OperatorGuideSection? Primary,
             item.Gate.EquipmentType,
             item.Unit.DisplayName,
             Photos = photo is null ? null : Stamp(photo),
-            Pages = sections.Select(f => new { f.Title, f.PairId, f.PairHash, Source = Stamp(f.Path) })
+            Pages = sections.Select(f => new { f.Title, f.PairId, f.PairHash, f.LightChart, Source = Stamp(f.Path) })
         });
         return new(primary, sections, photo, Convert.ToHexString(SHA256.HashData(fingerprint)), reassigned);
+    }
+
+    // Each signal column configuration covering the unit: a chart drawn from the .signal file and,
+    // when it was uploaded with one, the PDF sheet saved beside it. A sheet already attached to the
+    // unit guide by hand is not added twice.
+    private static List<OperatorGuideSection> LightColumnSections(DataService data, OperatorPublicationUnit item,
+        IReadOnlyList<ResourceDefinition> resources, IReadOnlyList<OperatorGuideSection> attachments, CancellationToken token)
+    {
+        var signals = new List<string>();
+        foreach (var resource in data.ResourcesFor(item.Gate, item.Unit, resources).Where(r => AssetFileLayout.Category(r) == DataService.SignalCategory))
+        {
+            token.ThrowIfCancellationRequested();
+            if (!Directory.Exists(data.ResourceCurrentFolder(resource, item.Gate))) continue;
+            signals.AddRange(data.GetResourceFiles(resource, item.Gate).Where(p => Path.GetExtension(p).Equals(".signal", StringComparison.OrdinalIgnoreCase)));
+        }
+        signals = signals.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList();
+        var attached = new Lazy<HashSet<string>>(() => attachments.Select(a => Hash(a.Path)).ToHashSet(StringComparer.Ordinal));
+        var result = new List<OperatorGuideSection>();
+        foreach (string signal in signals)
+        {
+            string name = Path.GetFileNameWithoutExtension(signal);
+            string suffix = signals.Count == 1 ? "" : " - " + name;
+            result.Add(new("Light column" + suffix, RequireSharedFile(data.SharedRoot, signal), LightChart: true));
+            string sheet = Path.ChangeExtension(signal, ".pdf");
+            if (File.Exists(sheet) && !attached.Value.Contains(Hash(sheet)))
+                result.Add(new("Light column configuration sheet" + suffix, RequireSharedFile(data.SharedRoot, sheet)));
+        }
+        return result;
+        static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
     }
 
     // A recorded assignment to other units is different from an unavailable file. Follow the new

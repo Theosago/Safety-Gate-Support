@@ -25,9 +25,80 @@ internal static class OperatorDriveChecks
         ("Removing a guide PDF affects one unit, archives the last copy and rebuilds the Drive guide in place", () => RemoveGuidePdfAsync().GetAwaiter().GetResult()),
         ("Spare parts follow unit assignments and keep each item's last confirmed scan in the original Drive PDF", () => SparePartsAsync().GetAwaiter().GetResult()),
         ("Operator notes sync to and from the phone document while preserving previous edits", SharedNotesSyncAsyncTest),
+        ("Light column configurations add a drawn chart and their PDF sheet to covered units' QR guides only", () => LightColumnAsync().GetAwaiter().GetResult()),
         ("Batch QR sheets contain every stable unit URL across multiple print pages", CheckQrLabels),
         ("Larger electrical PDFs open a resumable upload and preserve their file ID on update", () => ResumablePdfAsync().GetAwaiter().GetResult())
     ];
+
+    private static async Task LightColumnAsync()
+    {
+        using var library = new Fixture();
+        using var drive = new FakeDrive();
+        using var http = new HttpClient(drive);
+        var publisher = new OperatorDrivePublisher(new(http, _ => Task.FromResult("fixture")), (_, _) => Task.FromResult<UnitGuidePhoto?>(null));
+        var state = new OperatorPublishingState { PublishAll = true };
+        var first = library.Units[0];
+        var second = library.Units[1];
+        string signal = Path.Combine(library.DirectoryPath, "Column A.signal");
+        File.WriteAllBytes(signal, SignalFixture());
+        string sheet = Path.Combine(library.DirectoryPath, "column sheet.pdf");
+        File.WriteAllBytes(sheet, DrawingPdfFixture.TextPage(90));
+        var saved = library.Data.SaveSignalPair(library.Gate, first, signal, sheet);
+
+        var run = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        Require(run.Issues == 0, "Light column publishing failed: " + string.Join("; ", state.Units.Values.Select(u => u.Error).OfType<string>()));
+        string guideId = state.Units[first.Id].Guide!.Id;
+        using (var guide = PdfDocument.Open(drive.Items[guideId].Bytes!))
+        {
+            string chart = guide.GetPage(2).Text;
+            Require(guide.NumberOfPages == 3 && guide.GetPage(1).Text.Contains("Light column") &&
+                guide.GetPage(1).Text.Contains("Light column configuration sheet"), "The guide should list the light column chart and its sheet.");
+            Require(chart.Contains("What the light means") && chart.Contains("Input 1 (white)") && chart.Contains("Gate open") &&
+                chart.Contains("blink") && chart.Contains("sound"), "The chart should name the inputs, wires, states, blinking and sound.");
+            Require(guide.GetPage(2).Letters.Count > 0 && guide.GetPage(3).Text.Length > 0, "The configuration sheet should follow the chart.");
+        }
+        using (var other = PdfDocument.Open(drive.Items[state.Units[second.Id].Guide!.Id].Bytes!))
+            Require(!other.GetPage(1).Text.Contains("Light column"), "A unit without the configuration should not show it.");
+
+        // A copy of the sheet already attached to the guide by hand is not added twice; the guide keeps its file ID.
+        OperatorPublishingState.SaveGuidePdf(library.Data, library.Root, library.Gate.Id, [first.Id], saved.Pdf, null);
+        var again = await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        using (var guide = PdfDocument.Open(drive.Items[guideId].Bytes!))
+            Require(again.Issues == 0 && state.Units[first.Id].Guide!.Id == guideId && guide.NumberOfPages == 3 &&
+                !guide.GetPage(1).Text.Contains("Light column configuration sheet"), "A hand-attached sheet should replace the automatic copy, not duplicate it.");
+    }
+
+    // A minimal schema-5, nine-segment configuration as the Siemens configurator writes it.
+    internal static byte[] SignalFixture()
+    {
+        using var bytes = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(bytes, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            void Write(string name, object value)
+            {
+                using var stream = zip.CreateEntry(name).Open();
+                JsonSerializer.Serialize(stream, value);
+            }
+            Write("configurator.conf", new Dictionary<string, object>
+            {
+                ["version"] = 5, ["device"] = new { Variant = 21, SegmentCount = 9, HasSound = true }, ["mode"] = 4,
+                ["stages"] = Array.Empty<object>(),
+                ["states"] = new object[] { new Dictionary<string, object> { ["<Name>k__BackingField"] = "Gate open", ["<PinCombination>k__BackingField"] = new { state = new[] { true, false, false, false, false, false } } } },
+                ["<Pins>k__BackingField"] = new object[] { new Dictionary<string, object> { ["<Number>k__BackingField"] = 1, ["<Name>k__BackingField"] = "Input 1", ["<Color>k__BackingField"] = "WH", ["<Description>k__BackingField"] = "" } }
+            });
+            for (int state = 0; state < 64; state++)
+                Write($"state_config_{state}.json", new
+                {
+                    Segments = Enumerable.Range(0, 9).Select(segment => new
+                    {
+                        r = state == 2 ? 134 : 0, g = state is 1 or 2 ? (state == 1 ? 255 : 120) : 0, b = 0,
+                        brightness = state is 1 or 2 && segment < 3 ? 255 : 0, lightEffect = state == 2 ? 50 : 10
+                    }).ToArray(),
+                    Sound = new { mode = state == 4 ? 2 : 0, volume = state == 4 ? 15 : 0, frequency01 = 0, frequency02 = 0, frequency03 = 0, repeatCount = 0, repeatPause = 0, cyclePause = 0, holdTime = 0 }
+                });
+        }
+        return bytes.ToArray();
+    }
 
     private static async Task PublishLibraryAsync()
     {

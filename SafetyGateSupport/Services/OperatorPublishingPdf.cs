@@ -165,6 +165,121 @@ internal static class OperatorPublishingPdf
         return document.Build();
     }
 
+    /// <summary>
+    /// A phone-readable chart of a signal column configuration: each input combination drawn as the
+    /// column (segment 1 at the base), with the input wires, state names, blinking and sound.
+    /// </summary>
+    internal static byte[] LightColumn(string unitLabel, string configurationName, byte[] signal)
+    {
+        using var document = new PdfDocumentBuilder();
+        document.DocumentInformation.Title = unitLabel + " - Light column";
+        var normal = document.AddTrueTypeFont(RegularFont.Value);
+        var bold = document.AddTrueTypeFont(BoldFont.Value);
+        PdfPageBuilder Header()
+        {
+            var page = document.AddPage(Width, Height);
+            Fill(page, 0, 644, Width, 148, Ink);
+            Text(page, "LIGHT COLUMN", 36, 715, 15, bold, (182, 221, 222), 536);
+            Text(page, unitLabel, 36, 666, 32, bold, White, 536);
+            Text(page, "What the light means", 36, 611, 20, bold, Ink, 536);
+            Text(page, "Configuration " + configurationName, 36, 591, 10, normal, Muted, 536);
+            return page;
+        }
+
+        Siemens.PreparedSignalUpload selected;
+        Siemens.SignalLabels labels;
+        try { selected = Siemens.PreparedSignalUpload.FromBytes(signal, configurationName); labels = Siemens.SignalLabels.Read(selected); }
+        catch (Exception error) when (error is InvalidDataException or NotSupportedException)
+        {
+            var notice = Header();
+            Text(notice, "This configuration cannot be drawn here. Use the configuration sheet.", 36, 556, 13, normal, Ink, 536);
+            return document.Build();
+        }
+
+        var page = Header();
+        // Input wires
+        Text(page, "INPUTS", 36, 560, 9, bold, Accent, 200);
+        double y = 542;
+        foreach (var input in labels.Inputs)
+        {
+            double x = 36 + (input.Number - 1) % 2 * 270;
+            if (input.Number > 1 && input.Number % 2 == 1) y -= 18;
+            if (input.WireColor is { } wire) { Fill(page, x, y - 1, 10, 10, Darken(wire)); Fill(page, x + 1, y, 8, 8, wire); }
+            Text(page, input.Label + (input.Description.Length > 0 ? " - " + input.Description : ""), x + 16, y, 10.5, normal, Ink, 250);
+        }
+
+        // One drawn column per configured input combination, six to a row.
+        const double cardW = 90, cardH = 172, segH = 9, colW = 22;
+        double rowTop = y - 26;
+        int index = 0;
+        foreach (int state in selected.Archive.ActiveStates.Distinct().Order())
+        {
+            Siemens.SignalStatePreview.Appearance look;
+            try { look = Siemens.SignalStatePreview.ReadAppearance(selected, state); } catch (Exception error) when (error is InvalidDataException or InvalidOperationException) { continue; }
+            int column = index % 6;
+            if (column == 0 && index > 0) rowTop -= cardH;
+            if (column == 0 && rowTop - cardH < 78) { LightFooter(page, normal); page = Header(); rowTop = 570; }
+            double cx = 36 + column * cardW, cy = rowTop;
+            Fill(page, cx + 2, cy - cardH + 8, cardW - 4, cardH - 8, Pale);
+
+            // the column: cap, segments, base (upside-down mounting puts the base on top)
+            int count = look.Segments.Count;
+            bool sound = look.SoundMode != 0 && look.SoundVolume != 0;
+            double bodyX = cx + (cardW - colW) / 2, baseY = cy - 14 - 10 - count * segH - 10;
+            double stackTop = baseY + 10 + count * segH;
+            if (labels.UpsideDown)
+            {
+                Fill(page, bodyX - 2, stackTop, colW + 4, 10, (31, 36, 41));
+                for (int s = 0; s < count; s++) Lens(page, look.Segments[s], bodyX, stackTop - (s + 1) * segH, colW, segH);
+                Fill(page, bodyX, baseY + 10 - (sound ? 10 : 5), colW, sound ? 10 : 5, (52, 58, 64));
+            }
+            else
+            {
+                Fill(page, bodyX - 2, baseY, colW + 4, 10, (31, 36, 41));
+                for (int s = 0; s < count; s++) Lens(page, look.Segments[s], bodyX, baseY + 10 + s * segH, colW, segH);
+                Fill(page, bodyX, stackTop, colW, sound ? 10 : 5, (52, 58, 64));
+                if (sound) for (int k = 0; k < 3; k++) Fill(page, bodyX + 5, stackTop + 2 + k * 3, colW - 10, 1, (150, 158, 166));
+            }
+
+            var on = labels.Inputs.Where(i => (state & (1 << (i.Number - 1))) != 0).ToArray();
+            Text(page, on.Length == 0 ? "No inputs" : "Input " + string.Join(" + ", on.Select(i => i.Number)), cx + 8, baseY - 13, 10, bold, Ink, cardW - 14);
+            double line = baseY - 25;
+            if (on.Any(i => i.WireColor is not null))
+                Text(page, string.Join(", ", on.Select(i => i.WireName)), cx + 8, line, 8.5, normal, Muted, cardW - 14);
+            line -= 11;
+            if (labels.NameFor(state) is { } name) { Text(page, name, cx + 8, line, 8.5, normal, Ink, cardW - 14); line -= 11; }
+            string effects = string.Join(", ", look.Segments.Where(s => !s.IsOff && s.Effect != 10).Select(s => s.EffectName.ToLowerInvariant()).Distinct());
+            if (sound) effects = effects.Length == 0 ? "sound" : effects + ", sound";
+            if (effects.Length > 0) Text(page, effects, cx + 8, line, 8.5, normal, Accent, cardW - 14);
+            index++;
+        }
+        if (index == 0) Text(page, "No input combination lights the column or sounds.", 36, rowTop - 20, 12, normal, Ink, 536);
+        LightFooter(page, normal);
+        return document.Build();
+    }
+
+    private static void LightFooter(PdfPageBuilder page, PdfDocumentBuilder.AddedFont font)
+    {
+        Fill(page, 36, 69, 540, 1, Line);
+        Text(page, "Drawn from the saved configuration. Segment 1 is next to the base.", 36, 45, 9.5, font, Muted, 430);
+        Text(page, "Light column", 490, 45, 10, font, Muted, 86);
+    }
+
+    private static void Lens(PdfPageBuilder page, Siemens.SignalStatePreview.Segment segment, double x, double y, double w, double h)
+    {
+        (byte, byte, byte) color;
+        if (segment.IsOff) color = (214, 220, 226);
+        else
+        {
+            var (r, g, b) = segment.DisplayColor; double o = segment.DisplayOpacity;
+            color = ((byte)(255 - (255 - r) * o), (byte)(255 - (255 - g) * o), (byte)(255 - (255 - b) * o));
+        }
+        Fill(page, x, y, w, h, Darken(color));
+        Fill(page, x + 1, y + 1, w - 2, h - 1.5, color);
+    }
+
+    private static (byte, byte, byte) Darken((byte R, byte G, byte B) c) => ((byte)(c.R * 0.7), (byte)(c.G * 0.7), (byte)(c.B * 0.7));
+
     private static ExplicitDestination Destination(int page) =>
         new(page, ExplicitDestinationType.FitPage, ExplicitDestinationCoordinates.Empty);
 

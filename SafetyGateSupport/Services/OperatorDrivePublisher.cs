@@ -164,7 +164,7 @@ internal sealed class OperatorDrivePublisher(
                         continue;
                     }
                     if (sources.Primary is not null) electrical = OperatorPublicationSources.ReadPdf(sources.Primary.Path);
-                    guideSources = ReadGuideSources(sources, electrical, token);
+                    guideSources = ReadGuideSources(sources, electrical, item.Label, token);
                 }
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException) { sourceProblem = error; }
 
@@ -351,14 +351,16 @@ internal sealed class OperatorDrivePublisher(
     }
 
     private static IReadOnlyList<GuidePdfSource> ReadGuideSources(OperatorPublicationSources sources,
-        byte[]? electrical, CancellationToken token)
+        byte[]? electrical, string unitLabel, CancellationToken token)
     {
         var result = new List<GuidePdfSource>(sources.Sections.Count);
         long total = 0;
         foreach (var section in sources.Sections)
         {
             token.ThrowIfCancellationRequested();
-            var bytes = result.Count == 0 && electrical is not null ? electrical : OperatorPublicationSources.ReadPdf(section.Path);
+            var bytes = result.Count == 0 && electrical is not null ? electrical
+                : section.LightChart ? OperatorPublishingPdf.LightColumn(unitLabel, Path.GetFileName(section.Path), File.ReadAllBytes(section.Path))
+                : OperatorPublicationSources.ReadPdf(section.Path);
             total += bytes.Length;
             if (total > OperatorPublicationSources.MaximumPdfBytes)
                 throw new IOException("The guide sources exceed 80 MiB. Reduce the size of the additional PDFs.");
