@@ -22,6 +22,7 @@
     <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <EmbeddedResource Include="Branding/Fonts/*.ttf" LogicalName="Publishing.%(Filename)%(Extension)" />
     <EmbeddedResource Include="SeedData.zip" />
+    <Resource Include="Branding/SafetyGateSupport-512.png" />
     <EmbeddedResource Include="DemoAssets/*" />
     <EmbeddedResource Include="Catalog/Safe2CrossParts.json" />
     <Content Include="../docs/third-party/**/*" Link="ThirdPartyNotices/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />

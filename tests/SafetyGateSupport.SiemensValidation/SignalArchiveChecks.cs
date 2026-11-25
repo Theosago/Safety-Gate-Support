@@ -16,7 +16,7 @@ internal static class SignalArchiveChecks
         ("signal: preview maps the six input bits without altering configuration", StatePreview),
         ("signal: visual appearance uses stored colors, effects and sound without edits", VisualAppearance),
         ("signal: configurator pin names, wire colours and state names are read", Labels),
-        ("signal: display colours match the configurator simulator", DisplayColours),
+        ("signal: display colours scale power-limited mixes back to full, amber as amber", DisplayColours),
         ("signal: all four known hardware variants", KnownHardware),
         ("signal: deflated ZIP is supported", DeflatedArchive),
         ("signal: unknown editor metadata is ignored", UnknownEditorMetadata),
@@ -108,6 +108,8 @@ internal static class SignalArchiveChecks
         Check(labels.Inputs.Count == 6 && labels.Inputs[0].Label == "Input 1 (white)" && labels.Inputs[1].Label == "2 Open (brown)" && labels.Inputs[1].Description == "Gate open", "Pin names or wire colours were not read.");
         Check(labels.Inputs[2].Label == "Input 3" && labels.Inputs[0].WireColor is not null, "Unlisted inputs did not fall back to their numbers.");
         Check(labels.NameFor(7) == "Fault" && labels.NameFor(50) is null && labels.NameFor(1) is null, "State names were not mapped to their input combination.");
+        Check(!labels.UpsideDown, "A standard mounting was read as upside down.");
+        Check(SignalLabels.Read(PreparedSignalUpload.FromBytes(Archive(files => Change(files, "configurator.conf", root => root["<IsUpsideDown>k__BackingField"] = true)), "flip.signal")).UpsideDown, "Upside-down mounting was not read.");
         Check(selected.GetBytes().SequenceEqual(bytes), "Reading labels changed the upload bytes.");
         var plain = SignalLabels.Read(PreparedSignalUpload.FromBytes(Archive(), "plain.signal"));
         Check(plain.Inputs.Select(i => i.Label).SequenceEqual(Enumerable.Range(1, 6).Select(n => $"Input {n}")) && plain.StateNames.Count == 0, "A file without names did not fall back to input numbers.");
@@ -117,7 +119,8 @@ internal static class SignalArchiveChecks
     {
         // Amber authored as 255, 227, 0 is stored power-limited as 134, 120, 0.
         var amber = new SignalStatePreview.Segment(1, 134, 120, 0, 255, 10);
-        Check(amber.DisplayColor == (255, 228, 0) && Math.Abs(amber.DisplayOpacity - 1) < 1e-9, "Stored amber was not shown as the simulator shows it.");
+        Check(amber.DisplayColor == (255, 200, 0) && Math.Abs(amber.DisplayOpacity - 1) < 1e-9, "Stored amber was not shown as amber.");
+        Check(new SignalStatePreview.Segment(1, 120, 120, 120, 255, 10).DisplayColor == (255, 255, 255), "White was tinted.");
         Check(new SignalStatePreview.Segment(1, 255, 0, 0, 255, 10).DisplayColor == (255, 0, 0), "A full colour changed.");
         Check(new SignalStatePreview.Segment(1, 0, 0, 0, 0, 10).DisplayColor == (0, 0, 0), "Black was scaled.");
         Check(Math.Abs(new SignalStatePreview.Segment(1, 255, 0, 0, 0, 10).DisplayOpacity - 0.25) < 1e-9, "Brightness opacity does not match the simulator.");

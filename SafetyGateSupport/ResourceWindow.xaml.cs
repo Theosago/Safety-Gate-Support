@@ -109,6 +109,7 @@ public partial class ResourceWindow : Window
     {
         if (!_resource.AllowUserUpload) return;
         if (AssignedDrawings.IsDrawing(_resource)) { await UploadDrawingPairAsync(null); return; }
+        if (IsSignalPairs) { SignalPairsOnly(); return; }
         var filter = _resource.Label.Contains("Drawing", StringComparison.OrdinalIgnoreCase)
             ? "Drawings|*.pdf;*.dwg;*.dxf|PDF|*.pdf|AutoCAD|*.dwg;*.dxf|All files|*.*"
             : "All files|*.*";
@@ -127,12 +128,19 @@ public partial class ResourceWindow : Window
     {
         if (FileList.SelectedItem is not ResourceFileItem item) { StatusText.Text = "Select the sheet or file you are replacing first."; return; }
         if (AssignedDrawings.IsDrawing(_resource)) { await UploadDrawingPairAsync(item.Path); return; }
+        if (IsSignalPairs) { SignalPairsOnly(); return; }
         var dialog = new OpenFileDialog { Title = "Choose the replacement for " + item.Name, Multiselect = false, Filter = "All files|*.*" };
         if (dialog.ShowDialog(Owner ?? this) != true) return;
         if (MessageBox.Show(Owner ?? this, $"Replace '{item.Name}' with '{Path.GetFileName(dialog.FileName)}'?\n\nThe previous file will be archived. Every unit linked to this same file will use the replacement; unrelated sheets stay current.", "Replace selected file", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         try { _data.ReplaceAssetFile(_resource, _gate, item.Path, dialog.FileName); RefreshFiles(); StatusText.Text = "Replacement saved. Previous revision archived; existing unit links preserved."; }
         catch (Exception error) { MessageBox.Show(Owner ?? this, error.Message, "Unable to replace file", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
+    // Signal configurations are saved only as .signal + PDF pairs from the Light column tab.
+    private bool IsSignalPairs => AssetFileLayout.Category(_resource) == DataService.SignalCategory;
+    private void SignalPairsOnly() => MessageBox.Show(Owner ?? this,
+        "Signal configurations are saved as a .signal and PDF pair. Use Upload configuration pair… on the Light column tab.",
+        "Upload configuration pair", MessageBoxButton.OK, MessageBoxImage.Information);
+
     internal async Task<DrawingUploadReceipt?> UploadDrawingPairAsync(string? replacing)
     {
         if (_fileUpdateBusy) return null;

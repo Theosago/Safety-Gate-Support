@@ -1,6 +1,8 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using SafetyGateSupport.Models;
 using SafetyGateSupport.Services;
 namespace SafetyGateSupport;
@@ -16,6 +18,20 @@ public partial class MainWindow
         return true;
     }
     private void UnitOverview_Click(object sender, RoutedEventArgs e) { if (CloseInlineTool() && SelectedGate is { } g && SelectedUnit is { } u) LoadDrawings(g, u); }
+    // Tools shown inside the unit page bring their own scroll areas, which take the mouse wheel
+    // even when they have nothing to scroll. Pass the wheel to the page unless an inner area can move.
+    private void UnitWorkspace_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        for (var node = e.OriginalSource as DependencyObject; node is not null && !ReferenceEquals(node, UnitWorkspaceScroll);
+             node = (node is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(node) : null) ?? LogicalTreeHelper.GetParent(node))
+        {
+            if (node is ComboBox { IsDropDownOpen: true } or System.Windows.Controls.Primitives.Popup) return;
+            if (node is ScrollViewer inner && (e.Delta > 0 ? inner.VerticalOffset > 0 : inner.VerticalOffset < inner.ScrollableHeight)) return;
+        }
+        e.Handled = true;
+        UnitWorkspaceScroll.ScrollToVerticalOffset(UnitWorkspaceScroll.VerticalOffset - e.Delta);
+    }
+
     private void HostInline(Window window, FrameworkElement content)
     {
         _inlineWindow = window; InlineToolContent.Content = content;
@@ -67,29 +83,40 @@ public partial class MainWindow
         }
         catch (Exception error) { MessageBox.Show(this, "Unable to load unit tool: " + error.Message); }
     }
-    // A .signal file and the PDF that shows it are uploaded together, like a drawing's PDF and DWG.
+    // A .signal file and the PDF that shows it are uploaded together, like a drawing's PDF and DWG,
+    // and every upload asks which units the pair covers.
     private async void UploadSignalPair(SafetyGate gate, SafetySystem unit, SiemensUsbCheck.MainWindow column)
     {
         if (column.IsEmbeddedBusy) { MessageBox.Show(this, "Finish or cancel the current column operation first."); return; }
-        var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Choose the .signal file and its PDF", Filter = "Signal configuration and PDF (*.signal;*.pdf)|*.signal;*.pdf", Multiselect = true };
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Choose the .signal file and its PDF together", Filter = "Signal configuration pair (*.signal, *.pdf)|*.signal;*.pdf", Multiselect = true };
         if (dialog.ShowDialog(this) != true) return;
         var signals = dialog.FileNames.Where(f => Path.GetExtension(f).Equals(".signal", StringComparison.OrdinalIgnoreCase)).ToArray();
         var pdfs = dialog.FileNames.Where(f => Path.GetExtension(f).Equals(".pdf", StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (signals.Length != 1 || pdfs.Length > 1 || signals.Length + pdfs.Length != dialog.FileNames.Length)
-        { MessageBox.Show(this, "Choose one .signal file and the PDF that goes with it (hold Ctrl to pick both).", "Upload configuration pair"); return; }
-        string? replacing = null;
-        if (column.SelectedConfigurationPath is { } current)
-        {
-            int choice = ChoiceDialog.Ask(this, "Upload configuration pair", $"What is {Path.GetFileName(signals[0])}?",
-                ("A new revision of " + Path.GetFileName(current), "Replaces it everywhere it is used. The previous files are archived."),
-                ("A different configuration", "Saves it alongside the current one for " + unit.UnitDisplay + "."));
-            if (choice < 0) return;
-            if (choice == 0) replacing = current;
-        }
-        if (pdfs.Length == 0 && MessageBox.Show(this, "No PDF was chosen. Save the configuration without its PDF sheet?", "Upload configuration pair", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (dialog.FileNames.Length != 2 || signals.Length != 1 || pdfs.Length != 1)
+        { MessageBox.Show(this, "Select one .signal file and the PDF that goes with it, together (hold Ctrl to pick both).", "Both files are required", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         try
         {
-            await Task.Run(() => _data.SaveSignalPair(gate, unit, signals[0], pdfs.FirstOrDefault(), replacing));
+            string? replacing = null;
+            if (column.SelectedConfigurationPath is { } current)
+            {
+                int choice = ChoiceDialog.Ask(this, "Upload configuration pair", $"What is {Path.GetFileName(signals[0])}?",
+                    ("A new revision of " + Path.GetFileName(current), "Replaces it, and its PDF, for the units you choose next. The previous files are archived."),
+                    ("A different configuration", "Saved as a separate pair. You choose which units use it next."));
+                if (choice < 0) return;
+                if (choice == 0) replacing = current;
+            }
+            IReadOnlyList<string>? units = null;
+            if (!string.IsNullOrWhiteSpace(gate.AssetFolder))
+            {
+                var (eligible, linked) = await Task.Run(() => _data.SignalPairUnits(gate, replacing));
+                if (eligible.Count == 0) throw new InvalidOperationException("Add a unit to this asset before uploading a configuration.");
+                var preselected = replacing is null ? new[] { unit.Id } : linked;
+                var picker = new DrawingUnitsWindow(gate, eligible, Path.GetFileName(signals[0]) + Environment.NewLine + Path.GetFileName(pdfs[0]),
+                    preselected, replacing is null ? "Save configuration" : "Replace configuration", replacing: replacing is not null) { Owner = this };
+                if (picker.ShowDialog() != true) return;
+                units = picker.UnitIds;
+            }
+            await Task.Run(() => _data.SaveSignalPair(gate, unit, signals[0], pdfs[0], replacing, units));
             if (!_isClosed && SelectedUnit?.Id == unit.Id && ReferenceEquals(_inlineWindow, column)) ShowInlineResource(DataService.SignalCategory);
         }
         catch (Exception error) { MessageBox.Show(this, "The configuration was not saved: " + error.Message, "Upload configuration pair", MessageBoxButton.OK, MessageBoxImage.Warning); }

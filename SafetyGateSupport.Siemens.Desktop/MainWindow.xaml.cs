@@ -94,7 +94,7 @@ public partial class MainWindow : Window
         finally { _isRefreshing = false; UpdateControls(); UpdatePreview(); BuildStateTable(); _ = LoadPairedPdfAsync(_selectedPath); }
     }
 
-    // One row per configured input combination, like the Siemens configurator's state list.
+    // One card per configured input combination, like the Siemens configurator's state list.
     private void BuildStateTable()
     {
         StateTablePanel.Children.Clear();
@@ -103,22 +103,14 @@ public partial class MainWindow : Window
         {
             SignalStatePreview.Appearance look;
             try { look = SignalStatePreview.ReadAppearance(selected, state); } catch (Exception) { continue; }
-            var row = new Grid { Margin = new Thickness(0, 1, 0, 1) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.Children.Add(StateHeading(state));
-            var swatches = new WrapPanel { VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(swatches, 1); row.Children.Add(swatches);
-            foreach (var segment in look.Segments)
-            {
-                var cell = new StackPanel { Width = 34, Margin = new Thickness(0, 0, 4, 0) };
-                cell.Children.Add(new Border { Height = 22, CornerRadius = new CornerRadius(4), Background = SegmentBrush(segment), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(segment.IsOff ? 0.5 : 1),
-                    ToolTip = $"Segment {segment.Number}: {(segment.IsOff ? "off" : segment.EffectName)}" });
-                if (!segment.IsOff && segment.Effect != 10) cell.Children.Add(new TextBlock { Text = segment.Effect switch { >= 50 and < 90 => "blink", >= 90 and < 130 => "flash", 130 => "rotate", _ => "fx" }, FontSize = 10, HorizontalAlignment = HorizontalAlignment.Center });
-                swatches.Children.Add(cell);
-            }
-            if (look.SoundMode != 0 && look.SoundVolume != 0) swatches.Children.Add(new TextBlock { Text = "🔊 sound", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) });
+            var card = new StackPanel { Width = 118 };
+            card.Children.Add(SignalColumnGraphic.Build(look, 9, 26, _labels.UpsideDown, labels: false));
+            var heading = StateHeading(state); heading.Margin = new Thickness(0, 8, 0, 0); card.Children.Add(heading);
+            string effects = string.Join(", ", look.Segments.Where(s => !s.IsOff && s.Effect != 10).Select(s => s.EffectName.ToLowerInvariant()).Distinct());
+            if (look.SoundMode != 0 && look.SoundVolume != 0) effects = effects.Length == 0 ? "sound" : effects + ", sound";
+            if (effects.Length > 0) card.Children.Add(new TextBlock { Text = char.ToUpperInvariant(effects[0]) + effects[1..], FontSize = 11, Opacity = 0.75, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center });
             int target = state;
-            var button = new Button { Content = row, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(0, 0, 0, 2), ToolTip = "Show this state under Try inputs" };
+            var button = new Button { Content = card, Padding = new Thickness(6, 10, 6, 8), Margin = new Thickness(0, 0, 8, 8), VerticalContentAlignment = VerticalAlignment.Top, ToolTip = "Look at this state under Try inputs" };
             button.SetResourceReference(StyleProperty, "QuietButton");
             button.SetResourceReference(ForegroundProperty, "Ink");
             button.Click += (_, _) => { foreach (var (input, bit) in InputSwitches.Select((t, i) => (t, i))) input.IsChecked = (target & (1 << bit)) != 0; WorkflowTabs.SelectedIndex = 1; };
@@ -127,31 +119,24 @@ public partial class MainWindow : Window
         if (StateTablePanel.Children.Count == 0) StateTablePanel.Children.Add(new TextBlock { Text = "This file has no configured states." });
     }
 
-    private static Brush SegmentBrush(SignalStatePreview.Segment segment)
-    {
-        if (segment.IsOff) return new SolidColorBrush(Color.FromRgb(228, 234, 239));
-        var (r, g, b) = segment.DisplayColor;
-        return new SolidColorBrush(Color.FromRgb(r, g, b)) { Opacity = segment.DisplayOpacity };
-    }
-
     private static Brush WireBrush(SignalLabels.Input input) => input.WireColor is { } c ? new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B)) : Brushes.Transparent;
 
     // The inputs that make this state, as wire-coloured chips, and the state's own name when it has one.
     private FrameworkElement StateHeading(int state)
     {
-        var heading = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-        var chips = new WrapPanel();
+        var heading = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var chips = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
         var active = _labels.Inputs.Where(input => (state & (1 << (input.Number - 1))) != 0).ToArray();
         if (active.Length == 0) chips.Children.Add(new TextBlock { Text = "No inputs", FontWeight = FontWeights.SemiBold });
         foreach (var input in active)
         {
-            var chip = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 8, 1), ToolTip = input.Label + (input.Description.Length == 0 ? "" : " — " + input.Description) };
+            var chip = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(3, 1, 3, 1), ToolTip = input.Label + (input.Description.Length == 0 ? "" : " — " + input.Description) };
             if (input.WireColor is not null) chip.Children.Add(new Border { Width = 11, Height = 11, CornerRadius = new CornerRadius(6), Background = WireBrush(input), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
             chip.Children.Add(new TextBlock { Text = $"In {input.Number}", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
             chips.Children.Add(chip);
         }
         heading.Children.Add(chips);
-        if (_labels.NameFor(state) is { } name) heading.Children.Add(new TextBlock { Text = name, FontSize = 12, Opacity = 0.75, TextWrapping = TextWrapping.Wrap });
+        if (_labels.NameFor(state) is { } name) heading.Children.Add(new TextBlock { Text = name, FontSize = 12, Opacity = 0.75, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center });
         return heading;
     }
 
@@ -201,18 +186,11 @@ public partial class MainWindow : Window
         int state = PreviewState;
         string on = string.Join(", ", _labels.Inputs.Where(input => (state & (1 << (input.Number - 1))) != 0).Select(input => input.Label));
         InputStateText.Text = $"Inputs ON: {(on.Length == 0 ? "none" : on)}" + (_labels.NameFor(state) is { } name ? $"  •  {name}" : "") + $"  •  stored combination {state}";
-        SegmentPreviewPanel.Children.Clear();
+        SegmentPreviewPanel.Content = null;
         PreviewText.Text = _selectedUpload is null ? "Choose a configuration to view expected outputs." : SignalStatePreview.Describe(_selectedUpload, state);
         if (_selectedUpload is null) { SoundPreviewText.Text = "Choose a configuration to see its lights and sound."; return; }
         var appearance = SignalStatePreview.ReadAppearance(_selectedUpload, state);
-        foreach (var segment in appearance.Segments)
-        {
-            var panel = new StackPanel { Width = 86, Margin = new Thickness(0, 0, 10, 8) };
-            panel.Children.Add(new TextBlock { Text = $"Segment {segment.Number}", FontSize = 12, Margin = new Thickness(0, 0, 0, 5) });
-            panel.Children.Add(new Border { Height = 46, CornerRadius = new CornerRadius(7), Background = SegmentBrush(segment), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(1), ToolTip = $"RGB {segment.Red}, {segment.Green}, {segment.Blue}; brightness {segment.Brightness}" });
-            panel.Children.Add(new TextBlock { Text = segment.IsOff ? "Off" : segment.EffectName, FontSize = 12, Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
-            SegmentPreviewPanel.Children.Add(panel);
-        }
+        SegmentPreviewPanel.Content = SignalColumnGraphic.Build(appearance, 26, 64, _labels.UpsideDown, labels: true);
         SoundPreviewText.Text = appearance.SoundMode == 0 || appearance.SoundVolume == 0 ? "Sound: off" : $"Sound: configured • mode {appearance.SoundMode}, volume {appearance.SoundVolume}";
     }
     private void ResetObservation() { if (ObservationCombo is not null) ObservationCombo.SelectedIndex = 0; if (ObservationText is not null) ObservationText.Text = ""; }

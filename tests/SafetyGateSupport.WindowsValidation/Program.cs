@@ -101,6 +101,7 @@ internal static class Program
             ("Missing and corrupt photos return distinct nonfatal results", PhotoFailures),
             ("Pre-canceled photo requests cannot return a photo or a missing-file result", PhotoCancellation),
             ("Main window loads the real inventory after construction and searches it", MainWindowStartup),
+            ("Maximized main window fills the work area and its close button owns the top-right corner pixel", MaximizedCaptionButtons),
 
             ("An invalid resource folder cannot discard indexed shared notes", NotesIndexSurvivesInvalidResource),
             ("Main window rapid selection keeps the final photo and clears deselection", MainWindowPhotoSelection),
@@ -328,7 +329,7 @@ internal static class Program
         string file = Directory.GetFiles(data.ResourceCurrentFolder(resource, gate), "*.signal").Single();
         var column = Track(new global::SiemensUsbCheck.MainWindow("Asset DEMO / Unit 1", [file], previewOnly: true));
         ShowOffscreen(column); Control<ComboBox>(column, "AssignedFilesCombo").SelectedIndex = 0;
-        await WaitUntil(() => Control<Panel>(column, "SegmentPreviewPanel").Children.Count == 9, "Screenshot light preview did not load.");
+        await WaitUntil(() => Lenses(column).Length == 9, "Screenshot light preview did not load.");
         SetPreviewInputs(column, 2); await DispatcherSettled();
         Descendants<ScrollViewer>(column).First().ScrollToBottom(); await DispatcherSettled();
         Capture(column, "02-light-preview.png"); column.Close();
@@ -946,6 +947,38 @@ internal static class Program
         finally { stop.Cancel(); listener.Stop(); await server; }
     }
 
+    private static async Task MaximizedCaptionButtons()
+    {
+        var fixture = NewFixture();
+        var main = Track(new MainWindow(fixture.Data, (_, _) => Task.FromResult(new StockroomService.Snapshot([], DateTimeOffset.UtcNow))));
+        main.WindowStartupLocation = WindowStartupLocation.Manual; main.Left = 40; main.Top = 40;
+        main.WindowState = WindowState.Maximized; main.Show(); main.Activate();
+        await DispatcherSettled(); await Task.Delay(400); await DispatcherSettled();
+        var handle = new WindowInteropHelper(main).Handle;
+        var info = new CornerMonitorInfo { Size = Marshal.SizeOf<CornerMonitorInfo>() };
+        Require(CornerGetMonitorInfo(CornerMonitorFromWindow(handle, 2), ref info), "Monitor information was unavailable.");
+        var work = info.Work;
+        var close = Control<Button>(main, "CloseCaptionButton");
+        var corner = close.PointToScreen(new Point(close.ActualWidth, 0));
+        Require(Math.Abs(corner.X - work.Right) <= 1.5 && Math.Abs(corner.Y - work.Top) <= 1.5,
+            $"The close button's corner {corner} is not the work area's corner ({work.Right}, {work.Top}).");
+        Require(CornerWindowFromPoint(new CornerPoint { X = work.Right - 1, Y = work.Top }) == handle, "The top-right corner pixel belongs to another window.");
+        DependencyObject? hit = main.InputHitTest(main.PointFromScreen(new Point(work.Right - 1, work.Top))) as DependencyObject;
+        while (hit is not null && hit is not Button) hit = VisualTreeHelper.GetParent(hit);
+        Require(ReferenceEquals(hit, close), "The top-right corner pixel does not press Close.");
+        var left = main.PointFromScreen(new Point(work.Left, work.Bottom - 1));
+        Require(left.X >= -0.5 && main.InputHitTest(left) is not null, "The maximized window does not reach the bottom-left of the screen.");
+        main.WindowState = WindowState.Normal; await DispatcherSettled(); await Task.Delay(200); await DispatcherSettled();
+        Equal(new Thickness(0), Control<Grid>(main, "WindowRoot").Margin, "Restored window inset");
+        main.Close();
+    }
+    [StructLayout(LayoutKind.Sequential)] private struct CornerRect { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] private struct CornerPoint { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] private struct CornerMonitorInfo { public int Size; public CornerRect Monitor; public CornerRect Work; public uint Flags; }
+    [DllImport("user32.dll", EntryPoint = "MonitorFromWindow")] private static extern IntPtr CornerMonitorFromWindow(IntPtr window, uint flags);
+    [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")] private static extern bool CornerGetMonitorInfo(IntPtr monitor, ref CornerMonitorInfo info);
+    [DllImport("user32.dll", EntryPoint = "WindowFromPoint")] private static extern IntPtr CornerWindowFromPoint(CornerPoint point);
+
     private static async Task CancelStockroomLookup()
     {
         var fixture = NewFixture(); int requests = 0;
@@ -1184,6 +1217,10 @@ internal static class Program
         File.Delete(path);
     }
 
+    // The lens segments drawn in the Try inputs column.
+    private static Border[] Lenses(FrameworkElement root) => Descendants<Border>(Control<ContentControl>(root, "SegmentPreviewPanel"))
+        .Where(b => b.ToolTip is string tip && tip.StartsWith("Segment ", StringComparison.Ordinal)).ToArray();
+
     private static async Task V7InputSwitches()
     {
         string path = Path.Combine(NewDirectory(), "DEMO ONLY.signal"); File.WriteAllBytes(path, HomePreviewService.SampleConfiguration());
@@ -1191,7 +1228,7 @@ internal static class Program
         ShowOffscreen(window);
         await WaitUntil(() => Control<Button>(window, "RefreshButton").IsEnabled, "Normal light tool did not finish passive discovery.");
         Control<ComboBox>(window, "AssignedFilesCombo").SelectedIndex = 0;
-        await WaitUntil(() => Control<Panel>(window, "SegmentPreviewPanel").Children.Count == 9, "Visual light preview did not load.");
+        await WaitUntil(() => Lenses(window).Length == 9, "Visual light preview did not load.");
         for (int state = 0; state < 64; state++)
         {
             SetPreviewInputs(window, state);
@@ -1199,9 +1236,8 @@ internal static class Program
             Require(Control<TextBox>(window, "PreviewText").Text.StartsWith($"State {state}:"), "Visible lights and stored details are out of sync.");
         }
         SetPreviewInputs(window, 4);
-        var segment = (StackPanel)Control<Panel>(window, "SegmentPreviewPanel").Children[0];
-        var swatch = segment.Children.OfType<Border>().Single();
-        Equal(Colors.Lime, ((SolidColorBrush)swatch.Background).Color, "Green example swatch");
+        var swatch = Lenses(window).Single(b => ((string)b.ToolTip).StartsWith("Segment 1:"));
+        Equal(Colors.Lime, ((LinearGradientBrush)swatch.Background).GradientStops.Single(s => s.Offset == 0.55).Color, "Green example lens");
         SetPreviewInputs(window, 8);
         Require(Control<TextBlock>(window, "SoundPreviewText").Text.Contains("configured"), "Sound-only combination was shown as silent.");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Viewing input switches enabled an upload.");
@@ -1279,7 +1315,7 @@ internal static class Program
         assigned.SelectedIndex = 1;
         await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(Path.GetFileName(second)), "Explicit unit configuration did not load.");
         Require(Control<TextBox>(window, "ResultText").Text.Contains("not been checked"), "File choice incorrectly reported a device configuration match.");
-        await WaitUntil(() => Control<StackPanel>(window, "StateTablePanel").Children.OfType<Button>().Any(), "The state table did not list the configured input states.");
+        await WaitUntil(() => Control<Panel>(window, "StateTablePanel").Children.OfType<Button>().Any(), "The state table did not list the configured input states.");
         await WaitUntil(() => Control<TextBlock>(window, "PairedPdfText").Text.Contains("No PDF"), "A configuration without a sheet did not say so.");
         Require(Control<TextBlock>(window, "MatchText").Text.Length == 0, "A file choice alone showed a match result.");
         SetPreviewInputs(window, 7);
@@ -1292,7 +1328,7 @@ internal static class Program
         assigned.SelectedIndex = 0;
         await WaitUntil(() => Control<TextBlock>(window, "PairedPdfText").Text.Contains("Unit 1.pdf"), "The PDF saved with the configuration was not found.");
         Equal(Path.ChangeExtension(first, ".pdf"), global::SiemensUsbCheck.MainWindow.CompanionPdf(first), "Paired PDF lookup");
-        var table = Control<StackPanel>(window, "StateTablePanel").Children.OfType<Button>().ToArray();
+        var table = Control<Panel>(window, "StateTablePanel").Children.OfType<Button>().ToArray();
         Click(table[^1]);
         Equal(1, Control<TabControl>(window, "WorkflowTabs").SelectedIndex, "Choosing a state did not open Try inputs");
     }
@@ -1869,7 +1905,7 @@ internal static class Program
         var assigned = Control<ComboBox>(column, "AssignedFilesCombo");
         Require(assigned.Items.Count == 1, "The fictional light column did not offer its assigned sample.");
         assigned.SelectedIndex = 0;
-        await WaitUntil(() => Control<Panel>(column, "SegmentPreviewPanel").Children.Count == 9,
+        await WaitUntil(() => Lenses(column).Length == 9,
             "The assigned fictional light configuration did not render.");
         SetPreviewInputs(column, 2);
         Require(Control<TextBox>(column, "PreviewText").Text.Contains("RGB 255, 180, 0"),
@@ -2043,7 +2079,7 @@ internal static class Program
         string signal = Path.Combine(NewDirectory(), "Unit 1 column.signal"); File.WriteAllBytes(signal, SyntheticColumnArchive());
         var column = Track(new global::SiemensUsbCheck.MainWindow($"{fixture.Gate.Display} / Unit 1", new[] { signal }, previewOnly: true)); ShowOffscreen(column);
         column.Width = 1440; column.Height = 900;
-        await WaitUntil(() => Control<StackPanel>(column, "StateTablePanel").Children.OfType<Button>().Any(), "Snapshot signal states did not load.");
+        await WaitUntil(() => Control<Panel>(column, "StateTablePanel").Children.OfType<Button>().Any(), "Snapshot signal states did not load.");
         await DispatcherSettled(); Snap(column, output, "40-signal-column");
         SetPreviewInputs(column, 1); await DispatcherSettled(); Snap(column, output, "41-signal-try-inputs");
         column.Close();

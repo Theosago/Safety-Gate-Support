@@ -79,10 +79,19 @@ internal static class AssetStorageChecks
         Require(!File.Exists(revB.Pdf) && File.ReadAllText(revC.Pdf!) == "sheet-c" && Path.GetFileName(revC.Pdf!) == "Rev C.pdf", "The sheet was not replaced with its configuration.");
         Require(Directory.GetFiles(archive, "*", SearchOption.AllDirectories).Any(p => File.ReadAllText(p) == "sheet-b"), "The previous sheet was not archived.");
 
-        var other = f.Data.SaveSignalPair(gate, f.Units[2], Write("Other.signal", "config-other"), null);
-        Require(other.Pdf is null && FilesFor(2).Contains(other.Signal) && !FilesFor(0).Contains(other.Signal), "A different configuration leaked to another unit.");
-        bool refused = false; try { f.Data.SaveSignalPair(gate, f.Units[2], Write("Sheet only.pdf", "x"), null); } catch (InvalidOperationException) { refused = true; }
-        Require(refused, "A PDF was accepted as a configuration file.");
+        var other = f.Data.SaveSignalPair(gate, f.Units[2], Write("Other.signal", "config-other"), Write("other sheet.pdf", "sheet-other"));
+        Require(FilesFor(2).Contains(other.Signal) && FilesFor(2).Contains(other.Pdf) && !FilesFor(0).Contains(other.Signal), "A different configuration leaked to another unit.");
+        bool Refused(Action save) { try { save(); return false; } catch (InvalidOperationException) { return true; } }
+        Require(Refused(() => f.Data.SaveSignalPair(gate, f.Units[2], Write("Sheet only.pdf", "x"), Write("s.pdf", "x"))), "A PDF was accepted as a configuration file.");
+        Require(Refused(() => f.Data.SaveSignalPair(gate, f.Units[2], Write("Lonely.signal", "x"), null!)), "A configuration was saved without its PDF.");
+
+        // The units chosen at upload are the units the pair covers.
+        var shared = f.Data.SaveSignalPair(gate, f.Units[0], Write("Shared.signal", "config-shared"), Write("shared sheet.pdf", "sheet-shared"),
+            unitIds: new[] { f.Units[0].Id, f.Units[2].Id });
+        Require(FilesFor(0).Contains(shared.Signal) && FilesFor(2).Contains(shared.Signal) && FilesFor(2).Contains(shared.Pdf) && !FilesFor(1).Contains(shared.Signal),
+            "The pair did not cover exactly the units chosen at upload.");
+        var (eligible, linked) = f.Data.SignalPairUnits(gate, shared.Signal);
+        Require(f.Units.All(u => eligible.Any(e => e.Id == u.Id)) && linked.OrderBy(id => id).SequenceEqual(new[] { f.Units[0].Id, f.Units[2].Id }.OrderBy(id => id)), "The unit picker would not show the pair's current units.");
     }
     private static void PreviewOnly()
     {

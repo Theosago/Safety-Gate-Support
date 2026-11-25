@@ -100,8 +100,8 @@
                     <TabControl x:Name="WorkflowTabs" Padding="0,10,0,0">
                         <TabItem Header="All states">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,8" Text="Each row is an input combination and the segments it lights (segment 1 first). Click a row to look at it closely."/>
-                                <StackPanel x:Name="StateTablePanel"/>
+                                <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,8" Text="Each column shows what the light does for one input combination. Click one to look at it closely."/>
+                                <WrapPanel x:Name="StateTablePanel"/>
                             </StackPanel>
                         </TabItem>
                         <TabItem Header="Try inputs">
@@ -117,7 +117,7 @@
                                     <Button x:Name="ClearInputsButton" Content="All off" Click="ClearInputs_Click" Style="{StaticResource QuietButton}" Margin="0,0,0,6"/>
                                 </WrapPanel>
                                 <TextBlock x:Name="InputStateText" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                <WrapPanel x:Name="SegmentPreviewPanel"/>
+                                <ContentControl x:Name="SegmentPreviewPanel" HorizontalAlignment="Left" Margin="0,4,0,0"/>
                                 <TextBlock x:Name="SoundPreviewText" TextWrapping="Wrap" Margin="0,6,0,0"/>
                                 <Expander Header="Stored values" Margin="-6,8,0,0"><TextBox x:Name="PreviewText" IsReadOnly="True" TextWrapping="Wrap" Height="150" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top"/></Expander>
                                 <Expander Header="Record a physical check" Margin="-6,0,0,0">

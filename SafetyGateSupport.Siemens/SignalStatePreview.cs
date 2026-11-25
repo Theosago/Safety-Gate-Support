@@ -11,8 +11,9 @@ public static class SignalStatePreview
     {
         public bool IsOff => Brightness == 0 || Effect == 0 || (Red == 0 && Green == 0 && Blue == 0);
         /// <summary>
-        /// The colour the configurator's own simulator shows: stored values are power-limited (amber is
-        /// stored as 134, 120, 0), so the brightest channel is scaled back to full before display.
+        /// The colour a lit segment looks like. Stored values are power-limited (amber is stored as
+        /// 134, 120, 0), so the brightest channel is scaled back to full; the other channels are scaled
+        /// perceptually (gamma 2.2) so a red-green mix reads as amber rather than lemon yellow.
         /// </summary>
         public (byte R, byte G, byte B) DisplayColor
         {
@@ -20,7 +21,7 @@ public static class SignalStatePreview
             {
                 int max = Math.Max(Red, Math.Max(Green, Blue));
                 if (max == 0) return (0, 0, 0);
-                static byte Scale(int value, int max) => (byte)Math.Min(255, (int)Math.Round(value * 255.0 / max));
+                static byte Scale(int value, int max) => (byte)Math.Min(255, (int)Math.Round(255 * Math.Pow(value / (double)max, 2.2)));
                 return (Scale(Red, max), Scale(Green, max), Scale(Blue, max));
             }
         }

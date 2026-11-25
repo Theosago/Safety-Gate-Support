@@ -44,7 +44,6 @@ public partial class DrawingUnitsWindow : Window
         IReadOnlyList<SafetySystem> eligible, IEnumerable<string> files)
     {
         if (eligible.Count == 0) throw new InvalidOperationException("Add a unit to this asset before uploading a drawing.");
-        if (eligible.Count == 1 && eligible[0].Id == unit.Id) return new[] { unit.Id };
         var picker = new DrawingUnitsWindow(gate, eligible, string.Join(Environment.NewLine, files.Select(System.IO.Path.GetFileName)),
             new[] { unit.Id }, "Add drawing") { Owner = owner };
         return picker.ShowDialog() == true ? picker.UnitIds : null;

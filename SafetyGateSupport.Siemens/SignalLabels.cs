@@ -11,6 +11,9 @@ namespace SafetyGateSupport.Siemens;
 /// </summary>
 public sealed partial record SignalLabels(IReadOnlyList<SignalLabels.Input> Inputs, IReadOnlyDictionary<int, string> StateNames)
 {
+    /// <summary>The configurator's "upside down" mounting option: base at the top.</summary>
+    public bool UpsideDown { get; init; }
+
     public sealed record Input(int Number, string Name, string WireCode, string Description)
     {
         public string WireName => WireNames.TryGetValue(WireCode, out var name) ? name.Name : WireCode.ToLowerInvariant();
@@ -66,7 +69,7 @@ public sealed partial record SignalLabels(IReadOnlyList<SignalLabels.Input> Inpu
                 foreach (var value in bits.EnumerateArray()) { if (value.ValueKind == JsonValueKind.True) index |= 1 << bit; bit++; }
                 if (Text(state, "Name") is { Length: > 0 } name) names.TryAdd(index, name.Trim());
             }
-        return new SignalLabels(inputs, names);
+        return new SignalLabels(inputs, names) { UpsideDown = Property(root, "IsUpsideDown") is { ValueKind: JsonValueKind.True } };
     }
 
     // The configurator serialises auto-properties as "<Name>k__BackingField".
