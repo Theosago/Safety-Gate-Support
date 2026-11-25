@@ -78,7 +78,9 @@ public partial class MainWindow : Window
             _isRefreshing = true; UpdateControls();
             _selectedUpload = await Task.Run(() => PreparedSignalUpload.Load(path));
             _selectedPath = path;
-            SelectedSignalText.Text = $"{_selectedUpload.Archive.ActiveStates.Count} input states configured · {path}";
+            int states = _selectedUpload.Archive.ActiveStates.Count;
+            SelectedSignalText.Text = $"{states} input {(states == 1 ? "state" : "states")} configured · {System.IO.Path.GetFileName(path)}";
+            SelectedSignalText.ToolTip = path;
             ResultText.Text = _comparison;
             StatusText.Text = _previewOnly || _selectedUpload.IsPreviewOnly ? "Preview only: this sample cannot be uploaded." : "Configuration ready.";
         }

@@ -367,7 +367,7 @@ internal static class Program
         ShowOffscreen(window); await DispatcherSettled();
         Require(!Control<Button>(window, "RefreshButton").IsEnabled, "Preview attempted device discovery.");
         Control<ComboBox>(window, "AssignedFilesCombo").SelectedIndex = 0;
-        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(path), "Preview sample did not load.");
+        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(Path.GetFileName(path)), "Preview sample did not load.");
         SetPreviewInputs(window, 2);
         Require(Control<TextBox>(window, "PreviewText").Text.Contains("RGB 255, 180, 0"), "Preview sample's amber state did not render.");
         Control<ComboBox>(window, "DeviceCombo").ItemsSource = new[] { TestColumnPort() };
@@ -1277,7 +1277,7 @@ internal static class Program
         Require(assigned.Items.Count == 2 && assigned.SelectedIndex == -1, "Assigned configuration was selected automatically.");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Upload enabled before an explicit file choice.");
         assigned.SelectedIndex = 1;
-        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(second), "Explicit unit configuration did not load.");
+        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(Path.GetFileName(second)), "Explicit unit configuration did not load.");
         Require(Control<TextBox>(window, "ResultText").Text.Contains("not been checked"), "File choice incorrectly reported a device configuration match.");
         await WaitUntil(() => Control<StackPanel>(window, "StateTablePanel").Children.OfType<Button>().Any(), "The state table did not list the configured input states.");
         await WaitUntil(() => Control<TextBlock>(window, "PairedPdfText").Text.Contains("No PDF"), "A configuration without a sheet did not say so.");
@@ -1302,7 +1302,7 @@ internal static class Program
         var root = NewDirectory(); string only = Path.Combine(root, "Only.signal"); File.WriteAllBytes(only, SyntheticColumnArchive());
         var window = Track(new global::SiemensUsbCheck.MainWindow("Asset validation / Unit 1", new[] { only }, previewOnly: true));
         ShowOffscreen(window);
-        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(only), "The only saved configuration was not chosen automatically.");
+        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(Path.GetFileName(only)), "The only saved configuration was not chosen automatically.");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Preview enabled upload after the automatic choice.");
     }
 
