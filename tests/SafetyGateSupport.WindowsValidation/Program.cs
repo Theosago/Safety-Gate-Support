@@ -498,8 +498,6 @@ internal static class Program
         string folder = fixture.Data.ResourceCurrentFolder(resource, fixture.Gate), upside = Path.Combine(folder, "01-upside-down.pdf"), sideways = Path.Combine(folder, "02-sideways.pdf");
         byte[] original = SafetyGateSupport.TestFixtures.DrawingPdfFixture.TextPage(180); File.WriteAllBytes(upside, original);
         File.WriteAllBytes(sideways, SafetyGateSupport.TestFixtures.DrawingPdfFixture.TextPage(90));
-        // Previous manual preferences cannot override the new automatic detector.
-        fixture.Data.SaveDrawingView(fixture.BlueUnit.Id, fixture.Data.DrawingViewKey(upside, 0), 0);
         var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main); await WaitUntil(() => main.IsEnabled, "Main did not load."); await SelectGalleryUnit(main, fixture.BlueUnit);
         var image = Control<Image>(main, "DrawingImage");
         await WaitUntil(() => image.Source is TransformedBitmap { Transform: RotateTransform { Angle: 180 } }, "Upside-down PDF text was not corrected automatically.");

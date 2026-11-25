@@ -11,7 +11,7 @@ On a new PC, choose **Set up this plant** or press **Ctrl+Shift+Alt+A**. Setup o
 a blank plant with its first area. Follow the pilot-unit steps before configuring
 more equipment. A local folder works for a pilot; other PCs need a shared location
 for the same library. Huntingdon sample data is an optional training choice, not
-the new-plant default. See [the guided setup walkthrough](V8_4_1.md).
+the new-plant default. See [the guided setup walkthrough](CHANGELOG.md#841--a-guided-first-plant-pilot).
 Local settings live at `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
 
 ## View MaintainX work orders

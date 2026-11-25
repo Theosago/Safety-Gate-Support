@@ -1,47 +1,29 @@
 # Safety Gate Support
 
-Windows WPF support console, version **8.5.7**, based on the supplied
-`SafetyGateSupport_V6_4_1_TroubleshootPreview_FIXED.zip`.
+Windows WPF support console for plant safety gates, version **8.5.7**.
 
-The console provides gate/unit browsing, identification photos, shared notes,
-drawings/configuration resources, manuals, parts, global search, and guided
-troubleshooting. **Version 7.1 opens directly to a searchable photo gallery of units.** Select the unit to see a large, uncropped identification photo beside its troubleshooting and current-file actions. Gränges branding and a maximized photo viewer are included. The redesigned Siemens tool uses six input switches and visual segment previews in place of the 64-state dropdown. Electrical drawings now display automatically inside the selected-unit page, with permanently visible shared notes alongside. PDF page controls, image drawings and full-size viewing are supported. The direct scanner/PLC tools remain available. Version 8.2.3 waits for [server-confirmed inventory filtering](docs/V8_2_3.md). Version 8.2.2 replaces the failed background Edge launch with [embedded stockroom search](docs/V8_2_2.md). Version 8.2.1 adds [stockroom matching corrections and a lookup report](docs/V8_2_1.md). Version 8.2 adds [the replacement-parts panel, unit-specific choices and live availability](docs/V8_2.md). Version 8.1.3 adds [per-computer stockroom plant selection](docs/V8_1_3.md). Version 8.1.2 adds [all 19 parts, interactive stockroom search and conditional pagination](docs/V8_1_2.md). Version 8.1.1 adds [automatic reading-direction detection and click-to-zoom drawings](docs/V8_1_1.md). Version 8.1 adds [part photos, a resizable parts page and background stockroom quantity checks](docs/V8_1.md). Version 8 adds readable asset folders and paired PDF/DWG drawing updates; see [the v8 update and migration guide](docs/V8.md). Version 6.5.0 integrates Siemens USB backup, configuration comparison and upload, adds expected-output previews and documented troubleshooting, and imports local support libraries. Startup, photo loading and search retain the earlier performance improvements.
+Engineers and electricians pick a unit from a searchable photo gallery and get
+its identification photo, current electrical drawing, shared notes, replacement
+parts, manuals, configuration files and guided troubleshooting in one place. The
+engineering library lives on a shared folder (normally the plant's Q: drive).
 
-Version 8.4.6 imports stockroom metadata by Item ID, supports bulk ID lists, and refreshes parts outside the Safe2Cross search. See [release notes](docs/V8_4_6.md).
+Main features:
 
-Version 8.4.4 adds PLC, light column and scanner examples to the operator demo and puts PLC files directly on the unit page.
+- **Drawings** — upload a PDF/DWG pair once, choose the units it covers, and
+  replace it from the unit page. Prior revisions are archived on the shared drive.
+- **Publish & print QR** — publishes unit guides and electrical PDFs to Google
+  Drive folders, keeps them updated after drawing changes, optionally syncs
+  shared notes with phones, and prints every unit's QR code in one PDF. See the
+  [Drive publishing guide](docs/GOOGLE_DRIVE_PILOT.md).
+- **Parts and stockroom** — replacement parts per unit with live stockroom
+  availability, Item ID import, and dated spare-parts PDFs for the QR folders.
+- **MaintainX** — read-only view of open work orders for a unit's linked
+  MaintainX asset. See [MaintainX setup](docs/WINDOWS_QUICK_START.md#view-maintainx-work-orders).
+- **Equipment tools** — built-in Siemens signal-column USB backup, comparison
+  and verified upload; read-only Hokuyo UAM USB diagnostics; PLC files.
 
-Version 8.4.3 adds a [fictional operator demo and a guided first-unit checklist](docs/V8_4_3.md).
-
-Version 8.5.7 shows current MaintainX work orders from a unit’s page. See [MaintainX setup](docs/WINDOWS_QUICK_START.md#view-maintainx-work-orders).
-
-Version 8.5.6 scans stockroom counts for QR spare-parts PDFs daily and registers the optional background task directly with Windows Task Scheduler. See [QR publishing and stockroom refresh](docs/GOOGLE_DRIVE_PILOT.md).
-
-Version 8.5.5 adds unit spare-parts PDFs with individually dated stockroom counts.
-
-Version 8.5.4 adds batch PDF and Word imports directly in **Manuals**. It also shows drawing coverage on the unit page and lets one PDF attachment appear in several unit guides.
-
-Version 8.5.3 lets you include additional units as part of replacing a drawing pair.
-
-Version 8.5.2 can sync the app's shared notes with the Operator notes in each Drive QR folder. See [the shared notes setup](docs/GOOGLE_DRIVE_PILOT.md#sync-shared-notes-with-phones).
-
-Version 8.5.1 lets you upload a drawing pair once, choose the units it covers, and update every linked unit from one replacement.
-
-Version 8.5.0 adds **Publish & print QR** to the main sidebar. The app creates Drive folders and illustrated unit guides, updates the standalone electrical PDFs after paired drawing uploads, and prints all unit QR codes in one batch. See the [Drive publishing guide](docs/GOOGLE_DRIVE_PILOT.md).
-
-Version 8.4.2 adds a [one-unit QR pilot](docs/V8_4_2.md).
-
-Version 8.4.1 starts with a [guided first-plant pilot](docs/V8_4_1.md), blank-library creation and direct PDF assignment.
-
-Version 8.4.0 adds [collapsible Common Problems, multiple photos and offline QR guide exports](docs/V8_4.md).
-
-Version 8.3.1 adds a configurable [photo-based Common Problems panel](docs/V8_3_1.md) on the home page.
-
-Version 8.3.0 adds [Item ID import and a portrait unit gallery](docs/V8_3.md), with fixed search and collapsible unit parts.
-
-The post-v8.2.3 [stockroom quantity follow-up](docs/STOCKROOM_QUANTITY_FOLLOWUP.md) rejects unconfirmed inventory quantities, adds cancel/retry controls, and provides an initial admin checklist. Live plant confirmation remains outstanding.
-
-See the [Windows quick start](docs/WINDOWS_QUICK_START.md) for upgrading, importing the supplied files, and checking a signal column.
+Start with the [Windows quick start](docs/WINDOWS_QUICK_START.md). Release history
+is in the [changelog](docs/CHANGELOG.md).
 
 ## Get the Windows app
 
@@ -65,17 +47,21 @@ setup. A local folder works for the pilot. Huntingdon sample data is an explicit
 training option under Shared Data / Software.
 Local settings live in `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
 
-Production use requires access to the configured shared folder. Built-in Siemens USB configuration needs no vendor configurator. Optional Siemens/UAM/BusLink launch actions require their Windows applications; each PC saves its own executable paths.
-The storeroom lookup requires the configured plant-network service. Those live
-integrations still need validation in the plant environment.
+Production use requires access to the configured shared folder. Built-in Siemens
+USB configuration needs no vendor configurator. Optional Siemens/UAM/BusLink
+launch actions require their Windows applications; each PC saves its own
+executable paths. The stockroom lookup requires the configured plant-network
+service.
 
 For a standalone Siemens 8WD4613-5JH37 USB utility, download
-**SiemensUsbCheck-Windows-x64** from a successful workflow run. This diagnostic
-backs up a spare column and, from version 0.2.0, uploads compatible `.signal`
-files with a saved original and readback verification. Hardware upload and a later
-readback and physical behavior were confirmed by the user. Version 6.5.0 reuses that protocol and the report-access recovery fix; the integrated UI still needs a site check on a spare column.
-Follow [its instructions](tools/SiemensUsbCheck/README.md) and see
-[protocol evidence and validation limits](docs/SIEMENS_USB.md).
+**SiemensUsbCheck-Windows-x64** from a successful workflow run. It backs up a
+spare column and uploads compatible `.signal` files with a saved original and
+readback verification. Follow [its instructions](tools/SiemensUsbCheck/README.md)
+and see [protocol evidence and validation limits](docs/SIEMENS_USB.md).
+
+Hokuyo UAM-05LP-T301 diagnostics are read-only; see
+[USB diagnostics and current limits](docs/HOKUYO_USB_DIAGNOSTICS.md). No scanner
+programming controls are provided.
 
 ## Develop and run on Windows
 
@@ -97,7 +83,7 @@ They exercise actual WPF windows/codecs using isolated settings and shared data.
 See [the runner documentation](tests/SafetyGateSupport.WindowsValidation/README.md)
 and [remaining manual Windows checks](docs/WINDOWS_VALIDATION.md).
 
-## Validate in the Linux cloud environment
+## Validate on Linux
 
 ```bash
 bash scripts/bootstrap-dotnet.sh
@@ -105,29 +91,17 @@ bash scripts/validate.sh
 ```
 
 The bootstrap verifies Microsoft's published SHA512 checksum and installs the
-pinned SDK outside the checkout, at `/workspace/.tools/dotnet` in this environment.
-CLI/NuGet caches also remain outside the checkout. Source `scripts/dotnet-env.sh`
-to activate the SDK in a shell. Use the existing checkout; cloud tasks are already
-isolated and do not need another Git worktree.
+pinned SDK outside the checkout (`../.tools/dotnet`). CLI/NuGet caches also stay
+outside the checkout. Source `scripts/dotnet-env.sh` to activate the SDK in a shell.
 
-Validation cross-compiles both WPF projects, runs the Siemens protocol/archive
-checks, and runs **26** data/search
-checks. These cover seed initialization, migrations, repeat initialization,
-assignments, notes, resource archives, photo storage/reselection, backups, audits,
-troubleshooting persistence, cancellation, snapshots, and exact search equivalence
-including 600 randomized comparisons. Tests use temporary settings/data. The
-previously failing partial-migration regression now runs and passes by default.
-The older `--include-known-issues` flag is accepted for compatibility.
+Validation cross-compiles the WPF projects, runs the Siemens protocol/archive
+checks, the data/search/publishing checks, and the Hokuyo checks. Tests use
+temporary settings and data and never touch the configured shared library.
+Linux compilation alone does not validate WPF behavior; desktop execution needs
+Windows. For the optional CPU/allocation comparison against the original search
+logic, run `bash scripts/validate.sh --benchmark-search`.
 
-For the optional CPU/allocation comparison against the original search logic:
-
-```bash
-bash scripts/validate.sh --benchmark-search
-```
-
-See [performance changes and measurement limits](docs/PERFORMANCE.md) and
-[remaining known issues](docs/KNOWN_ISSUES.md). Desktop execution needs Windows;
-Linux compilation alone does not validate WPF behavior.
+See [remaining known issues](docs/KNOWN_ISSUES.md).
 
 ## Build a self-contained Windows executable locally
 
@@ -143,8 +117,4 @@ Or on Windows:
 dotnet publish .\SafetyGateSupport\SafetyGateSupport.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/win-x64
 ```
 
-Output: `artifacts/win-x64/SafetyGateSupport.exe`. Initial data contains 60 units
-in 28 gates across three areas, with identification photos. No data format change
-or reinitialization is required to upgrade from version 6.4.1.
-
-Hokuyo UAM-05LP-T301 read-only USB diagnostics are available as a first-hardware-validation prototype; see [USB diagnostics and current limits](docs/HOKUYO_USB_DIAGNOSTICS.md). No scanner programming controls are provided.
+Output: `artifacts/win-x64/SafetyGateSupport.exe`.

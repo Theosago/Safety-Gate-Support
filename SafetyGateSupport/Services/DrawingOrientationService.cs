@@ -102,11 +102,6 @@ public static class DrawingOrientationService
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException("Drawing-text recognition exceeded its time limit."); }
         finally { if (started && !process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(CancellationToken.None); } }
     }
-    public static ScoreSummary ScoreWords(string tsv)
-    {
-        var score = ParseScore(tsv); return new(score.Value, score.Words);
-    }
-    public sealed record ScoreSummary(double Value, int Words);
     private static OcrScore ParseScore(string tsv)
     {
         double weighted = 0, weight = 0; int words = 0;

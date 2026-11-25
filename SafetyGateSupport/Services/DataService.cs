@@ -1,11 +1,8 @@
 using System.IO;
 using System.IO.Compression;
-using System.Net;
-using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
 using SafetyGateSupport.Models;
 
@@ -462,14 +459,6 @@ public partial class DataService
         return AddOrUpdateResource(resource, gate, s, sourceFile);
     }
 
-    public List<string> AddOrUpdateDrawings(SafetySystem s, IEnumerable<string> sourceFiles)
-    {
-        var gate = GateFor(s) ?? throw new InvalidOperationException("Gate record could not be found.");
-        var resource = LoadResources().FirstOrDefault(r => r.GateId == gate.Id && r.AppliesTo(s.Id) && r.Label.Equals("Electrical Drawings", StringComparison.OrdinalIgnoreCase) && r.Kind == "ManagedFiles")
-            ?? throw new InvalidOperationException("No Electrical Drawings resource is assigned to this unit.");
-        return AddOrUpdateResourceFiles(resource, gate, s, sourceFiles);
-    }
-
     public string SystemNotesPath(SafetySystem s) => Resolve(s.NotesFolder + "/shared-notes.txt");
 
     public string LoadSystemNotes(SafetySystem s)
@@ -638,7 +627,6 @@ public partial class DataService
     }
 
     public List<ManualRecord> ManualsFor(SafetyGate gate, SafetySystem unit) => LoadManualRecords().Where(m => m.AppliesTo(gate.Id, unit.Id)).OrderBy(m => m.Title).ToList();
-    public List<PartRecord> PartsFor(SafetyGate gate, SafetySystem unit) => LoadParts().Where(p => p.AppliesTo(gate.Id, unit.Id)).OrderBy(p => p.PartNumber).ThenBy(p => p.Description).ToList();
 
     private static void ArchiveFile(string oldPath, string archiveFolder)
     {
@@ -711,36 +699,6 @@ public partial class DataService
         var lines = Encoding.UTF8.GetString(bytes).Split('\n');
         int last = lines.Length - 1; if (bytes.Length > 0 && bytes[^1] == (byte)'\n') last--;
         return Enumerable.Range(0, Math.Min(max, last + 1)).Select(i => lines[last - i].TrimEnd('\r').TrimStart('\uFEFF')).ToArray();
-    }
-
-    public async Task<string> LookupStoreroomAsync(string query, CancellationToken cancellationToken = default)
-    {
-        var content = LoadSharedContent();
-        if (string.IsNullOrWhiteSpace(content.StoreroomUrl)) return "Storeroom database URL is not configured.";
-        if (string.IsNullOrWhiteSpace(query)) return "Enter or select a part number / keyword first.";
-
-        using var handler = new HttpClientHandler { UseDefaultCredentials = true };
-        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(8) };
-        var html = await client.GetStringAsync(content.StoreroomUrl, cancellationToken);
-        var matchIndex = html.IndexOf(query, StringComparison.OrdinalIgnoreCase);
-        if (matchIndex < 0) return $"'{query}' was not found in the HTML returned by the storeroom page.";
-
-        var rowStart = html.LastIndexOf("<tr", matchIndex, StringComparison.OrdinalIgnoreCase);
-        var rowEnd = html.IndexOf("</tr>", matchIndex, StringComparison.OrdinalIgnoreCase);
-        string snippet;
-        if (rowStart >= 0 && rowEnd > rowStart) snippet = html.Substring(rowStart, rowEnd + 5 - rowStart);
-        else
-        {
-            var start = Math.Max(0, matchIndex - 300);
-            var length = Math.Min(html.Length - start, 700);
-            snippet = html.Substring(start, length);
-        }
-        snippet = Regex.Replace(snippet, "<script.*?</script>", " ", RegexOptions.Singleline | RegexOptions.IgnoreCase);
-        snippet = Regex.Replace(snippet, "<style.*?</style>", " ", RegexOptions.Singleline | RegexOptions.IgnoreCase);
-        snippet = Regex.Replace(snippet, "<[^>]+>", " ");
-        snippet = WebUtility.HtmlDecode(snippet);
-        snippet = Regex.Replace(snippet, @"\s+", " ").Trim();
-        return string.IsNullOrWhiteSpace(snippet) ? $"Found '{query}', but could not extract readable row text." : snippet;
     }
 
     private static List<HelpItem> DefaultHelpItems() => new()

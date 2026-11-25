@@ -570,12 +570,6 @@ public partial class MainWindow : Window
         await ReloadDataAsync();
     }
 
-    private void ResourceButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button b || b.Tag is not string id || SelectedGate is not { } gate || SelectedUnit is not { } unit) return;
-        var resource = _resources.FirstOrDefault(r => r.Id == id); if (resource is null) return; OpenResource(resource, gate, unit);
-    }
-
     private void OpenResource(ResourceDefinition resource, SafetyGate gate, SafetySystem unit)
     {
         switch (resource.Kind.ToLowerInvariant())
