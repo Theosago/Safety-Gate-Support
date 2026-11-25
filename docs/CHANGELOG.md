@@ -2,6 +2,13 @@
 
 Release history for Safety Gate Support, newest first. This file consolidates the per-version notes that previously lived in separate files under `docs/`. Older entries describe behavior at the time of that release; the current behavior is in the [README](../README.md) and the [Windows quick start](WINDOWS_QUICK_START.md).
 
+## 8.6.1 — Remove guide PDFs
+
+- Guide PDFs (extra PDFs added to a unit's QR guide) show as **Guide PDF • name** in a unit's **Drawings and guide PDFs** list, so they are not mistaken for electrical drawings.
+- Select one and choose **Remove from this unit…** to take it off that unit. Other units on the asset keep it. When no unit uses it, the file moves to `_AppData/Operator Publishing/Removed Guide PDFs` on the shared library rather than being deleted. The unit guide on Google Drive is rebuilt in place at the next publish, so QR links are unchanged.
+- PDFs left by the original one-unit QR pilot can be removed the same way.
+- The Windows build tests allow the embedded stockroom browser more start-up time, which stops intermittent build failures.
+
 ## 8.6.0 — One search bar and a cleaner layout
 
 - A single search bar at the top of every page replaces the separate unit search, **Search everything**, Manuals and Parts search boxes. Typing filters the unit photo gallery and shows a **Matches** list of units, drawings, manuals, parts, notes and help topics. One click (or Enter) opens a match; searching from another page returns to the results.

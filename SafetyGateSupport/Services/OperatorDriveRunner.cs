@@ -173,6 +173,15 @@ internal static class OperatorDriveRunner
         _ = RunAsync(data);
     }
 
+    internal static async Task RemoveGuidePdfAsync(DataService data, string gateId, string unitId, string path)
+    {
+        if (!IsSupported(data)) throw new InvalidOperationException("Use a connected plant library to remove a guide PDF.");
+        string root = Path.GetFullPath(data.SharedRoot);
+        await Task.Run(() => OperatorPublishingState.RemoveGuidePdf(data, root, gateId, unitId, path, DateTimeOffset.Now));
+        // The unit guide on Drive is rebuilt without the PDF at the next publish.
+        _ = RunAsync(data);
+    }
+
     internal static async Task SignInAsync(string? path, CancellationToken token)
     {
         await Mutex.WaitAsync(token);

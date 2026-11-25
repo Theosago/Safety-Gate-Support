@@ -154,6 +154,55 @@ internal sealed class OperatorPublishingState
         return true;
     }
 
+    internal static string RemovedGuideFolder(string root) =>
+        Path.Combine(root, "_AppData", "Operator Publishing", "Removed Guide PDFs");
+
+    /// <summary>
+    /// Takes a guide PDF off one unit. Other units on the asset keep it. When no unit uses the
+    /// file any more it is moved into Removed Guide PDFs on the shared library, never deleted.
+    /// </summary>
+    internal static void RemoveGuidePdf(DataService data, string root, string gateId, string unitId, string path, DateTimeOffset now)
+    {
+        using var lease = data.AcquireAssetWriteLock();
+        if (!data.IsReady || !Path.GetFullPath(data.SharedRoot).Equals(root, StringComparison.OrdinalIgnoreCase))
+            throw new IOException("Connect the original shared library before removing this PDF.");
+        string full = Path.GetFullPath(path), name = Path.GetFileName(full);
+        string stamp = now.ToLocalTime().ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+        string legacyFolder = Path.GetFullPath(AttachmentsPath(root, unitId));
+        if (Path.GetDirectoryName(full)!.Equals(legacyFolder, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!File.Exists(full)) return;
+            ArchiveGuide(root, MobileSupportExporter.FileKey(unitId), stamp, OperatorPublicationSources.RequireSharedFile(root, full));
+            return;
+        }
+
+        string folder = Path.GetFullPath(AssetGuideFolder(root, gateId));
+        var records = LoadGuidePdfs(root, gateId);
+        var record = records.SingleOrDefault(pdf => Path.GetFullPath(Path.Combine(folder, pdf.Hash, pdf.FileName))
+            .Equals(full, StringComparison.OrdinalIgnoreCase))
+            ?? throw new IOException($"{name} is no longer attached to this asset. Reopen the unit to refresh the list.");
+        string[] remaining = record.UnitIds.Where(id => !id.Equals(unitId, StringComparison.OrdinalIgnoreCase)).ToArray();
+        records.Remove(record);
+        if (remaining.Length > 0) records.Add(record with { UnitIds = remaining });
+        WriteFile(Path.Combine(folder, "attachments.json"), JsonSerializer.SerializeToUtf8Bytes(records));
+        if (remaining.Length == 0 && !records.Any(pdf => pdf.Hash == record.Hash) && File.Exists(full))
+        {
+            ArchiveGuide(root, MobileSupportExporter.FileKey(gateId), stamp, OperatorPublicationSources.RequireSharedFile(root, full));
+            string hashFolder = Path.GetDirectoryName(full)!;
+            if (Directory.Exists(hashFolder) && !Directory.EnumerateFileSystemEntries(hashFolder).Any()) Directory.Delete(hashFolder);
+        }
+    }
+
+    private static void ArchiveGuide(string root, string ownerKey, string stamp, string source)
+    {
+        string target = Path.Combine(RemovedGuideFolder(root), ownerKey, stamp);
+        Directory.CreateDirectory(target);
+        string destination = Path.Combine(target, Path.GetFileName(source));
+        for (int i = 2; File.Exists(destination); i++)
+            destination = Path.Combine(target, $"{Path.GetFileNameWithoutExtension(source)} ({i}){Path.GetExtension(source)}");
+        File.Move(source, destination);
+    }
+
     internal void Save(string root) => WriteFile(StatePath(root), JsonSerializer.SerializeToUtf8Bytes(this));
 
     internal static void WriteFile(string path, byte[] bytes)

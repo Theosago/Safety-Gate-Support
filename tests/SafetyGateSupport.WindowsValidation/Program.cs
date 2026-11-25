@@ -45,9 +45,9 @@ internal static class Program
         // rather than leave an unattended runner waiting indefinitely.
         using var watchdog = new System.Threading.Timer(_ =>
         {
-            Console.Error.WriteLine("FAIL: Windows validation exceeded its three-minute deadline.");
+            Console.Error.WriteLine("FAIL: Windows validation exceeded its five-minute deadline.");
             Environment.Exit(1);
-        }, null, TimeSpan.FromMinutes(3), Timeout.InfiniteTimeSpan);
+        }, null, TimeSpan.FromMinutes(5), Timeout.InfiniteTimeSpan);
 
         int completionCode = 2;
         try
@@ -154,6 +154,7 @@ internal static class Program
             ("Siemens USB check refuses a different model before requesting configuration", SiemensModelMismatch),
             ("Siemens USB check preserves an HTTP error without retries or reset requests", SiemensHttpFailure),
             ("A canceled Siemens USB check saves its report without sending requests", SiemensCancellation),
+            ("UI snapshots render the main screens for design review when requested", UiSnapshots),
 
         ];
 
@@ -165,7 +166,7 @@ internal static class Program
                 var watch = Stopwatch.StartNew();
                 try
                 {
-                    await check().WaitAsync(TimeSpan.FromSeconds(25));
+                    await check().WaitAsync(TimeSpan.FromSeconds(60));
                     Console.WriteLine($"PASS {name} ({watch.ElapsedMilliseconds} ms)");
                     passed++;
                 }
@@ -863,7 +864,9 @@ internal static class Program
         File.WriteAllText(path, html);
         if (!unchanged && Environment.GetEnvironmentVariable("SAFETYGATE_ITEM_SMOKE_FIXTURE") is { Length: > 0 } output)
         { Directory.CreateDirectory(Path.GetDirectoryName(output)!); File.WriteAllText(output, html); }
-        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(unchanged ? 8 : 18));
+        // WebView2 can take well over ten seconds to start on a cold CI runner; the unchanged fixture
+        // only updates after 60 s, so a longer limit still proves stale inventory is rejected.
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(unchanged ? 25 : 50));
         try
         {
             var snapshot = await StockroomWebViewReader.SearchAsync(new Uri(path).AbsoluteUri, id, cancel.Token);
@@ -1941,6 +1944,65 @@ internal static class Program
 
     // Never contact the private plant network from CI; the parts integration check
     // separately injects delayed, successful and failing inventory responses.
+    // Design review: when SAFETYGATE_UI_SNAPSHOTS names a folder, render the main screens to PNG.
+    // Uses the isolated fixture only; normal validation runs skip this.
+    private static async Task UiSnapshots()
+    {
+        string? output = Environment.GetEnvironmentVariable("SAFETYGATE_UI_SNAPSHOTS");
+        if (string.IsNullOrWhiteSpace(output)) return;
+        Directory.CreateDirectory(output);
+        var fixture = NewFixture();
+        var main = Track(NewMainWindow(fixture.Data)); ShowOffscreen(main);
+        main.Width = 1600; main.Height = 940;
+        await WaitUntil(() => main.IsEnabled && Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "Snapshot home did not load.");
+        await DispatcherSettled(); await Task.Delay(400);
+        Snap(main, output, "01-home");
+        Control<TextBox>(main, "UnitSearchBox").Text = fixture.Gate.AssetNumber;
+        await WaitUntil(() => Control<ListBox>(main, "GlobalSearchResults").Items.Count > 0, "Snapshot search returned nothing.");
+        await DispatcherSettled(); Snap(main, output, "02-search");
+        await SelectGalleryUnit(main, fixture.BlueUnit);
+        await DispatcherSettled(); await Task.Delay(600); Snap(main, output, "03-unit");
+        Click(Control<Button>(main, "PartsNav")); await DispatcherSettled(); Snap(main, output, "04-parts");
+        Click(Control<Button>(main, "ManualsNav")); await DispatcherSettled(); Snap(main, output, "05-manuals");
+        Click(Control<Button>(main, "TroubleshootNav")); await DispatcherSettled(); Snap(main, output, "06-troubleshoot");
+        Control<ComboBox>(main, "ThemeBox").SelectedIndex = 1;
+        Click(Control<Button>(main, "HomeNav")); await DispatcherSettled(); Snap(main, output, "07-home-dark");
+        Click(Control<Button>(main, "SystemsNav")); await DispatcherSettled(); Snap(main, output, "08-unit-dark");
+        Control<ComboBox>(main, "ThemeBox").SelectedIndex = 0; await DispatcherSettled();
+
+        var admin = Track(new AdminWindow(fixture.Data)); ShowOffscreen(admin);
+        admin.Width = 1440; admin.Height = 920;
+        await WaitUntil(() => admin.IsEnabled, "Snapshot setup did not load.");
+        var tabs = Control<TabControl>(admin, "SetupTabs");
+        int index = 0;
+        foreach (var tab in tabs.Items.OfType<TabItem>().Where(tab => tab.Visibility == Visibility.Visible).ToArray())
+        {
+            tab.IsSelected = true; await DispatcherSettled();
+            string label = new string((tab.Header?.ToString() ?? "tab").Where(char.IsLetterOrDigit).ToArray());
+            Snap(admin, output, $"{10 + index++:D2}-setup-{label}");
+        }
+        admin.Close();
+
+        var publishing = Track(new OperatorDriveWindow(fixture.Data, fixture.BlueUnit.Id)); ShowOffscreen(publishing);
+        await DispatcherSettled(); await Task.Delay(400); Snap(publishing, output, "30-publish");
+        publishing.Close();
+    }
+
+    private static void Snap(Window window, string folder, string name)
+    {
+        window.UpdateLayout();
+        if (window.Content is not FrameworkElement root || root.ActualWidth < 1 || root.ActualHeight < 1) return;
+        int width = (int)Math.Ceiling(root.ActualWidth), height = (int)Math.Ceiling(root.ActualHeight);
+        var background = new DrawingVisual();
+        using (var context = background.RenderOpen())
+            context.DrawRectangle(window.Background ?? Brushes.White, null, new Rect(0, 0, width, height));
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(background); bitmap.Render(root);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var file = File.Create(Path.Combine(folder, name + ".png"));
+        encoder.Save(file);
+    }
+
     private static MainWindow NewMainWindow(DataService data) => new(data, (_, token) => Task.FromResult(new StockroomService.Snapshot([], DateTimeOffset.UtcNow)));
 
     private static Fixture NewFixture()

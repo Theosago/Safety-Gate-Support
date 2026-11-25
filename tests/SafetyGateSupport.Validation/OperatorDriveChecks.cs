@@ -22,6 +22,7 @@ internal static class OperatorDriveChecks
         ("The previous pilot's Drive folder, drawing and notes IDs survive upgrade and a renamed upload", () => ImportPilotAsync().GetAwaiter().GetResult()),
         ("Shared drawing coverage updates every linked Drive guide and clears removed drawings", () => SharedDrawingPublicationAsync().GetAwaiter().GetResult()),
         ("A shared supplemental PDF appears in exactly the selected units and updates their guides in place", () => SharedGuidePdfAsync().GetAwaiter().GetResult()),
+        ("Removing a guide PDF affects one unit, archives the last copy and rebuilds the Drive guide in place", () => RemoveGuidePdfAsync().GetAwaiter().GetResult()),
         ("Spare parts follow unit assignments and keep each item's last confirmed scan in the original Drive PDF", () => SparePartsAsync().GetAwaiter().GetResult()),
         ("Operator notes sync to and from the phone document while preserving previous edits", SharedNotesSyncAsyncTest),
         ("Batch QR sheets contain every stable unit URL across multiple print pages", CheckQrLabels),
@@ -310,6 +311,52 @@ internal static class OperatorDriveChecks
         Require(revised.Published == 2 && revised.Current == 1 && File.Exists(left.Path) &&
             state.Units[first.Id].Guide!.Id == firstGuide && state.Units[second.Id].Guide!.Id == secondGuide &&
             state.Units[first.Id].Electrical!.Id == firstPdf, "Revising the shared PDF should preserve earlier bytes and the Drive IDs.");
+    }
+
+    private static async Task RemoveGuidePdfAsync()
+    {
+        using var library = new Fixture();
+        using var drive = new FakeDrive();
+        using var http = new HttpClient(drive);
+        var publisher = new OperatorDrivePublisher(new(http, _ => Task.FromResult("fixture")), (_, _) => Task.FromResult<UnitGuidePhoto?>(null));
+        var state = new OperatorPublishingState { PublishAll = true };
+        var first = library.Units[0];
+        var second = library.Units[1];
+        library.AddPair(first, "Primary wiring", 0);
+        string pdf = Path.Combine(library.DirectoryPath, "Shared supplemental print.pdf");
+        File.WriteAllBytes(pdf, DrawingPdfFixture.TextPage(90));
+        OperatorPublishingState.SaveGuidePdf(library.Data, library.Root, library.Gate.Id, [first.Id, second.Id], pdf, null);
+        // An attachment saved by the earlier one-unit pilot lives in a per-unit folder.
+        string legacy = Path.Combine(OperatorPublishingState.AttachmentsPath(library.Root, first.Id), "Pilot leftover.pdf");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacy)!);
+        File.WriteAllBytes(legacy, DrawingPdfFixture.TextPage(0));
+        await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        var firstGuide = state.Units[first.Id].Guide!.Id;
+        Require(OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, first.Id).Count() == 2, "Fixture should list the shared and pilot PDFs.");
+
+        var shared = OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, first.Id).Single(p => p.UnitIds.Count == 2);
+        var now = new DateTimeOffset(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
+        OperatorPublishingState.RemoveGuidePdf(library.Data, library.Root, library.Gate.Id, first.Id, shared.Path, now);
+        Require(OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, first.Id).Select(p => Path.GetFileName(p.Path)).SequenceEqual(["Pilot leftover.pdf"]) &&
+            OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, second.Id).Single().UnitIds.SequenceEqual([second.Id]) &&
+            File.Exists(shared.Path), "Removing from one unit should leave the shared file with the other unit.");
+
+        OperatorPublishingState.RemoveGuidePdf(library.Data, library.Root, library.Gate.Id, first.Id, legacy, now);
+        OperatorPublishingState.RemoveGuidePdf(library.Data, library.Root, library.Gate.Id, second.Id, shared.Path, now);
+        string removed = OperatorPublishingState.RemovedGuideFolder(library.Root);
+        Require(!OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, first.Id).Any() &&
+            !OperatorPublishingState.GuidePdfsFor(library.Root, library.Gate.Id, second.Id).Any() &&
+            !OperatorPublishingState.LoadGuidePdfs(library.Root, library.Gate.Id).Any() &&
+            !File.Exists(shared.Path) && !File.Exists(legacy) &&
+            Directory.EnumerateFiles(removed, "*.pdf", SearchOption.AllDirectories).Select(Path.GetFileName).Order()
+                .SequenceEqual(["Pilot leftover.pdf", "Shared supplemental print.pdf"]),
+            "The last copies should move to Removed Guide PDFs rather than being deleted.");
+
+        await publisher.RunAsync(library.Data, library.Root, state, false, null, default);
+        using var document = PdfDocument.Open(drive.Items[firstGuide].Bytes!);
+        Require(state.Units[first.Id].Guide!.Id == firstGuide && document.GetPage(1).Text.Contains("Primary wiring") &&
+            !document.GetPage(1).Text.Contains("Shared supplemental print") && !document.GetPage(1).Text.Contains("Pilot leftover"),
+            "The Drive guide should be rebuilt in place without the removed PDFs.");
     }
 
     private static async Task SparePartsAsync()

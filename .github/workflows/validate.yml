@@ -49,6 +49,7 @@ jobs:
           SAFETYGATE_WEBVIEW_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/webview-smoke.html
           SAFETYGATE_OCR_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/ocr-smoke.png
           SAFETYGATE_PDF_SMOKE_FIXTURE: ${{ github.workspace }}/artifacts/pdf-smoke.pdf
+          SAFETYGATE_UI_SNAPSHOTS: ${{ github.workspace }}/ui-snapshots
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
@@ -65,6 +66,14 @@ jobs:
             Write-Output "::error title=Windows desktop validation log (exit $validationExitCode)::$failureTail"
           }
           exit $validationExitCode
+      - name: Upload UI snapshots for design review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: UI-snapshots
+          path: ui-snapshots/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Publish self-contained Windows x64 app
         run: dotnet publish SafetyGateSupport/SafetyGateSupport.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/win-x64
       - name: Publish Siemens USB check tool

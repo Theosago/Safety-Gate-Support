@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console for plant safety gates, version **8.6.0**.
+Windows WPF support console for plant safety gates, version **8.6.1**.
 
 Engineers and electricians pick a unit from a searchable photo gallery and get
 its identification photo, current electrical drawing, shared notes, replacement

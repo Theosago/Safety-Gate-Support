@@ -95,7 +95,7 @@ public partial class MainWindow
                 try
                 {
                     var guideFiles = OperatorPublishingState.GuidePdfsFor(_data.SharedRoot, gate.Id, unit.Id)
-                        .Select(pdf => new AssignedDrawings.FileItem(Path.GetFileName(pdf.Path), pdf.Path) { GuideUnitIds = pdf.UnitIds });
+                        .Select(pdf => new AssignedDrawings.FileItem("Guide PDF • " + Path.GetFileName(pdf.Path), pdf.Path) { GuideUnitIds = pdf.UnitIds });
                     return new AssignedDrawings.Listing(assigned.Files.Concat(guideFiles).ToArray(), assigned.Unavailable);
                 }
                 catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or System.Text.Json.JsonException)
@@ -261,6 +261,31 @@ public partial class MainWindow
         bool canReplace = DrawingFileBox.SelectedItem is AssignedDrawings.FileItem { Resource: { StorageMode: "Asset", AllowUserUpload: true } };
         ReplaceDrawingButton.Visibility = canReplace ? Visibility.Visible : Visibility.Collapsed;
         ReplaceDrawingButton.IsEnabled = enabled && canReplace;
+        bool isGuide = DrawingFileBox.SelectedItem is AssignedDrawings.FileItem { GuideUnitIds: not null } && !_data.IsHomePreview;
+        RemoveGuidePdfButton.Visibility = isGuide ? Visibility.Visible : Visibility.Collapsed;
+        RemoveGuidePdfButton.IsEnabled = enabled && isGuide;
+    }
+
+    private async void RemoveGuidePdf_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGate is not { } gate || SelectedUnit is not { } unit || InlineBusy || _drawingListing is not null ||
+            DrawingFileBox.SelectedItem is not AssignedDrawings.FileItem { GuideUnitIds: { } covered } file) return;
+        string name = Path.GetFileName(file.Path);
+        string others = covered.Count > 1 ? " Other units on this asset keep it." : " It is the last unit using this PDF, so the file moves to Removed Guide PDFs on the shared drive.";
+        if (MessageBox.Show(this, $"Remove {name} from {unit.UnitDisplay}'s guide?{others}\n\nThe unit guide on Google Drive is rebuilt without it at the next publish.",
+            "Remove guide PDF", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
+        UpdateDrawingUploadButtons(false);
+        try
+        {
+            await OperatorDriveRunner.RemoveGuidePdfAsync(_data, gate.Id, unit.Id, file.Path);
+            if (_isClosed) return;
+            LoadDrawings(gate, unit);
+            DrawingPublishStatus.Text = $"Removed {name} from this unit.";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException or InvalidDataException)
+        {
+            if (!_isClosed) { MessageBox.Show(this, error.Message, "Guide PDF was not removed", MessageBoxButton.OK, MessageBoxImage.Warning); UpdateDrawingUploadButtons(true); }
+        }
     }
 
     private async void AddDrawing_Click(object sender, RoutedEventArgs e) => await UploadDrawingAsync(replace: false);
