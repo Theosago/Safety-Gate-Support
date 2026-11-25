@@ -10,6 +10,22 @@ public static class SignalStatePreview
     public sealed record Segment(int Number, int Red, int Green, int Blue, int Brightness, int Effect)
     {
         public bool IsOff => Brightness == 0 || Effect == 0 || (Red == 0 && Green == 0 && Blue == 0);
+        /// <summary>
+        /// The colour the configurator's own simulator shows: stored values are power-limited (amber is
+        /// stored as 134, 120, 0), so the brightest channel is scaled back to full before display.
+        /// </summary>
+        public (byte R, byte G, byte B) DisplayColor
+        {
+            get
+            {
+                int max = Math.Max(Red, Math.Max(Green, Blue));
+                if (max == 0) return (0, 0, 0);
+                static byte Scale(int value, int max) => (byte)Math.Min(255, (int)Math.Round(value * 255.0 / max));
+                return (Scale(Red, max), Scale(Green, max), Scale(Blue, max));
+            }
+        }
+        /// <summary>The simulator's opacity for the stored brightness (25 % to 100 %).</summary>
+        public double DisplayOpacity => Brightness / 255.0 * 0.75 + 0.25;
         public string EffectName => Effect switch { 0 => "Off", 10 => "Steady", 50 => "Blink · 1 Hz", 51 => "Blink · 2 Hz", 52 => "Blink · 3 Hz", 90 => "Flash once", 91 => "Flash twice", 92 => "Flash three times", 130 => "Rotate", _ => $"Effect {Effect}" };
     }
     public sealed record Appearance(IReadOnlyList<Segment> Segments, int SoundMode, int SoundVolume);

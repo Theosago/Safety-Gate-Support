@@ -15,6 +15,8 @@ internal static class SignalArchiveChecks
         ("signal: preserves caller's archive bytes", PreservesBytes),
         ("signal: preview maps the six input bits without altering configuration", StatePreview),
         ("signal: visual appearance uses stored colors, effects and sound without edits", VisualAppearance),
+        ("signal: configurator pin names, wire colours and state names are read", Labels),
+        ("signal: display colours match the configurator simulator", DisplayColours),
         ("signal: all four known hardware variants", KnownHardware),
         ("signal: deflated ZIP is supported", DeflatedArchive),
         ("signal: unknown editor metadata is ignored", UnknownEditorMetadata),
@@ -86,6 +88,39 @@ internal static class SignalArchiveChecks
         Check(selected.GetBytes().SequenceEqual(bytes), "Visual preview changed the upload bytes.");
         Throws<ArgumentOutOfRangeException>(() => SignalStatePreview.ReadAppearance(selected, -1));
         Throws<ArgumentOutOfRangeException>(() => SignalStatePreview.ReadAppearance(selected, 64));
+    }
+
+    private static void Labels()
+    {
+        // The configurator writes auto-properties as "<Name>k__BackingField"; mirror its layout.
+        byte[] bytes = Archive(files => Change(files, "configurator.conf", root =>
+        {
+            root["<Pins>k__BackingField"] = new JsonArray(
+                new JsonObject { ["<Color>k__BackingField"] = "WH", ["<Description>k__BackingField"] = "", ["<Name>k__BackingField"] = "Input 1", ["<Number>k__BackingField"] = 1 },
+                new JsonObject { ["<Color>k__BackingField"] = "BN", ["<Description>k__BackingField"] = "Gate open", ["<Name>k__BackingField"] = "Open", ["<Number>k__BackingField"] = 2 },
+                new JsonObject { ["<Color>k__BackingField"] = "BU", ["<Name>k__BackingField"] = "COM", ["<Number>k__BackingField"] = 7 });
+            root["states"] = new JsonArray(
+                new JsonObject { ["<Name>k__BackingField"] = "Fault", ["<PinCombination>k__BackingField"] = new JsonObject { ["state"] = new JsonArray(true, true, true, false, false, false) } },
+                new JsonObject { ["<Name>k__BackingField"] = "State (Copy 2) (Copy 2)", ["<PinCombination>k__BackingField"] = new JsonObject { ["state"] = new JsonArray(false, true, false, false, true, true) } });
+        }));
+        var selected = PreparedSignalUpload.FromBytes(bytes, "labels.signal");
+        var labels = SignalLabels.Read(selected);
+        Check(labels.Inputs.Count == 6 && labels.Inputs[0].Label == "Input 1 (white)" && labels.Inputs[1].Label == "2 Open (brown)" && labels.Inputs[1].Description == "Gate open", "Pin names or wire colours were not read.");
+        Check(labels.Inputs[2].Label == "Input 3" && labels.Inputs[0].WireColor is not null, "Unlisted inputs did not fall back to their numbers.");
+        Check(labels.NameFor(7) == "Fault" && labels.NameFor(50) is null && labels.NameFor(1) is null, "State names were not mapped to their input combination.");
+        Check(selected.GetBytes().SequenceEqual(bytes), "Reading labels changed the upload bytes.");
+        var plain = SignalLabels.Read(PreparedSignalUpload.FromBytes(Archive(), "plain.signal"));
+        Check(plain.Inputs.Select(i => i.Label).SequenceEqual(Enumerable.Range(1, 6).Select(n => $"Input {n}")) && plain.StateNames.Count == 0, "A file without names did not fall back to input numbers.");
+    }
+
+    private static void DisplayColours()
+    {
+        // Amber authored as 255, 227, 0 is stored power-limited as 134, 120, 0.
+        var amber = new SignalStatePreview.Segment(1, 134, 120, 0, 255, 10);
+        Check(amber.DisplayColor == (255, 228, 0) && Math.Abs(amber.DisplayOpacity - 1) < 1e-9, "Stored amber was not shown as the simulator shows it.");
+        Check(new SignalStatePreview.Segment(1, 255, 0, 0, 255, 10).DisplayColor == (255, 0, 0), "A full colour changed.");
+        Check(new SignalStatePreview.Segment(1, 0, 0, 0, 0, 10).DisplayColor == (0, 0, 0), "Black was scaled.");
+        Check(Math.Abs(new SignalStatePreview.Segment(1, 255, 0, 0, 0, 10).DisplayOpacity - 0.25) < 1e-9, "Brightness opacity does not match the simulator.");
     }
 
     private static void PreservesBytes()

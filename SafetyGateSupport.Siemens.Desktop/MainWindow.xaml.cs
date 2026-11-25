@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private string _comparison = "Stored configuration has not been checked against the selected file.";
     private sealed record AssignedFile(string Path, string Label);
     private string? _selectedPath, _pairedPdf;
+    private SignalLabels _labels = SignalLabels.Default;
     private CancellationTokenSource? _pdfLoad;
 
     /// <summary>Renders the first page of the PDF saved with a configuration; supplied by the host app.</summary>
@@ -69,7 +70,7 @@ public partial class MainWindow : Window
     private async Task SelectFileAsync(string path)
     {
         if (_isRefreshing || _operationCancellation is not null) return;
-        _selectedUpload = null; _selectedPath = null;
+        _selectedUpload = null; _selectedPath = null; _labels = SignalLabels.Default; ApplyInputLabels();
         ResetObservation();
         MatchText.Text = "";
         _comparison = "Stored configuration has not been checked against the selected file.";
@@ -78,6 +79,7 @@ public partial class MainWindow : Window
             _isRefreshing = true; UpdateControls();
             _selectedUpload = await Task.Run(() => PreparedSignalUpload.Load(path));
             _selectedPath = path;
+            _labels = SignalLabels.Read(_selectedUpload); ApplyInputLabels();
             int states = _selectedUpload.Archive.ActiveStates.Count;
             SelectedSignalText.Text = $"{states} input {(states == 1 ? "state" : "states")} configured · {System.IO.Path.GetFileName(path)}";
             SelectedSignalText.ToolTip = path;
@@ -101,17 +103,15 @@ public partial class MainWindow : Window
         {
             SignalStatePreview.Appearance look;
             try { look = SignalStatePreview.ReadAppearance(selected, state); } catch (Exception) { continue; }
-            string inputs = string.Join(" + ", Enumerable.Range(1, 6).Where(i => (state & (1 << (i - 1))) != 0));
             var row = new Grid { Margin = new Thickness(0, 1, 0, 1) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(128) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.Children.Add(new TextBlock { Text = inputs.Length == 0 ? "No inputs" : "Input " + inputs, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap });
+            row.Children.Add(StateHeading(state));
             var swatches = new WrapPanel { VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(swatches, 1); row.Children.Add(swatches);
             foreach (var segment in look.Segments)
             {
-                var color = segment.IsOff ? Color.FromRgb(228, 234, 239) : Color.FromRgb((byte)segment.Red, (byte)segment.Green, (byte)segment.Blue);
                 var cell = new StackPanel { Width = 34, Margin = new Thickness(0, 0, 4, 0) };
-                cell.Children.Add(new Border { Height = 22, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(color), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(segment.IsOff ? 0.5 : 1),
+                cell.Children.Add(new Border { Height = 22, CornerRadius = new CornerRadius(4), Background = SegmentBrush(segment), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(segment.IsOff ? 0.5 : 1),
                     ToolTip = $"Segment {segment.Number}: {(segment.IsOff ? "off" : segment.EffectName)}" });
                 if (!segment.IsOff && segment.Effect != 10) cell.Children.Add(new TextBlock { Text = segment.Effect switch { >= 50 and < 90 => "blink", >= 90 and < 130 => "flash", 130 => "rotate", _ => "fx" }, FontSize = 10, HorizontalAlignment = HorizontalAlignment.Center });
                 swatches.Children.Add(cell);
@@ -125,6 +125,47 @@ public partial class MainWindow : Window
             StateTablePanel.Children.Add(button);
         }
         if (StateTablePanel.Children.Count == 0) StateTablePanel.Children.Add(new TextBlock { Text = "This file has no configured states." });
+    }
+
+    private static Brush SegmentBrush(SignalStatePreview.Segment segment)
+    {
+        if (segment.IsOff) return new SolidColorBrush(Color.FromRgb(228, 234, 239));
+        var (r, g, b) = segment.DisplayColor;
+        return new SolidColorBrush(Color.FromRgb(r, g, b)) { Opacity = segment.DisplayOpacity };
+    }
+
+    private static Brush WireBrush(SignalLabels.Input input) => input.WireColor is { } c ? new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B)) : Brushes.Transparent;
+
+    // The inputs that make this state, as wire-coloured chips, and the state's own name when it has one.
+    private FrameworkElement StateHeading(int state)
+    {
+        var heading = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        var chips = new WrapPanel();
+        var active = _labels.Inputs.Where(input => (state & (1 << (input.Number - 1))) != 0).ToArray();
+        if (active.Length == 0) chips.Children.Add(new TextBlock { Text = "No inputs", FontWeight = FontWeights.SemiBold });
+        foreach (var input in active)
+        {
+            var chip = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 8, 1), ToolTip = input.Label + (input.Description.Length == 0 ? "" : " — " + input.Description) };
+            if (input.WireColor is not null) chip.Children.Add(new Border { Width = 11, Height = 11, CornerRadius = new CornerRadius(6), Background = WireBrush(input), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
+            chip.Children.Add(new TextBlock { Text = $"In {input.Number}", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+            chips.Children.Add(chip);
+        }
+        heading.Children.Add(chips);
+        if (_labels.NameFor(state) is { } name) heading.Children.Add(new TextBlock { Text = name, FontSize = 12, Opacity = 0.75, TextWrapping = TextWrapping.Wrap });
+        return heading;
+    }
+
+    // Input switches show the wire colour and name stored with the configuration.
+    private void ApplyInputLabels()
+    {
+        foreach (var (toggle, input) in InputSwitches.Zip(_labels.Inputs))
+        {
+            var content = new StackPanel { Orientation = Orientation.Horizontal };
+            if (input.WireColor is not null) content.Children.Add(new Border { Width = 11, Height = 11, CornerRadius = new CornerRadius(6), Background = WireBrush(input), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center });
+            content.Children.Add(new TextBlock { Text = input.Label });
+            toggle.Content = content;
+            toggle.ToolTip = $"Preview {input.Label} ON / OFF" + (input.Description.Length == 0 ? "" : " — " + input.Description);
+        }
     }
 
     private async Task LoadPairedPdfAsync(string? signalPath)
@@ -158,18 +199,17 @@ public partial class MainWindow : Window
     private void UpdatePreview()
     {
         int state = PreviewState;
-        string on = string.Join(", ", Enumerable.Range(1, 6).Where(i => (state & (1 << (i - 1))) != 0));
-        InputStateText.Text = $"Inputs ON: {(on.Length == 0 ? "none" : on)}  •  stored combination {state}";
+        string on = string.Join(", ", _labels.Inputs.Where(input => (state & (1 << (input.Number - 1))) != 0).Select(input => input.Label));
+        InputStateText.Text = $"Inputs ON: {(on.Length == 0 ? "none" : on)}" + (_labels.NameFor(state) is { } name ? $"  •  {name}" : "") + $"  •  stored combination {state}";
         SegmentPreviewPanel.Children.Clear();
         PreviewText.Text = _selectedUpload is null ? "Choose a configuration to view expected outputs." : SignalStatePreview.Describe(_selectedUpload, state);
         if (_selectedUpload is null) { SoundPreviewText.Text = "Choose a configuration to see its lights and sound."; return; }
         var appearance = SignalStatePreview.ReadAppearance(_selectedUpload, state);
         foreach (var segment in appearance.Segments)
         {
-            var color = segment.IsOff ? Color.FromRgb(228, 234, 239) : Color.FromRgb((byte)segment.Red, (byte)segment.Green, (byte)segment.Blue);
             var panel = new StackPanel { Width = 86, Margin = new Thickness(0, 0, 10, 8) };
             panel.Children.Add(new TextBlock { Text = $"Segment {segment.Number}", FontSize = 12, Margin = new Thickness(0, 0, 0, 5) });
-            panel.Children.Add(new Border { Height = 46, CornerRadius = new CornerRadius(7), Background = new SolidColorBrush(color), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(1), ToolTip = $"RGB {segment.Red}, {segment.Green}, {segment.Blue}; brightness {segment.Brightness}" });
+            panel.Children.Add(new Border { Height = 46, CornerRadius = new CornerRadius(7), Background = SegmentBrush(segment), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(1), ToolTip = $"RGB {segment.Red}, {segment.Green}, {segment.Blue}; brightness {segment.Brightness}" });
             panel.Children.Add(new TextBlock { Text = segment.IsOff ? "Off" : segment.EffectName, FontSize = 12, Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
             SegmentPreviewPanel.Children.Add(panel);
         }
