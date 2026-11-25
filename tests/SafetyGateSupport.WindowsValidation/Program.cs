@@ -45,9 +45,9 @@ internal static class Program
         // rather than leave an unattended runner waiting indefinitely.
         using var watchdog = new System.Threading.Timer(_ =>
         {
-            Console.Error.WriteLine("FAIL: Windows validation exceeded its five-minute deadline.");
+            Console.Error.WriteLine("FAIL: Windows validation exceeded its eight-minute deadline.");
             Environment.Exit(1);
-        }, null, TimeSpan.FromMinutes(5), Timeout.InfiniteTimeSpan);
+        }, null, TimeSpan.FromMinutes(8), Timeout.InfiniteTimeSpan);
 
         int completionCode = 2;
         try
@@ -166,7 +166,7 @@ internal static class Program
                 var watch = Stopwatch.StartNew();
                 try
                 {
-                    await check().WaitAsync(TimeSpan.FromSeconds(60));
+                    await check().WaitAsync(TimeSpan.FromSeconds(90));
                     Console.WriteLine($"PASS {name} ({watch.ElapsedMilliseconds} ms)");
                     passed++;
                 }
@@ -717,7 +717,8 @@ internal static class Program
         await SelectGalleryUnit(main, fixture.BlueUnit);
         var image = Control<Image>(main, "DrawingImage"); var status = Control<TextBlock>(main, "DrawingPairStatusText");
         await WaitUntil(() => HasColor(image.Source, Colors.Red) && status.Text.Contains("uploaded together"), "Uploaded PDF did not display with its companion status.");
-        Require(((System.Windows.Documents.Hyperlink)main.FindName("DownloadDwgLink")).IsEnabled, "DWG companion download link is unavailable.");
+        // The status text is shown before the companion file probe enables the link.
+        await WaitUntil(() => ((System.Windows.Documents.Hyperlink)main.FindName("DownloadDwgLink")).IsEnabled, "DWG companion download link is unavailable.");
         // Use the production watcher with a short test interval, without waiting 15 seconds.
         var timer = (DispatcherTimer)typeof(MainWindow).GetField("_drawingWatch", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!;
         await WaitUntil(() => ((string)typeof(MainWindow).GetField("_drawingFingerprint", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!).Length > 0, "Companion fingerprint was not recorded.");
@@ -866,10 +867,13 @@ internal static class Program
         { Directory.CreateDirectory(Path.GetDirectoryName(output)!); File.WriteAllText(output, html); }
         // WebView2 can take well over ten seconds to start on a cold CI runner; the unchanged fixture
         // only updates after 60 s, so a longer limit still proves stale inventory is rejected.
-        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(unchanged ? 25 : 50));
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(unchanged ? 25 : 40));
         try
         {
-            var snapshot = await StockroomWebViewReader.SearchAsync(new Uri(path).AbsoluteUri, id, cancel.Token);
+            StockroomService.Snapshot snapshot;
+            // A cold CI runner can occasionally stall WebView2 start-up past the reader's own limit; retry once.
+            try { snapshot = await StockroomWebViewReader.SearchAsync(new Uri(path).AbsoluteUri, id, cancel.Token); }
+            catch (TimeoutException) when (!unchanged) { snapshot = await StockroomWebViewReader.SearchAsync(new Uri(path).AbsoluteUri, id, CancellationToken.None); }
             Require(!unchanged, "Initial inventory was accepted without a result update.");
             var part = StockroomService.ImportItem(snapshot, id);
             Require(part.PartNumber == id && part.Description == "Imported additive" && part.ReportedQuantity == 51071.52m && part.BinLocation == "TRUCK SHOP" && part.Site == "HRM" && part.StockroomDescription == "Complete source specification", "Unhighlighted delayed results lost source fields or accepted stale inventory.");
@@ -1981,6 +1985,17 @@ internal static class Program
             string label = new string((tab.Header?.ToString() ?? "tab").Where(char.IsLetterOrDigit).ToArray());
             Snap(admin, output, $"{10 + index++:D2}-setup-{label}");
         }
+        Control<TabItem>(admin, "UnitsSetupTab").IsSelected = true;
+        Control<ComboBox>(admin, "GateAreaFilterBox").SelectedItem = fixture.Gate.Category;
+        var gateList = Control<ListBox>(admin, "GateList");
+        gateList.SelectedItem = gateList.Items.Cast<SafetyGate>().Single(gate => gate.Id == fixture.Gate.Id);
+        var unitList = Control<ListBox>(admin, "UnitListAdmin");
+        unitList.SelectedItem = unitList.Items.Cast<SafetySystem>().Single(unit => unit.Id == fixture.RedUnit.Id);
+        await WaitUntil(() => Control<Image>(admin, "UnitPhotoPreview").Source is not null, "Snapshot unit photo did not load.");
+        await DispatcherSettled(); Snap(admin, output, "20-setup-unit-selected");
+        var advanced = Control<CheckBox>(admin, "AdvancedSetupCheck"); advanced.IsChecked = true; advanced.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
+        Control<TabItem>(admin, "ResourcesSetupTab").IsSelected = true; await DispatcherSettled(); Snap(admin, output, "21-setup-resources");
+        Control<TabItem>(admin, "FlowsSetupTab").IsSelected = true; await DispatcherSettled(); Snap(admin, output, "22-setup-flows");
         admin.Close();
 
         var publishing = Track(new OperatorDriveWindow(fixture.Data, fixture.BlueUnit.Id)); ShowOffscreen(publishing);

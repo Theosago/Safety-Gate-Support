@@ -50,7 +50,7 @@ public partial class MainWindow
             var status = await Task.Run(() => DrawingPairStatus.Check(_data, gate, file.Resource, file.Path, token), token);
             if (_isClosed || token.IsCancellationRequested || _drawingPath != file.Path) return;
             _drawingDwg = status.DwgPath;
-            DrawingPairStatusText.Text = status.Message; DrawingPairStatusText.Foreground = new SolidColorBrush(status.NeedsAttention ? Color.FromRgb(150, 88, 19) : Color.FromRgb(65, 100, 115));
+            DrawingPairStatusText.Text = status.Message; DrawingPairStatusText.SetResourceReference(TextBlock.ForegroundProperty, status.NeedsAttention ? "ThemeForeground965813" : "InkMuted");
             var probe = await Task.Run(() => (Fingerprint: DrawingFingerprint(file.Path, status.DwgPath), Available: status.DwgPath is not null && File.Exists(status.DwgPath)), token);
             if (!token.IsCancellationRequested && !_isClosed && _drawingPath == file.Path) { _drawingFingerprint = probe.Fingerprint; _drawingDwgAvailable = probe.Available; UpdateDrawingControls(); }
         }

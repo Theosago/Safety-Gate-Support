@@ -182,19 +182,20 @@
         <TextBox x:Name="UnitNumberBox" Grid.Column="2" AutomationProperties.Name="Unit number"/>
        </Grid>
        <Border x:Name="UnitPhotoPreviewBorder" Margin="0,12,0,0" Padding="12" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Focusable="True" AllowDrop="True" PreviewKeyDown="UnitPhotoPreviewBorder_PreviewKeyDown" MouseLeftButtonDown="UnitPhotoPreviewBorder_MouseLeftButtonDown" DragOver="UnitPhotoPreviewBorder_DragOver" Drop="UnitPhotoPreviewBorder_Drop" ToolTip="Click here and press Ctrl+V to paste an image, or drag an image file onto it.">
-        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="200"/></Grid.ColumnDefinitions>
+        <StackPanel>
          <Border Height="250" Background="{DynamicResource Surface}" CornerRadius="8" BorderBrush="{DynamicResource Line}" BorderThickness="1">
           <Grid><Image x:Name="UnitPhotoPreview" Stretch="Uniform" Margin="4"/><TextBlock Text="{Binding Text, ElementName=UnitPhotoPreviewStatus}" TextWrapping="Wrap" TextAlignment="Center" Margin="20" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Source, ElementName=UnitPhotoPreview}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
          </Border>
-         <StackPanel Grid.Column="1" Margin="14,0,0,0">
-          <TextBlock Text="Identification photo" FontWeight="SemiBold"/>
-          <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,8" Text="Choose a file, paste (Ctrl+V after clicking the preview) or drag an image here."/>
-          <Button Content="Choose photo…" Click="ChoosePhoto_Click" HorizontalAlignment="Stretch" Margin="0,0,0,6"/>
-          <Button Content="Paste image" Click="PastePhoto_Click" HorizontalAlignment="Stretch" Margin="0"/>
-          <TextBlock x:Name="UnitPhotoText" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkMuted}" Margin="0,8,0,0"/>
-          <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Style="{StaticResource HelpText}" Margin="0,6,0,0"/>
-         </StackPanel>
-        </Grid>
+         <DockPanel Margin="0,10,0,0">
+          <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top"><Button Content="Choose photo…" Click="ChoosePhoto_Click" Margin="4,0,0,0"/><Button Content="Paste image" Click="PastePhoto_Click" Margin="8,0,0,0"/></WrapPanel>
+          <StackPanel>
+           <TextBlock Text="Identification photo" FontWeight="SemiBold"/>
+           <TextBlock Style="{StaticResource HelpText}" Text="Choose a file, paste (click the preview, then Ctrl+V) or drag an image onto it."/>
+          </StackPanel>
+         </DockPanel>
+         <TextBlock x:Name="UnitPhotoText" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkMuted}" Margin="0,6,0,0"/>
+         <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Style="{StaticResource HelpText}" Margin="0,2,0,0"/>
+        </StackPanel>
        </Border>
        <TextBlock Text="Equipment on this unit" Style="{StaticResource FieldLabel}"/>
        <WrapPanel><CheckBox x:Name="UnitHasSignalColumnCheck" Content="Signal column" Margin="0,2,24,0"/><CheckBox x:Name="UnitHasScannerCheck" Content="Safety scanner" Margin="0,2,0,0"/></WrapPanel>
@@ -235,7 +236,7 @@
    </TabItem>
 
    <!-- COMMON PROBLEMS & HELP -->
-   <TabItem x:Name="HelpSetupTab" Header="Common problems &amp; help" Tag="&#xE897;">
+   <TabItem x:Name="HelpSetupTab" Header="Common problems" Tag="&#xE897;">
     <Grid Margin="24,20,24,16"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="320"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <StackPanel Grid.ColumnSpan="3" Margin="0,0,0,14">
       <TextBlock Text="Common problems &amp; help" Style="{StaticResource PageHeading}"/>
@@ -296,12 +297,9 @@
       <Border Style="{StaticResource Card}" Margin="0,0,0,14"><StackPanel>
        <TextBlock Text="Add or refresh a part by Item ID" Style="{StaticResource SectionTitle}"/>
        <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Details and any supplied photo are saved to the shared library."/>
-       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel><TextBlock Text="Stockroom" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="ImportPlantBox" DisplayMemberPath="Name" AutomationProperties.Name="Stockroom plant"/></StackPanel>
-        <StackPanel Grid.Column="2"><TextBlock Text="Item ID" Style="{StaticResource FieldLabel}"/>
-         <DockPanel><Button x:Name="ImportItemButton" Content="Import" Click="ImportItem_Click" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"/><TextBox x:Name="PartNumberBox" FontSize="16" KeyDown="ImportItem_KeyDown" AutomationProperties.Name="Item ID"/></DockPanel>
-        </StackPanel>
-       </Grid>
+       <TextBlock Text="Stockroom" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="ImportPlantBox" DisplayMemberPath="Name" MaxWidth="320" HorizontalAlignment="Stretch" AutomationProperties.Name="Stockroom plant"/>
+       <TextBlock Text="Item ID" Style="{StaticResource FieldLabel}"/>
+       <DockPanel MaxWidth="520" HorizontalAlignment="Stretch"><Button x:Name="ImportItemButton" Content="Import" Click="ImportItem_Click" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"/><TextBox x:Name="PartNumberBox" FontSize="16" KeyDown="ImportItem_KeyDown" AutomationProperties.Name="Item ID"/></DockPanel>
        <TextBlock x:Name="ImportItemStatus" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource InkMuted}"/>
        <Expander Header="Bulk import by Item ID" Margin="-6,8,0,0"><StackPanel>
         <TextBlock Style="{StaticResource HelpText}" Text="Paste up to 100 IDs separated by lines, commas or spaces. Duplicates are skipped. Choose unit assignments afterwards."/>
