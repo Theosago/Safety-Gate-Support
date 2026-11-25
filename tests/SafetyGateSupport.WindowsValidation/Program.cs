@@ -1999,8 +1999,12 @@ internal static class Program
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(background); bitmap.Render(root);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var file = File.Create(Path.Combine(folder, name + ".png"));
-        encoder.Save(file);
+        using (var file = File.Create(Path.Combine(folder, name + ".png"))) encoder.Save(file);
+        // A compact JPEG copy is printed to the CI log for review where artifact downloads are unavailable.
+        Directory.CreateDirectory(Path.Combine(folder, "compact"));
+        var compact = new TransformedBitmap(bitmap, new ScaleTransform(0.62, 0.62));
+        var jpeg = new JpegBitmapEncoder { QualityLevel = 72 }; jpeg.Frames.Add(BitmapFrame.Create(compact));
+        using (var file = File.Create(Path.Combine(folder, "compact", name + ".jpg"))) jpeg.Save(file);
     }
 
     private static MainWindow NewMainWindow(DataService data) => new(data, (_, token) => Task.FromResult(new StockroomService.Snapshot([], DateTimeOffset.UtcNow)));

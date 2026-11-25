@@ -258,7 +258,7 @@ public partial class MainWindow : Window
     private void SetActiveNavigation(Button active)
     {
         foreach (var button in new[] { HomeNav, SystemsNav, TroubleshootNav, ManualsNav, PartsNav })
-            button.Background = ReferenceEquals(button, active) ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 69, 88)) : System.Windows.Media.Brushes.Transparent;
+            button.Tag = ReferenceEquals(button, active) ? "Active" : null;
     }
     private void EnsureSystemAreaSelected()
     {

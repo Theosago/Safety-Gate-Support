@@ -66,6 +66,18 @@ jobs:
             Write-Output "::error title=Windows desktop validation log (exit $validationExitCode)::$failureTail"
           }
           exit $validationExitCode
+      - name: Print compact UI snapshots for design review
+        if: always() && github.ref != 'refs/heads/main'
+        shell: pwsh
+        run: |
+          if (!(Test-Path ui-snapshots/compact)) { exit 0 }
+          foreach ($file in Get-ChildItem ui-snapshots/compact -Filter *.jpg | Sort-Object Name) {
+            $data = [Convert]::ToBase64String([IO.File]::ReadAllBytes($file.FullName))
+            for ($i = 0; $i -lt $data.Length; $i += 3000) {
+              $part = $data.Substring($i, [Math]::Min(3000, $data.Length - $i))
+              Write-Output "SNAP|$($file.BaseName)|$part"
+            }
+          }
       - name: Upload UI snapshots for design review
         if: always()
         uses: actions/upload-artifact@v4
