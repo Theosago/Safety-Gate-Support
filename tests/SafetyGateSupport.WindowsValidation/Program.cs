@@ -1656,7 +1656,8 @@ internal static class Program
         data.Settings.SharedRoot = Path.Combine(root, "not-initialized");
         var admin = Track(new AdminWindow(data)); ShowOffscreen(admin);
         await WaitUntil(() => admin.IsEnabled, "Guided Setup did not load.");
-        Require(Control<TabItem>(admin, "StartSetupTab").IsSelected && Control<TabItem>(admin, "ResourcesSetupTab").Visibility == Visibility.Collapsed, "Setup did not start with a focused first-plant flow.");
+        Require(Control<TabItem>(admin, "LibrarySetupTab").IsSelected && Control<TabItem>(admin, "StartSetupTab").Visibility == Visibility.Collapsed &&
+            Control<TabItem>(admin, "ResourcesSetupTab").Visibility == Visibility.Collapsed, "Setup without a library did not open on Library & software with Start here and Resource buttons hidden.");
         Control<TextBox>(admin, "StartLibraryPathBox").Text = Path.Combine(root, "plant");
         Click(Control<Button>(admin, "CreateBlankLibraryButton"));
         await WaitUntil(() => Control<TabControl>(admin, "SetupTabs").IsEnabled && Control<TextBlock>(admin, "StartGuideStatus").Text.Contains("first plant area"), "Missing area did not produce actionable feedback.");
@@ -1669,12 +1670,15 @@ internal static class Program
         Require(Control<TabItem>(admin, "UnitsSetupTab").IsSelected && Control<TextBox>(admin, "GateManufacturerBox").Text.Length == 0, "Add asset did not open a neutral editor.");
         Control<TextBox>(admin, "GateAssetBox").Text = "BOX-01"; Control<TextBox>(admin, "GateLocationBox").Text = "North walkway";
         Click(Control<Button>(admin, "SaveGateButton"));
+        Require(data.LoadSystems().SingleOrDefault() is { IsWholeAsset: true, UnitDisplay: "Whole asset" }, "A new asset did not appear as a whole asset.");
+        string wholeId = data.LoadSystems().Single().Id;
         Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
         Click(Control<Button>(admin, "StartAddUnitButton"));
         Require(Control<CheckBox>(admin, "UnitHasSignalColumnCheck").IsChecked == false && Control<CheckBox>(admin, "UnitHasScannerCheck").IsChecked == false, "A new plant unit assumed specific equipment.");
         Control<TextBox>(admin, "UnitNumberBox").Text = "1"; Click(Control<Button>(admin, "SaveUnitButton"));
         Control<TabItem>(admin, "StartSetupTab").IsSelected = true;
         Require(data.LoadSystems().Count == 1 && Control<ComboBox>(admin, "PilotUnitBox").Items.Count == 1, "Saved unit did not become available as the pilot.");
+        Require(data.LoadSystems().Single() is { IsWholeAsset: false, UnitNumber: "1" } numbered && numbered.Id == wholeId, "The first numbered unit did not take over the whole-asset record.");
         var first = data.LoadSystems().Single();
         string reference = Path.Combine(root, "Walkway reference.pdf");
         File.WriteAllBytes(reference, TestDrawingPdf());
@@ -1742,6 +1746,8 @@ internal static class Program
                     "Setup did not reopen for the selected operator unit.");
                 Require(Control<ComboBox>(reopenedSetup!, "PilotUnitBox").SelectedItem is SafetySystem resumed && resumed.Id == second.Id,
                     "Reopening Setup for the selected operator unit returned to a different pilot.");
+                Require(Control<TabItem>(reopenedSetup!, "UnitsSetupTab").IsSelected && Control<ListBox>(reopenedSetup!, "UnitListAdmin").SelectedItem is SafetySystem editing && editing.Id == second.Id,
+                    "Setup did not open on the unit being viewed.");
             }
             finally { reopenedSetup?.Close(); }
         }
@@ -2006,7 +2012,7 @@ internal static class Program
         await WaitUntil(() => Control<Image>(admin, "UnitPhotoPreview").Source is not null, "Snapshot unit photo did not load.");
         await DispatcherSettled(); Snap(admin, output, "20-setup-unit-selected");
         var advanced = Control<CheckBox>(admin, "AdvancedSetupCheck"); advanced.IsChecked = true; advanced.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
-        Control<TabItem>(admin, "ResourcesSetupTab").IsSelected = true; await DispatcherSettled(); Snap(admin, output, "21-setup-resources");
+        Control<TabItem>(admin, "ManualsSetupTab").IsSelected = true; await DispatcherSettled(); Snap(admin, output, "21-setup-manuals");
         Control<TabItem>(admin, "FlowsSetupTab").IsSelected = true; await DispatcherSettled(); Snap(admin, output, "22-setup-flows");
         admin.Close();
 

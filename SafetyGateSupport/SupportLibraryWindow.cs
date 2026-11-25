@@ -29,14 +29,14 @@ public sealed class SupportLibraryWindow : Window
     {
         SetResourceReference(StyleProperty, typeof(Window));
         _data = data;
-        Title = "Safety Gate Support — Support library"; Width = 1100; Height = 740; MinWidth = 850; MinHeight = 580;
+        Title = "Safety Gate Support — Software & configuration files"; Width = 1100; Height = 740; MinWidth = 850; MinHeight = 580;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var grid = new Grid { Margin = new Thickness(20) };
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var top = new StackPanel(); grid.Children.Add(top);
-        top.Children.Add(new TextBlock { Text = "Support library", FontSize = 25, FontWeight = FontWeights.Bold });
+        top.Children.Add(new TextBlock { Text = "Software & configuration files", FontSize = 24, FontWeight = FontWeights.SemiBold });
         top.Children.Add(new TextBlock { Text = "Import the original PDFs, DOCX, .signal, .hux or ZIP files from this PC. ZIP folders remain intact for portable software. Imports never run software or assign equipment automatically.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 5) });
         var toolbar = new WrapPanel(); top.Children.Add(toolbar);
         var import = new Button { Content = "Import files / ZIPs…" }; import.Click += Import_Click; toolbar.Children.Add(import);

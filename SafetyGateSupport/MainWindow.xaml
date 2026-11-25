@@ -31,10 +31,10 @@
      <Button x:Name="HomeNav" Style="{StaticResource NavButton}" Click="HomeNav_Click" AutomationProperties.Name="Find a unit"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Find a unit" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="SystemsNav" Style="{StaticResource NavButton}" Click="SystemsNav_Click" AutomationProperties.Name="Selected unit"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE890;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Selected unit" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="TroubleshootNav" Style="{StaticResource NavButton}" Click="TroubleshootNav_Click" Visibility="Collapsed" AutomationProperties.Name="Troubleshoot"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Troubleshoot" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="ManualsNav" Style="{StaticResource NavButton}" Click="ManualsNav_Click" AutomationProperties.Name="Manuals"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Manuals" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="ManualsNav" Style="{StaticResource NavButton}" Click="ManualsNav_Click" AutomationProperties.Name="Manuals and files"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Manuals &amp; files" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="PartsNav" Style="{StaticResource NavButton}" Click="PartsNav_Click" AutomationProperties.Name="Parts catalog"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE719;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Parts catalog" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="PublishDriveNav" Style="{StaticResource NavButton}" Click="PublishDrive_Click" Visibility="Collapsed" AutomationProperties.Name="Publish &amp; print QR"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE749;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Publish &amp; print QR" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="SupportLibraryNav" Style="{StaticResource NavButton}" Click="SupportLibrary_Click" AutomationProperties.Name="Support library"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Support library" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="SupportLibraryNav" Style="{StaticResource NavButton}" Click="SupportLibrary_Click" Visibility="Collapsed" AutomationProperties.Name="Support library"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Support library" VerticalAlignment="Center"/></StackPanel></Button>
     </StackPanel>
     <StackPanel Grid.Row="2" Margin="0,10,0,16">
      <Button x:Name="SetupButton" Style="{StaticResource NavButton}" Click="SetupSharedData_Click" Visibility="Collapsed" ToolTip="Open Plant setup (Ctrl+Alt+Shift+A)" AutomationProperties.Name="Plant setup"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Plant setup" VerticalAlignment="Center"/></StackPanel></Button>
@@ -269,8 +269,8 @@
 
    <!-- MANUALS -->
    <Grid Grid.Row="1" x:Name="ManualsView" Visibility="Collapsed">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <DockPanel><Button Content="Choose this unit’s manuals…" Click="ChooseUnitManuals_Click" DockPanel.Dock="Right"/><TextBlock Text="Manuals &amp; documents" Style="{StaticResource PageTitle}"/></DockPanel>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <DockPanel><Button Content="Choose this unit’s manuals…" Click="ChooseUnitManuals_Click" DockPanel.Dock="Right" VerticalAlignment="Center"/><TextBlock Text="Manuals &amp; files" Style="{StaticResource PageTitle}"/></DockPanel>
     <StackPanel Grid.Row="1" Margin="0,8,0,12">
      <TextBlock x:Name="ManualsIntroText" Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
      <TextBlock x:Name="ManualImportStatus" TextWrapping="Wrap" Margin="0,4,0,0"/>
@@ -283,6 +283,15 @@
       <Button Content="Open Manuals Folder" Click="OpenManualFolder_Click"/>
      </StackPanel>
     </Grid>
+    <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,14,0,0" Padding="18,14">
+     <DockPanel>
+      <Button x:Name="SoftwareFilesButton" Content="Open software &amp; config files…" Click="SupportLibrary_Click" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+      <StackPanel Margin="0,0,16,0">
+       <TextBlock Text="Software &amp; configuration files" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,3,0,0" Text="Manuals above are documents people read (PDF, Word). Software and configuration files are what technicians load onto equipment: ZIP packages, Siemens .signal, scanner .hux and installers."/>
+      </StackPanel>
+     </DockPanel>
+    </Border>
    </Grid>
 
    <!-- PARTS -->

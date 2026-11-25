@@ -53,43 +53,40 @@ public partial class MainWindow
     }
     private async void ChooseUnitManuals_Click(object sender, RoutedEventArgs e)
     {
-        if (SelectedUnit is not { } unit) { MessageBox.Show(this, "Select a unit first to choose its manuals."); return; }
-        var list = new ListBox { ItemsSource = _manuals.OrderBy(m => m.Title).ToList(), DisplayMemberPath = "Title", SelectionMode = SelectionMode.Multiple };
-        foreach (var manual in _manuals.Where(m => unit.ManualIds is { } ids ? ids.Contains(m.Id) : m.AppliesTo(unit.GateId, unit.Id))) list.SelectedItems.Add(manual);
-        var save = new Button { Content = "Save unit manuals", IsDefault = true }; var cancel = new Button { Content = "Cancel", IsCancel = true };
-        var buttons = new WrapPanel(); buttons.Children.Add(save); buttons.Children.Add(cancel);
-        var panel = new DockPanel { Margin = new Thickness(20) }; DockPanel.SetDock(buttons, Dock.Bottom); panel.Children.Add(buttons);
-        var label = new TextBlock { Text = unit.AdminDisplay + " — select the manuals used on this unit", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) }; DockPanel.SetDock(label, Dock.Top); panel.Children.Add(label); panel.Children.Add(list);
-        var dialog = new Window { Owner = this, Title = "Choose unit manuals", Width = 650, Height = 650, Content = panel, WindowStartupLocation = WindowStartupLocation.CenterOwner }; save.Click += (_, _) => dialog.DialogResult = true;
-        if (dialog.ShowDialog() != true) return;
-        var idsToSave = list.SelectedItems.Cast<ManualRecord>().Select(m => m.Id).ToList();
-        try { var result = await Task.Run(() => _data.SaveUnitManuals(unit.Id, idsToSave)); unit.ManualIds = result.ManualIds; _manualFilterGateId = unit.GateId; _manualFilterUnitId = unit.Id; RefreshManuals(); }
+        if (SelectedUnit is not { } unit || GateFor(unit) is not { } gate) { MessageBox.Show(this, "Select a unit first to choose its manuals."); return; }
+        var current = DataService.ManualIdsFor(unit, _manuals);
+        var options = _manuals.OrderBy(m => m.Title).Select(m => new AssignmentPickerWindow.Option(m.Id, m.Title, string.Join(" · ", new[] { m.Manufacturer, m.Model }.Where(s => !string.IsNullOrWhiteSpace(s))))).ToList();
+        var siblings = UnitsForGate(gate.Id);
+        var picked = AssignmentPickerWindow.Show(this, "Manuals for " + UnitTitle(gate, unit), "Tick the manuals and documents used on this equipment.", options, current, unit.UnitDisplay, gate.AssetDisplay, siblings.Count);
+        if (picked is null) return;
+        var targets = picked.WholeAsset ? siblings.Select(u => u.Id).ToList() : [unit.Id];
+        try
+        {
+            var saved = await Task.Run(() => _data.SaveUnitsManuals(targets, picked.SelectedIds));
+            foreach (var record in saved) if (_systems.FirstOrDefault(u => u.Id == record.Id) is { } local) local.ManualIds = record.ManualIds;
+            _manualFilterGateId = unit.GateId; _manualFilterUnitId = unit.Id; RefreshManuals();
+        }
         catch (Exception error) { MessageBox.Show(this, "Manual choices were not saved: " + error.Message); }
     }
     private async void ConfigureUnitParts_Click(object sender, RoutedEventArgs e)
     {
-        if (SelectedUnit is not { } unit) return;
-        var chosen = ReplacementPartsFor(unit).Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var search = new TextBox { Margin = new Thickness(0, 8, 0, 12), MinHeight = 34, ToolTip = "Search descriptions, locations or Item IDs" };
-        var checks = _parts.OrderBy(p => p.Description).Select(p => new CheckBox { Tag = p, Content = new TextBlock { Text = p.Description + " · " + p.LocationDisplay + " · Item ID: " + p.PartNumber, TextWrapping = TextWrapping.Wrap }, IsChecked = chosen.Contains(p.Id), Margin = new Thickness(0, 7, 0, 7) }).ToList();
-        var options = new StackPanel(); foreach (var check in checks) options.Children.Add(check);
-        search.TextChanged += (_, _) => { foreach (var check in checks) { var p = (PartRecord)check.Tag; check.Visibility = (p.Description + " " + p.PartNumber + " " + p.LocationValue).Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed; } };
-        var save = new Button { Content = "Save unit parts", IsDefault = true }; var cancel = new Button { Content = "Cancel", IsCancel = true };
-        var buttons = new WrapPanel(); buttons.Children.Add(save); buttons.Children.Add(cancel);
-        var panel = new DockPanel { Margin = new Thickness(20) }; DockPanel.SetDock(buttons, Dock.Bottom); panel.Children.Add(buttons);
-        var header = new StackPanel(); header.Children.Add(new TextBlock { Text = unit.AdminDisplay, FontSize = 20, TextWrapping = TextWrapping.Wrap }); header.Children.Add(new TextBlock { Text = "Choose only the parts used on this unit. Saved to shared data.", TextWrapping = TextWrapping.Wrap }); header.Children.Add(search); DockPanel.SetDock(header, Dock.Top); panel.Children.Add(header); panel.Children.Add(new ScrollViewer { Content = options, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
-        var dialog = new Window { Owner = this, Title = "Choose replacement parts", Content = panel, Width = 650, Height = 700, MinWidth = 450, MinHeight = 400, WindowStartupLocation = WindowStartupLocation.CenterOwner };
-        save.Click += (_, _) => dialog.DialogResult = true;
-        if (dialog.ShowDialog() != true) return;
-        var ids = checks.Where(c => c.IsChecked == true).Select(c => ((PartRecord)c.Tag).Id).ToList();
+        if (SelectedUnit is not { } unit || GateFor(unit) is not { } gate) return;
+        var current = ReplacementPartsFor(unit).Select(p => p.Id).ToList();
+        var options = _parts.OrderBy(p => p.Description).Select(p => new AssignmentPickerWindow.Option(p.Id, p.Description,
+            string.Join(" · ", new[] { "Item " + p.PartNumber, p.LocationValue.Length > 0 ? "Bin " + p.LocationValue : "" }.Where(s => s.Length > 0)))).ToList();
+        var siblings = UnitsForGate(gate.Id);
+        var picked = AssignmentPickerWindow.Show(this, "Spare parts for " + UnitTitle(gate, unit), "Tick the parts used on this equipment.", options, current, unit.UnitDisplay, gate.AssetDisplay, siblings.Count);
+        if (picked is null) return;
+        var targets = picked.WholeAsset ? siblings.Select(u => u.Id).ToList() : [unit.Id];
         try
         {
             ConfigureUnitPartsButton.IsEnabled = false;
-            var saved = await Task.Run(() => _data.SaveUnitReplacementParts(unit.Id, ids));
-            unit.ReplacementPartIds = saved.ReplacementPartIds;
+            var saved = await Task.Run(() => _data.SaveUnitsReplacementParts(targets, picked.SelectedIds));
+            foreach (var record in saved) if (_systems.FirstOrDefault(u => u.Id == record.Id) is { } local) local.ReplacementPartIds = record.ReplacementPartIds;
+            unit.ReplacementPartIds = saved.First(u => u.Id == unit.Id).ReplacementPartIds;
             if (!_isClosed) RefreshReplacementParts();
         }
         catch (Exception error) { if (!_isClosed) MessageBox.Show(this, "Unit parts were not saved: " + error.Message); }
-        finally { if (!_isClosed) ConfigureUnitPartsButton.IsEnabled = true; }
+        finally { if (!_isClosed) ConfigureUnitPartsButton.IsEnabled = _parts.Count > 0; }
     }
 }

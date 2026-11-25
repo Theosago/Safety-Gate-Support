@@ -474,6 +474,12 @@ public partial class MainWindow : Window
         }
     }
 
+    // A whole-asset record is titled by the asset alone.
+    internal static string UnitTitle(SafetyGate gate, SafetySystem unit)
+    {
+        string asset = gate.AssetKey == "Unassigned" ? gate.Display : gate.AssetDisplay;
+        return unit.IsWholeAsset ? asset : $"{asset} · {unit.UnitDisplay}";
+    }
     private SafetyGate? GateFor(SafetySystem unit) => _gates.FirstOrDefault(g => g.Id.Equals(unit.GateId, StringComparison.OrdinalIgnoreCase));
 
     private void NavigateToSystem(SafetySystem unit, string? highlightNoteText = null)
@@ -535,8 +541,7 @@ public partial class MainWindow : Window
         NoUnitPanel.Visibility = Visibility.Collapsed; UnitDetailPanel.Visibility = Visibility.Visible;
         DrawingPublishStatus.Text = "";
         _drawingPublicationUnits = [];
-        string asset = gate.AssetKey == "Unassigned" ? gate.Display : gate.AssetDisplay;
-        UnitTitleText.Text = $"{asset} · {unit.UnitDisplay}";
+        UnitTitleText.Text = UnitTitle(gate, unit);
         UnitAreaText.Text = string.Join(" • ", new[] { gate.Category, gate.Location }.Where(s => !string.IsNullOrWhiteSpace(s)));
         UnitPartsButton.IsEnabled = true;
         RefreshReplacementParts(); LoadPhoto(unit); LoadSharedNotes(unit); UpdateEquipmentActions(unit); LoadDrawings(gate, unit);

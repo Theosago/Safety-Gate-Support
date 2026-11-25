@@ -80,9 +80,18 @@ public partial class AdminWindow : Window
     {
         if (_loadingSetup || _isClosed) return;
         _loadingSetup = true;
-        try { var snapshot = await Task.Run(ReadSetupSnapshot); if (!_isClosed) { ApplySetupSnapshot(snapshot); SetupTabs.IsEnabled = true; AdminStatusText.Text = "Setup ready."; } }
+        try { var snapshot = await Task.Run(ReadSetupSnapshot); if (!_isClosed) { ApplySetupSnapshot(snapshot); SetupTabs.IsEnabled = true; AdminStatusText.Text = "Setup ready."; OpenFirstSection(); } }
         catch (Exception error) { if (!_isClosed) { SetupTabs.IsEnabled = false; AdminStatusText.Text = "Unable to load Setup. Close and reopen Setup after checking shared-drive access. " + error.Message; } }
         finally { _loadingSetup = false; if (!_isClosed) IsEnabled = true; }
+    }
+    // Setup opens on the unit the user was looking at, or on the library page until one is connected.
+    private void OpenFirstSection()
+    {
+        if (!_data.IsReady) { LibrarySetupTab.IsSelected = true; SetupTaskText.Text = "Connect the shared library folder to start."; return; }
+        UnitsSetupTab.IsSelected = true;
+        if (_units.FirstOrDefault(u => u.Id == InitialPilotUnitId) is not { } unit) return;
+        SelectGateById(unit.GateId);
+        UnitListAdmin.SelectedItem = (UnitListAdmin.ItemsSource as IEnumerable<SafetySystem>)?.FirstOrDefault(u => u.Id == unit.Id);
     }
     private void ApplySetupSnapshot(SetupSnapshot snapshot)
     {
@@ -103,10 +112,6 @@ public partial class AdminWindow : Window
     {
         GateAreaFilterBox.ItemsSource = _areas; GateAreaBox.ItemsSource = _areas; AreaList.ItemsSource = _areas;
         ResourceGateBox.ItemsSource = _gates.OrderBy(g => g.Category).ThenBy(g => SortNum(g.AssetNumber)).ToList();
-        ManualGateAssignments.ItemsSource = _gates.OrderBy(g => g.Category).ThenBy(g => SortNum(g.AssetNumber)).ToList();
-        ManualUnitAssignments.ItemsSource = _units.OrderBy(u => u.Category).ThenBy(u => SortNum(u.AssetNumber)).ThenBy(u => SortNum(u.UnitNumber)).ToList();
-        PartGateAssignments.ItemsSource = _gates.OrderBy(g => g.Category).ThenBy(g => SortNum(g.AssetNumber)).ToList();
-        PartUnitAssignments.ItemsSource = _units.OrderBy(u => u.Category).ThenBy(u => SortNum(u.AssetNumber)).ThenBy(u => SortNum(u.UnitNumber)).ToList();
         FlowGateBox.ItemsSource = new[] { new GateChoice { Id = "", Display = "All gates" } }.Concat(_gates.OrderBy(g => g.Category).ThenBy(g => SortNum(g.AssetNumber)).Select(g => new GateChoice { Id = g.Id, Display = g.Display })).ToList();
     }
 
@@ -145,6 +150,8 @@ public partial class AdminWindow : Window
             : "Unit details";
         UnitHasSignalColumnCheck.IsChecked = _selectedUnit?.ShowLightConfiguration ?? false; UnitHasScannerCheck.IsChecked = _selectedUnit?.ShowScannerConfiguration ?? false;
         UnitNumberBox.Text = _selectedUnit?.UnitNumber ?? "";
+        WholeAssetCheck.IsChecked = _selectedUnit?.IsWholeAsset == true;
+        UnitNumberBox.IsEnabled = _selectedUnit?.IsWholeAsset != true;
         MobileSupportUrlBox.Text = _selectedUnit?.MobileSupportUrl ?? ""; MobileOfflineBox.Text = _selectedUnit?.MobileOfflineInstructions ?? "";
         UnitPhotoText.Text = _selectedUnit?.PrimaryPhoto ?? "";
         GateUnitEditorScroll.ScrollToTop();
@@ -234,11 +241,18 @@ public partial class AdminWindow : Window
         }
         var savedGateId = _selectedGate.Id;
         _data.SaveGates(_gates); if (creatingGate) _data.WriteAssetFileIndex(_selectedGate); _data.LogAudit("Gate saved", savedGateId, details: _selectedGate.Display);
+        if (creatingGate && !_units.Any(u => u.GateId == savedGateId))
+        {
+            var whole = NewUnitRecord(_selectedGate, "", true);
+            _data.EnsureUnitFolders(_selectedGate, whole); _units.Add(whole);
+            _data.SynchronizeLegacyFields(_gates, _units); _data.SaveSystems(_units); CreateDefaultResources(_selectedGate, whole);
+            _data.LogAudit("Unit created", savedGateId, whole.Id, details: whole.UnitDisplay);
+        }
         ReloadAll();
         SelectGateById(savedGateId);
         PilotAssetBox.SelectedItem = _gates.FirstOrDefault(g => g.Id == savedGateId);
-        AdminStatusText.Text = "Asset / box saved.";
-        SetupTaskText.Text = "Choose Next: add a unit to this asset, then give the unit a number and photo.";
+        AdminStatusText.Text = "Asset saved.";
+        SetupTaskText.Text = creatingGate ? "Asset saved. It shows on the home page as a whole asset — add its photo below. If it has several units, use + Unit to number them." : "";
     }
     private void SelectGateById(string id)
     {
@@ -267,7 +281,7 @@ public partial class AdminWindow : Window
         _selectedUnit = null;
         _newUnit = true;
         PopulateUnit();
-        if (!_units.Any(u => u.GateId == _selectedGate.Id)) UnitNumberBox.Text = "1";
+        if (!_units.Any(u => u.GateId == _selectedGate.Id && !u.IsWholeAsset)) UnitNumberBox.Text = "1";
         UnitNumberBox.SelectAll();
         GateUnitEditorScroll.ScrollToTop();
         UnitNumberBox.Focus();
@@ -282,20 +296,25 @@ public partial class AdminWindow : Window
     private void SaveUnitCore()
     {
         if (_selectedGate is null) { MessageBox.Show("Select a gate first."); return; }
-        var number = UnitNumberBox.Text.Trim();
+        bool whole = WholeAssetCheck.IsChecked == true;
+        var number = whole ? "" : UnitNumberBox.Text.Trim();
+        if (!whole && number.Length == 0) { AdminStatusText.Text = "Enter the unit number from its label, or tick Whole asset."; return; }
+        if (whole && _units.Any(u => u != _selectedUnit && u.GateId == _selectedGate.Id)) { AdminStatusText.Text = "Only an asset with no other units can be a whole asset. Remove or renumber the other units first."; return; }
+        // The first numbered unit takes over the asset's automatic whole-asset record, keeping its photo and files.
+        if (_newUnit && !whole && _units.Where(u => u.GateId == _selectedGate.Id).ToList() is [{ IsWholeAsset: true } solo]) { _selectedUnit = solo; _newUnit = false; }
         string link = MobileSupportUrlBox.Text.Trim();
         if (link.Length > 0 && !MobileSupportExporter.ValidLink(link)) { AdminStatusText.Text = "Enter an approved HTTPS document link, or leave it blank for offline labels."; return; }
-        if (_units.Any(u => u != _selectedUnit && u.GateId == _selectedGate.Id && string.Equals(u.UnitNumber ?? "", number, StringComparison.OrdinalIgnoreCase))) { MessageBox.Show("That unit already exists under this gate."); return; }
+        if (!whole && _units.Any(u => u != _selectedUnit && u.GateId == _selectedGate.Id && string.Equals(u.UnitNumber ?? "", number, StringComparison.OrdinalIgnoreCase))) { MessageBox.Show("That unit already exists under this asset."); return; }
         var wasNew = _newUnit || _selectedUnit is not null && !_data.LoadSystems().Any(u => u.Id == _selectedUnit.Id);
         if (_newUnit)
         {
             var id = Guid.NewGuid().ToString("N"); var root = string.IsNullOrWhiteSpace(_selectedGate.AssetFolder) ? $"Gates/{_selectedGate.Id}/Units/{id}" : _selectedGate.AssetFolder;
-            _selectedUnit = new SafetySystem { Id = id, GateId = _selectedGate.Id, UnitNumber = string.IsNullOrWhiteSpace(number) ? null : number, SystemFolder = root, PhotosFolder = root + "/Photos", NotesFolder = root + "/Notes" };
-            if (!string.IsNullOrWhiteSpace(_selectedGate.AssetFolder)) { _selectedUnit.PhotosFolder = root + "/Photos/" + AssetFileLayout.SafeName("Unit " + number); _selectedUnit.NotesFolder = root + "/Notes/" + AssetFileLayout.SafeName("Unit " + number); }
+            _selectedUnit = NewUnitRecord(_selectedGate, number, whole);
             _data.EnsureUnitFolders(_selectedGate, _selectedUnit); _units.Add(_selectedUnit); _newUnit = false;
         }
         if (_selectedUnit is null) return;
         _selectedUnit.UnitNumber = string.IsNullOrWhiteSpace(number) ? null : number;
+        _selectedUnit.IsWholeAsset = whole;
         _selectedUnit.MobileSupportUrl = link; _selectedUnit.MobileOfflineInstructions = MobileOfflineBox.Text.Trim();
         _selectedUnit.ShowLightConfiguration = UnitHasSignalColumnCheck.IsChecked == true; _selectedUnit.ShowScannerConfiguration = UnitHasScannerCheck.IsChecked == true;
         if (!string.IsNullOrWhiteSpace(_pendingPhotoSource))
@@ -308,7 +327,18 @@ public partial class AdminWindow : Window
         if (wasNew) CreateDefaultResources(_selectedGate, _selectedUnit);
         var savedGateId = _selectedGate.Id;
         _data.LogAudit(wasNew ? "Unit created" : "Unit saved", savedGateId, _selectedUnit.Id, details: _selectedUnit.UnitDisplay);
-        var uid = _selectedUnit.Id; ReloadAll(); SelectGateById(savedGateId); UnitListAdmin.SelectedItem = (UnitListAdmin.ItemsSource as IEnumerable<SafetySystem>)?.FirstOrDefault(u => u.Id == uid); PilotUnitBox.SelectedItem = _units.FirstOrDefault(u => u.Id == uid); AdminStatusText.Text = "Unit saved."; SetupTaskText.Text = "Unit saved. Use Next: pilot checklist to attach a PDF or Common Problem and test operator view.";
+        var uid = _selectedUnit.Id; ReloadAll(); SelectGateById(savedGateId); UnitListAdmin.SelectedItem = (UnitListAdmin.ItemsSource as IEnumerable<SafetySystem>)?.FirstOrDefault(u => u.Id == uid); PilotUnitBox.SelectedItem = _units.FirstOrDefault(u => u.Id == uid); AdminStatusText.Text = "Unit saved."; SetupTaskText.Text = "";
+    }
+    private static SafetySystem NewUnitRecord(SafetyGate gate, string number, bool whole)
+    {
+        var id = Guid.NewGuid().ToString("N"); var root = string.IsNullOrWhiteSpace(gate.AssetFolder) ? $"Gates/{gate.Id}/Units/{id}" : gate.AssetFolder;
+        // New units start with explicit (empty) part and manual lists; they are chosen per unit.
+        var unit = new SafetySystem { Id = id, GateId = gate.Id, UnitNumber = string.IsNullOrWhiteSpace(number) ? null : number, IsWholeAsset = whole,
+            SystemFolder = root, PhotosFolder = root + "/Photos", NotesFolder = root + "/Notes", ReplacementPartIds = [], ManualIds = [],
+            ShowLightConfiguration = false, ShowScannerConfiguration = false };
+        string label = whole ? "Whole asset" : "Unit " + number;
+        if (!string.IsNullOrWhiteSpace(gate.AssetFolder)) { unit.PhotosFolder = root + "/Photos/" + AssetFileLayout.SafeName(label); unit.NotesFolder = root + "/Notes/" + AssetFileLayout.SafeName(label); }
+        return unit;
     }
     private void CreateDefaultResources(SafetyGate gate, SafetySystem unit)
     {
@@ -590,10 +620,12 @@ public partial class AdminWindow : Window
     private void NewManual_Click(object sender, RoutedEventArgs e) { _selectedManual = null; _newManual = true; _pendingManualSource = ""; PopulateManual(); ManualTitleBox.Focus(); }
     private void PopulateManual()
     {
-        ManualTitleBox.Text = _selectedManual?.Title ?? ""; ManualManufacturerBox.Text = _selectedManual?.Manufacturer ?? ""; ManualModelBox.Text = _selectedManual?.Model ?? ""; ManualKeywordsBox.Text = _selectedManual?.Keywords ?? ""; ManualFileText.Text = _selectedManual?.FilePath ?? ""; ManualGateAssignments.SelectedItems.Clear(); ManualUnitAssignments.SelectedItems.Clear(); if (_selectedManual is not null && ManualGateAssignments.ItemsSource is IEnumerable<SafetyGate> gates) foreach (var g in gates.Where(g => _selectedManual.AppliesToGateIds.Contains(g.Id, StringComparer.OrdinalIgnoreCase))) ManualGateAssignments.SelectedItems.Add(g); if (_selectedManual is not null && ManualUnitAssignments.ItemsSource is IEnumerable<SafetySystem> units) foreach (var u in units.Where(u => _selectedManual.AppliesToUnitIds.Contains(u.Id, StringComparer.OrdinalIgnoreCase))) ManualUnitAssignments.SelectedItems.Add(u);
+        ManualTitleBox.Text = _selectedManual?.Title ?? ""; ManualManufacturerBox.Text = _selectedManual?.Manufacturer ?? ""; ManualModelBox.Text = _selectedManual?.Model ?? ""; ManualKeywordsBox.Text = _selectedManual?.Keywords ?? ""; ManualFileText.Text = _selectedManual?.FilePath ?? "";
+        var used = _selectedManual is null ? new HashSet<string>() : _units.Where(u => DataService.ManualIdsFor(u, [_selectedManual]).Count > 0).Select(u => u.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _manualUsage = new UsageChecklist(ManualUsagePanel, _gates, _units, used);
     }
     private void ChooseManualFile_Click(object sender, RoutedEventArgs e) { var d = new OpenFileDialog { Title = "Choose manual", Filter = "Documents|*.pdf;*.doc;*.docx;*.txt|All files|*.*" }; if (d.ShowDialog() != true) return; _pendingManualSource = d.FileName; ManualFileText.Text = Path.GetFileName(d.FileName) + " (will copy when saved)"; if (string.IsNullOrWhiteSpace(ManualTitleBox.Text)) ManualTitleBox.Text = Path.GetFileNameWithoutExtension(d.FileName); }
-    private void SaveManual_Click(object sender, RoutedEventArgs e) { var title = ManualTitleBox.Text.Trim(); if (string.IsNullOrWhiteSpace(title)) { MessageBox.Show("Enter a manual title."); return; } if (_newManual) { _selectedManual = new ManualRecord(); _manuals.Add(_selectedManual); _newManual = false; } if (_selectedManual is null) return; _selectedManual.Title = title; _selectedManual.Manufacturer = ManualManufacturerBox.Text.Trim(); _selectedManual.Model = ManualModelBox.Text.Trim(); _selectedManual.Keywords = ManualKeywordsBox.Text.Trim(); _selectedManual.AppliesToGateIds = ManualGateAssignments.SelectedItems.Cast<SafetyGate>().Select(g => g.Id).ToList(); _selectedManual.AppliesToUnitIds = ManualUnitAssignments.SelectedItems.Cast<SafetySystem>().Select(u => u.Id).ToList(); if (!string.IsNullOrWhiteSpace(_pendingManualSource)) { var dest = _data.AddOrUpdateManual(_pendingManualSource); _selectedManual.FilePath = _data.ToRelative(dest); _pendingManualSource = ""; } _data.SaveManualRecords(_manuals); _data.LogAudit("Manual saved", details: title); ManualListAdmin.ItemsSource = _manuals.OrderBy(m => m.Title).ToList(); AdminStatusText.Text = "Manual saved."; }
+    private void SaveManual_Click(object sender, RoutedEventArgs e) { var title = ManualTitleBox.Text.Trim(); if (string.IsNullOrWhiteSpace(title)) { MessageBox.Show("Enter a manual title."); return; } if (_newManual) { _selectedManual = new ManualRecord(); _manuals.Add(_selectedManual); _newManual = false; } if (_selectedManual is null) return; _selectedManual.Title = title; _selectedManual.Manufacturer = ManualManufacturerBox.Text.Trim(); _selectedManual.Model = ManualModelBox.Text.Trim(); _selectedManual.Keywords = ManualKeywordsBox.Text.Trim(); if (!string.IsNullOrWhiteSpace(_pendingManualSource)) { var dest = _data.AddOrUpdateManual(_pendingManualSource); _selectedManual.FilePath = _data.ToRelative(dest); _pendingManualSource = ""; } _data.SaveManualRecords(_manuals); if (_manualUsage is not null) _data.SetManualUsage(_selectedManual.Id, _manualUsage.SelectedUnitIds); _data.LogAudit("Manual saved", details: title); var manualId = _selectedManual.Id; ReloadAll(); ManualListAdmin.SelectedItem = _manuals.FirstOrDefault(m => m.Id == manualId); AdminStatusText.Text = "Manual saved."; }
     private void DeleteManual_Click(object sender, RoutedEventArgs e) { if (_selectedManual is null) return; if (MessageBox.Show($"Remove '{_selectedManual.Title}' from the manual index?\n\nThe document file will be preserved.", "Delete manual", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return; _manuals.Remove(_selectedManual); _data.SaveManualRecords(_manuals); _selectedManual = null; ManualListAdmin.ItemsSource = _manuals.OrderBy(m => m.Title).ToList(); }
     private void OpenManualAdmin_Click(object sender, RoutedEventArgs e) { if (_selectedManual is null || string.IsNullOrWhiteSpace(_selectedManual.FilePath)) return; var p = _data.Resolve(_selectedManual.FilePath); if (File.Exists(p)) FileLauncherService.Open(p); }
 
@@ -604,7 +636,9 @@ public partial class AdminWindow : Window
     {
         PartSourceDescriptionBox.Text = _selectedPart?.StockroomDescription ?? "";
         PartBinBox.Text = _selectedPart?.LocationValue ?? ""; PartQuantityBox.Text = _selectedPart?.QuantityValue is { } quantity ? PartRecord.FormatQuantity(quantity) : ""; PartSiteBox.Text = _selectedPart?.SiteValue ?? "";
-        PartNumberBox.Text = _selectedPart?.PartNumber ?? ""; PartDescriptionBox.Text = _selectedPart?.Description ?? ""; PartManufacturerBox.Text = _selectedPart?.Manufacturer ?? ""; PartKeywordsBox.Text = _selectedPart?.Keywords ?? ""; PartAssetsBox.Text = _selectedPart?.RelatedAssets ?? ""; PartNotesBox.Text = _selectedPart?.Notes ?? ""; PartDocumentText.Text = _selectedPart?.DocumentPath ?? ""; PartGateAssignments.SelectedItems.Clear(); PartUnitAssignments.SelectedItems.Clear(); if (_selectedPart is not null && PartGateAssignments.ItemsSource is IEnumerable<SafetyGate> gates) foreach (var g in gates.Where(g => _selectedPart.AppliesToGateIds.Contains(g.Id, StringComparer.OrdinalIgnoreCase))) PartGateAssignments.SelectedItems.Add(g); if (_selectedPart is not null && PartUnitAssignments.ItemsSource is IEnumerable<SafetySystem> units) foreach (var u in units.Where(u => _selectedPart.AppliesToUnitIds.Contains(u.Id, StringComparer.OrdinalIgnoreCase))) PartUnitAssignments.SelectedItems.Add(u);
+        PartNumberBox.Text = _selectedPart?.PartNumber ?? ""; PartDescriptionBox.Text = _selectedPart?.Description ?? ""; PartManufacturerBox.Text = _selectedPart?.Manufacturer ?? ""; PartKeywordsBox.Text = _selectedPart?.Keywords ?? ""; PartAssetsBox.Text = _selectedPart?.RelatedAssets ?? ""; PartNotesBox.Text = _selectedPart?.Notes ?? ""; PartDocumentText.Text = _selectedPart?.DocumentPath ?? "";
+        var used = _selectedPart is null ? new HashSet<string>() : _units.Where(u => DataService.ReplacementPartsFor(u, [_selectedPart]).Any()).Select(u => u.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _partUsage = new UsageChecklist(PartUsagePanel, _gates, _units, used);
     }
     private void ChoosePartDocument_Click(object sender, RoutedEventArgs e) { var d = new OpenFileDialog { Title = "Choose part document", Filter = "Documents|*.pdf;*.xlsx;*.xls;*.csv;*.doc;*.docx;*.txt|All files|*.*" }; if (d.ShowDialog() != true) return; _pendingPartDocumentSource = d.FileName; PartDocumentText.Text = Path.GetFileName(d.FileName) + " (will copy when saved)"; }
     private void SavePart_Click(object sender, RoutedEventArgs e)
@@ -613,7 +647,7 @@ public partial class AdminWindow : Window
         if (string.IsNullOrWhiteSpace(PartDescriptionBox.Text)) { ImportItem_Click(sender, e); return; }
         try { SaveManualPart(); } catch (Exception error) { AdminStatusText.Text = "Part could not be saved: " + error.Message; }
     }
-    private void SaveManualPart() { decimal? quantity = null; if (!string.IsNullOrWhiteSpace(PartQuantityBox.Text)) { if (!decimal.TryParse(PartQuantityBox.Text.Trim(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var parsed) || parsed < 0) { MessageBox.Show("Enter a nonnegative reported quantity, or leave it blank."); return; } quantity = parsed; } var pn = PartNumberBox.Text.Trim(); var desc = PartDescriptionBox.Text.Trim(); if (string.IsNullOrWhiteSpace(pn) && string.IsNullOrWhiteSpace(desc)) { MessageBox.Show("Enter a part number or description."); return; } if (_newPart) { _selectedPart = new PartRecord(); _parts.Add(_selectedPart); _newPart = false; } if (_selectedPart is null) return; _selectedPart.BinLocation = PartBinBox.Text.Trim(); _selectedPart.ReportedQuantity = quantity; _selectedPart.Site = PartSiteBox.Text.Trim(); _selectedPart.PartNumber = pn; _selectedPart.Description = desc; _selectedPart.Manufacturer = PartManufacturerBox.Text.Trim(); _selectedPart.Keywords = PartKeywordsBox.Text.Trim(); _selectedPart.RelatedAssets = PartAssetsBox.Text.Trim(); _selectedPart.Notes = PartNotesBox.Text.Trim(); _selectedPart.Notes = _selectedPart.NotesDisplay; _selectedPart.AppliesToGateIds = PartGateAssignments.SelectedItems.Cast<SafetyGate>().Select(g => g.Id).ToList(); _selectedPart.AppliesToUnitIds = PartUnitAssignments.SelectedItems.Cast<SafetySystem>().Select(u => u.Id).ToList(); if (!string.IsNullOrWhiteSpace(_pendingPartDocumentSource)) { var dest = _data.AddOrUpdatePartDocument(_pendingPartDocumentSource); _selectedPart.DocumentPath = _data.ToRelative(dest); _pendingPartDocumentSource = ""; } _data.SaveParts(_parts); _data.LogAudit("Part saved", details: _selectedPart.Display); AdminPartList.ItemsSource = _parts.OrderBy(p => p.PartNumber).ThenBy(p => p.Description).ToList(); AdminStatusText.Text = "Part saved."; }
+    private void SaveManualPart() { decimal? quantity = null; if (!string.IsNullOrWhiteSpace(PartQuantityBox.Text)) { if (!decimal.TryParse(PartQuantityBox.Text.Trim(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var parsed) || parsed < 0) { MessageBox.Show("Enter a nonnegative reported quantity, or leave it blank."); return; } quantity = parsed; } var pn = PartNumberBox.Text.Trim(); var desc = PartDescriptionBox.Text.Trim(); if (string.IsNullOrWhiteSpace(pn) && string.IsNullOrWhiteSpace(desc)) { MessageBox.Show("Enter a part number or description."); return; } if (_newPart) { _selectedPart = new PartRecord(); _parts.Add(_selectedPart); _newPart = false; } if (_selectedPart is null) return; _selectedPart.BinLocation = PartBinBox.Text.Trim(); _selectedPart.ReportedQuantity = quantity; _selectedPart.Site = PartSiteBox.Text.Trim(); _selectedPart.PartNumber = pn; _selectedPart.Description = desc; _selectedPart.Manufacturer = PartManufacturerBox.Text.Trim(); _selectedPart.Keywords = PartKeywordsBox.Text.Trim(); _selectedPart.RelatedAssets = PartAssetsBox.Text.Trim(); _selectedPart.Notes = PartNotesBox.Text.Trim(); _selectedPart.Notes = _selectedPart.NotesDisplay; if (!string.IsNullOrWhiteSpace(_pendingPartDocumentSource)) { var dest = _data.AddOrUpdatePartDocument(_pendingPartDocumentSource); _selectedPart.DocumentPath = _data.ToRelative(dest); _pendingPartDocumentSource = ""; } _data.SaveParts(_parts); if (_partUsage is not null) _data.SetPartUsage(_selectedPart.Id, _partUsage.SelectedUnitIds); _data.LogAudit("Part saved", details: _selectedPart.Display); var partId = _selectedPart.Id; ReloadAll(); AdminPartList.SelectedItem = _parts.FirstOrDefault(p => p.Id == partId); AdminStatusText.Text = "Part saved."; }
     private void DeletePart_Click(object sender, RoutedEventArgs e) { if (_selectedPart is null) return; if (MessageBox.Show($"Delete '{_selectedPart.Display}' from the parts index?", "Delete", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return; _parts.Remove(_selectedPart); _data.SaveParts(_parts); _selectedPart = null; AdminPartList.ItemsSource = _parts.OrderBy(p => p.PartNumber).ThenBy(p => p.Description).ToList(); }
 
     // Shared content / areas / software
@@ -663,6 +697,19 @@ public partial class AdminWindow : Window
         base.OnClosing(e);
     }
 
+    private UsageChecklist? _partUsage, _manualUsage;
+    private void ConnectSharedRoot_Click(object sender, RoutedEventArgs e)
+    {
+        StartLibraryPathBox.Text = SharedRootBox.Text.Trim();
+        ConnectLibrary_Click(sender, e);
+    }
+    private void WholeAsset_Click(object sender, RoutedEventArgs e)
+    {
+        bool whole = WholeAssetCheck.IsChecked == true;
+        UnitNumberBox.IsEnabled = !whole;
+        if (whole) UnitNumberBox.Text = "";
+        else if (UnitNumberBox.Text.Length == 0) UnitNumberBox.Text = "1";
+    }
     private void ChooseSharedRoot_Click(object sender, RoutedEventArgs e) { var d = new OpenFolderDialog { Title = "Select the shared Safety Gate Support folder", Multiselect = false }; if (Directory.Exists(SharedRootBox.Text)) d.InitialDirectory = SharedRootBox.Text; if (d.ShowDialog(this) == true) SharedRootBox.Text = d.FolderName; }
     private void Initialize_Click(object sender, RoutedEventArgs e) { try { _data.SetSharedRoot(SharedRootBox.Text.Trim()); _data.InitializeSharedData(); ReloadAll(); AdminStatusText.Text = "Shared starter data initialized."; } catch (Exception ex) { MessageBox.Show(ex.Message, "Initialization failed", MessageBoxButton.OK, MessageBoxImage.Error); } }
     private void BrowseSiemens_Click(object sender, RoutedEventArgs e) => BrowseExe(SiemensBox, "Select Siemens 8WD46 Configurator");

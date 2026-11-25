@@ -21,7 +21,7 @@ public partial class MainWindow
     {
         public required SafetyGate Gate { get; init; }
         public required SafetySystem Unit { get; init; }
-        public string Title => $"{Gate.AssetDisplay} • {Unit.UnitDisplay}";
+        public string Title => Unit.IsWholeAsset ? Gate.AssetDisplay : $"{Gate.AssetDisplay} • {Unit.UnitDisplay}";
         public string Location => string.Join(" • ", new[] { Gate.Category, Gate.Location, Gate.Manufacturer }.Where(s => !string.IsNullOrWhiteSpace(s)));
         private BitmapSource? _photo;
         public BitmapSource? Photo { get => _photo; set { _photo = value; PropertyChanged?.Invoke(this, new(nameof(Photo))); } }

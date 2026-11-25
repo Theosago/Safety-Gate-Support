@@ -49,6 +49,7 @@ internal static class Program
                 ("Manual applicability supports gate/unit assignments and global content", ManualApplicability),
                 ("Part applicability supports gate/unit assignments and global content", PartApplicability),
                 ("Troubleshooting applicability respects manufacturer and explicit assignments", FlowApplicability),
+                ("Choosing where a part or manual is used keeps every other unit's list unchanged", UsageAssignments),
                 ("Embedded seed initializes 60 units, 28 gates, 3 areas, and 360 resources", SeedInitialization),
                 ("First-run migration preserves every unit and resource relationship", SeedMigrationConsistency),
                 ("Repeated initialization preserves edited data and existing files", InitializationIdempotency),
@@ -162,6 +163,34 @@ internal static class Program
         Require(!flow.AppliesTo(gate, unit), "Explicit assignments should exclude unassigned systems.");
         flow.AppliesToUnitIds = ["UNIT-A"];
         Require(flow.AppliesTo(gate, unit), "Explicit unit assignments should match ignoring case.");
+    }
+
+    private static void UsageAssignments()
+    {
+        var data = NewService(); data.InitializeSharedData();
+        var units = data.LoadSystems(); var a = units[0]; var b = units[1]; var c = units.First(u => u.GateId != a.GateId);
+        var everywhere = new PartRecord { Id = "p-everywhere", PartNumber = "100", Description = "Everywhere" };
+        var gateWide = new PartRecord { Id = "p-gate", PartNumber = "200", Description = "Gate wide", AppliesToGateIds = [a.GateId] };
+        var moving = new PartRecord { Id = "p-moving", PartNumber = "300", Description = "Moving", AppliesToUnitIds = [a.Id] };
+        data.SaveParts([everywhere, gateWide, moving]);
+        var before = data.LoadSystems().ToDictionary(u => u.Id, u => DataService.ReplacementPartsFor(u, data.LoadParts()).Select(p => p.Id).Order().ToArray());
+        data.SetPartUsage(moving.Id, [b.Id, c.Id]);
+        var after = data.LoadSystems();
+        foreach (var unit in after)
+        {
+            var expected = before[unit.Id].Where(id => id != moving.Id).Concat(unit.Id == b.Id || unit.Id == c.Id ? new[] { moving.Id } : Array.Empty<string>()).Order().ToArray();
+            Require(unit.ReplacementPartIds is not null && DataService.ReplacementPartsFor(unit, data.LoadParts()).Select(p => p.Id).Order().SequenceEqual(expected),
+                $"Part usage changed other assignments on {unit.AdminDisplay}.");
+        }
+        var saved = data.SaveUnitsReplacementParts([a.Id, b.Id], [gateWide.Id]);
+        Require(saved.Count == 2 && data.LoadSystems().Where(u => u.Id == a.Id || u.Id == b.Id).All(u => u.ReplacementPartIds!.SequenceEqual(new[] { gateWide.Id })), "Applying to every unit on an asset did not save the same list.");
+        var manual = new ManualRecord { Id = "m-one", Title = "One" }; var other = new ManualRecord { Id = "m-two", Title = "Two", AppliesToUnitIds = [c.Id] };
+        data.SaveManualRecords([manual, other]);
+        data.SetManualUsage(manual.Id, [a.Id]);
+        var manualsNow = data.LoadManualRecords();
+        Require(data.LoadSystems().All(u => DataService.ManualIdsFor(u, manualsNow).Contains("m-one") == (u.Id == a.Id) && DataService.ManualIdsFor(u, manualsNow).Contains("m-two") == (u.Id == c.Id)),
+            "Manual usage did not match the chosen units or disturbed another manual.");
+        Require(new SafetySystem { IsWholeAsset = true, UnitNumber = null }.UnitDisplay == "Whole asset" && new SafetySystem { UnitNumber = "4" }.UnitDisplay == "Unit 4", "Whole-asset naming changed numbered units.");
     }
 
     private static void SeedInitialization()

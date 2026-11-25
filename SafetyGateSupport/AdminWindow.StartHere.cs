@@ -18,11 +18,12 @@ public partial class AdminWindow
         PilotContentStep.BringIntoView();
     }
     public string? OperatorPreviewUnitId { get; private set; }
-    private IEnumerable<TabItem> AdvancedSetupTabs => [ResourcesSetupTab, FlowsSetupTab, ManualsSetupTab, AreasSetupTab, AuditSetupTab];
+    // Resource buttons are no longer offered; their shared records keep working unchanged.
+    private IEnumerable<TabItem> AdvancedSetupTabs => [FlowsSetupTab, ManualsSetupTab, AreasSetupTab, AuditSetupTab];
     private void AdvancedSetup_Click(object sender, RoutedEventArgs e)
     {
         bool show = AdvancedSetupCheck.IsChecked == true;
-        if (!show && AdvancedSetupTabs.Any(t => t.IsSelected)) StartSetupTab.IsSelected = true;
+        if (!show && AdvancedSetupTabs.Any(t => t.IsSelected)) UnitsSetupTab.IsSelected = true;
         foreach (var tab in AdvancedSetupTabs) tab.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
     private void SetupTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -128,7 +129,7 @@ public partial class AdminWindow
     private bool NeedLibrary()
     {
         if (_data.IsReady) return false;
-        StartGuideStatus.Text = "Connect or create a library in step 1 first."; StartSetupTab.IsSelected = true; return true;
+        StartGuideStatus.Text = "Connect the shared library first."; LibrarySetupTab.IsSelected = true; return true;
     }
     private SafetySystem? Pilot()
     {

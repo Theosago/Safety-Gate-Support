@@ -58,23 +58,75 @@ public partial class DataService
         }
         SaveParts(parts); LogAudit("Part imported from stockroom", details: part.Display); return part;
     }
-    public SafetySystem SaveUnitManuals(string unitId, IEnumerable<string> manualIds)
+    public SafetySystem SaveUnitManuals(string unitId, IEnumerable<string> manualIds) => SaveUnitsManuals([unitId], manualIds).Single();
+    public SafetySystem SaveUnitReplacementParts(string unitId, IEnumerable<string> partIds) => SaveUnitsReplacementParts([unitId], partIds).Single();
+
+    // Each unit keeps its own explicit list of parts and manuals. These save the same list to one
+    // unit or to every unit on an asset in one locked write.
+    public List<SafetySystem> SaveUnitsManuals(IReadOnlyCollection<string> unitIds, IEnumerable<string> manualIds)
     {
         using var lease = AcquireAssetWriteLock();
-        var units = JsonSerializer.Deserialize<List<SafetySystem>>(File.ReadAllText(SystemsFile), _read) ?? throw new InvalidDataException("Unit records unavailable.");
-        var unit = units.SingleOrDefault(u => u.Id == unitId) ?? throw new InvalidOperationException("Unit removed. Refresh first.");
+        var units = ReadUnitsForUpdate();
         var valid = LoadManualRecords().Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        unit.ManualIds = manualIds.Where(valid.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        SaveSystems(units); return unit;
+        var ids = manualIds.Where(valid.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var changed = SelectUnits(units, unitIds);
+        foreach (var unit in changed) unit.ManualIds = ids.ToList();
+        SaveSystems(units); return changed;
     }
-    public SafetySystem SaveUnitReplacementParts(string unitId, IEnumerable<string> partIds)
+    public List<SafetySystem> SaveUnitsReplacementParts(IReadOnlyCollection<string> unitIds, IEnumerable<string> partIds)
     {
         using var lease = AcquireAssetWriteLock();
-        var units = JsonSerializer.Deserialize<List<SafetySystem>>(File.ReadAllText(SystemsFile), _read) ?? throw new InvalidDataException("Unit records unavailable.");
-        var unit = units.SingleOrDefault(u => u.Id == unitId) ?? throw new InvalidOperationException("This unit was removed. Refresh first.");
+        var units = ReadUnitsForUpdate();
         var valid = LoadParts().Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        unit.ReplacementPartIds = partIds.Where(valid.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        SaveSystems(units); return unit;
+        var ids = partIds.Where(valid.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var changed = SelectUnits(units, unitIds);
+        foreach (var unit in changed) unit.ReplacementPartIds = ids.ToList();
+        SaveSystems(units); return changed;
+    }
+
+    /// <summary>
+    /// Sets exactly which units use one part. Every unit's current effective list is written out
+    /// explicitly first, so older asset-wide or "everywhere" assignments keep showing the same parts.
+    /// </summary>
+    public void SetPartUsage(string partId, IReadOnlyCollection<string> unitIds)
+    {
+        using var lease = AcquireAssetWriteLock();
+        var units = ReadUnitsForUpdate(); var parts = LoadParts();
+        if (!parts.Any(p => p.Id.Equals(partId, StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException("Save the part before choosing where it is used.");
+        var chosen = unitIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var unit in units)
+        {
+            var list = ReplacementPartsFor(unit, parts).Select(p => p.Id).Where(id => !id.Equals(partId, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (chosen.Contains(unit.Id)) list.Add(partId);
+            unit.ReplacementPartIds = list;
+        }
+        SaveSystems(units);
+    }
+    /// <summary>Sets exactly which units list one manual, keeping every other unit's manuals unchanged.</summary>
+    public void SetManualUsage(string manualId, IReadOnlyCollection<string> unitIds)
+    {
+        using var lease = AcquireAssetWriteLock();
+        var units = ReadUnitsForUpdate(); var manuals = LoadManualRecords();
+        if (!manuals.Any(m => m.Id.Equals(manualId, StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException("Save the manual before choosing where it is used.");
+        var chosen = unitIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var unit in units)
+        {
+            var list = ManualIdsFor(unit, manuals).Where(id => !id.Equals(manualId, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (chosen.Contains(unit.Id)) list.Add(manualId);
+            unit.ManualIds = list;
+        }
+        SaveSystems(units);
+    }
+    internal static List<string> ManualIdsFor(SafetySystem unit, IEnumerable<ManualRecord> manuals) =>
+        manuals.Where(m => unit.ManualIds is { } ids ? ids.Contains(m.Id, StringComparer.OrdinalIgnoreCase) : m.AppliesTo(unit.GateId, unit.Id)).Select(m => m.Id).ToList();
+
+    private List<SafetySystem> ReadUnitsForUpdate() =>
+        JsonSerializer.Deserialize<List<SafetySystem>>(File.ReadAllText(SystemsFile), _read) ?? throw new InvalidDataException("Unit records unavailable.");
+    private static List<SafetySystem> SelectUnits(List<SafetySystem> units, IReadOnlyCollection<string> unitIds)
+    {
+        var selected = units.Where(u => unitIds.Contains(u.Id, StringComparer.OrdinalIgnoreCase)).ToList();
+        if (selected.Count != unitIds.Distinct(StringComparer.OrdinalIgnoreCase).Count()) throw new InvalidOperationException("A unit was removed. Refresh first.");
+        return selected;
     }
     public PartRecord SavePartPhoto(string partId, string source)
     {

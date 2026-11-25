@@ -9,6 +9,8 @@ public class SafetySystem
     public List<string>? ReplacementPartIds { get; set; }
     public string GateId { get; set; } = "";
     public string? UnitNumber { get; set; }
+    /// <summary>The asset has no separate units; this record stands for the whole asset.</summary>
+    public bool IsWholeAsset { get; set; }
     public string DisplayName { get; set; } = "";
     public int? SelectedPhotoSourcePage { get; set; }
     public string MobileSupportUrl { get; set; } = "";
@@ -42,7 +44,7 @@ public class SafetySystem
     public string AssetDisplay => AssetKey == "Unassigned" ? "Unassigned" : $"Asset {AssetKey}";
     public string GateBrandDisplay => string.IsNullOrWhiteSpace(GateBrand) ? "Unspecified" : GateBrand.Trim();
     public string GateDisplay => $"{AssetDisplay} - {GateBrandDisplay}";
-    public string UnitDisplay => $"Unit {(string.IsNullOrWhiteSpace(UnitNumber) ? "Unknown" : UnitNumber)}";
+    public string UnitDisplay => IsWholeAsset ? "Whole asset" : $"Unit {(string.IsNullOrWhiteSpace(UnitNumber) ? "Unknown" : UnitNumber)}";
     public string AdminDisplay => $"{GateDisplay} / {UnitDisplay}";
 }
 
