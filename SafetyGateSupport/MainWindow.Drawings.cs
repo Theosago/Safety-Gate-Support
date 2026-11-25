@@ -110,7 +110,8 @@ public partial class MainWindow
             if (listing.Files.Count == 0)
                 DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The drawing folder is unavailable. Check the shared library connection." : "No drawing assigned. Use Upload drawing to add the PDF and DWG.";
             else DrawingFileBox.SelectedIndex = 0;
-            ShowDrawingOrParts(listing.Files.Count > 0 || listing.Unavailable.Count > 0);
+            NoDrawingText.Text = listing.Unavailable.Count > 0 ? "The drawing folder can’t be reached right now. Spare parts for this unit:" : "No electrical drawing is assigned yet. Spare parts for this unit:";
+            ShowDrawingOrParts(listing.Files.Count > 0);
             DrawingAssignmentText.Text = listing.Unavailable.Count > 0 ? "Unavailable files: " + string.Join(", ", listing.Unavailable)
                 : listing.Files.Count > 1 ? $"{listing.Files.Count} files assigned to this unit." : "";
         }
