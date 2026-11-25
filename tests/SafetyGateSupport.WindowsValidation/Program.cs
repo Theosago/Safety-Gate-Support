@@ -1218,8 +1218,10 @@ internal static class Program
     }
 
     // The lens segments drawn in the Try inputs column.
-    private static Border[] Lenses(FrameworkElement root) => Descendants<Border>(Control<ContentControl>(root, "SegmentPreviewPanel"))
-        .Where(b => b.ToolTip is string tip && tip.StartsWith("Segment ", StringComparison.Ordinal)).ToArray();
+    // Read from the drawing itself, so it works while the Try inputs tab is not on screen.
+    private static Border[] Lenses(FrameworkElement root) => Control<ContentControl>(root, "SegmentPreviewPanel").Content is Grid column
+        ? column.Children.OfType<Border>().Where(b => b.ToolTip is string tip && tip.StartsWith("Segment ", StringComparison.Ordinal)).ToArray()
+        : [];
 
     private static async Task V7InputSwitches()
     {
@@ -1907,6 +1909,17 @@ internal static class Program
         assigned.SelectedIndex = 0;
         await WaitUntil(() => Lenses(column).Length == 9,
             "The assigned fictional light configuration did not render.");
+        // The mouse wheel over the light column tool scrolls the unit page.
+        var unitScroll = Control<ScrollViewer>(main, "UnitWorkspaceScroll");
+        unitScroll.ScrollToTop(); await DispatcherSettled();
+        if (unitScroll.ScrollableHeight > 0)
+        {
+            var wheelTarget = Control<Panel>(column, "StateTablePanel");
+            wheelTarget.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120)
+                { RoutedEvent = UIElement.PreviewMouseWheelEvent, Source = wheelTarget });
+            await DispatcherSettled();
+            Require(unitScroll.VerticalOffset > 0, "The mouse wheel over the signal column page did not scroll the page.");
+        }
         SetPreviewInputs(column, 2);
         Require(Control<TextBox>(column, "PreviewText").Text.Contains("RGB 255, 180, 0"),
             "The fictional light configuration did not render its amber input.");
