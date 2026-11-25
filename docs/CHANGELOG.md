@@ -2,6 +2,10 @@
 
 Release history for Safety Gate Support, newest first. This file consolidates the per-version notes that previously lived in separate files under `docs/`. Older entries describe behavior at the time of that release; the current behavior is in the [README](../README.md) and the [Windows quick start](WINDOWS_QUICK_START.md).
 
+## 8.8.2 — App icon
+
+- Safety Gate Support has its own icon (a light-curtain gate with a red, amber and green signal column) on `SafetyGateSupport.exe`, the taskbar, the title bar and Alt+Tab, replacing the generic Windows icon. The Siemens USB check tool uses the same icon. `tools/branding/make_icon.py` regenerates it.
+
 ## 8.8.1 — Signal column names and true colours
 
 - The signal column tab reads the names the Siemens configurator saves inside a `.signal` file. The input switches and the All states table show each input's wire colour (for example **Input 2 (brown)**), any renamed inputs and their descriptions, and the state's name when it was given one.
