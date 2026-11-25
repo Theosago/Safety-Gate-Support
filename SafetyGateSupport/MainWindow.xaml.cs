@@ -57,7 +57,7 @@ public partial class MainWindow : Window
             var ids = _parts.Select(part => part.PartNumber).Where(id => id.Length > 0).Distinct().ToArray();
             return Task.Run(() => StockroomWebViewReader.FetchCatalogAsync(url, ids, token), token);
         });
-        InitializeStockroomPlants(); InitializeReplacementParts(); InitializeTheme();
+        InitializeStockroomPlants(); InitializeTheme();
         InitializeUnitGallery(); InitializeDrawingMonitor();
         if (data.IsOnboardingDemo)
         {
@@ -161,7 +161,9 @@ public partial class MainWindow : Window
             BuildHelpPanels();
             RefreshManuals();
             RefreshParts(); RefreshReplacementParts();
-            if (!_data.IsHomePreview && _parts.Count > 0 && SelectedStockroomPlant is { } plant && _stockroomRequestedUrl != plant.Url) { _stockroomRequestedUrl = plant.Url; _ = RefreshStockroomAsync(); }
+            // Stock is read once at start-up, and again only when a part was added since the last check.
+            if (!_data.IsHomePreview && _parts.Count > 0 && SelectedStockroomPlant is { } plant && _stockroomRefresh is null &&
+                (_stockroomRequestedUrl != plant.Url || StockroomMissesNewParts)) { _stockroomRequestedUrl = plant.Url; _ = RefreshStockroomAsync(); }
             BuildFastSearchIndex();
             _ = RefreshSearchIndexAsync();
             if (!string.IsNullOrWhiteSpace(_currentArea) && _categories.Contains(_currentArea)) AreaBox.SelectedItem = _currentArea;

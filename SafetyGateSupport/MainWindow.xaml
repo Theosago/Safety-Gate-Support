@@ -5,12 +5,15 @@
  Background="{DynamicResource AppBackground}" Foreground="{DynamicResource Ink}" FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="14" WindowStartupLocation="CenterScreen" PreviewKeyDown="MainWindow_PreviewKeyDown">
  <Window.Resources>
   <DataTemplate x:Key="ReplacementPartCard">
-   <Border BorderBrush="{DynamicResource ThemeBorderBrushD5DFE8}" BorderThickness="0,0,0,1" Padding="0,10">
-    <StackPanel><Border Height="130" Background="{DynamicResource ThemeBackgroundEDF1F4}" Margin="0,0,0,8"><Grid><TextBlock Text="No part photo" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource ThemeForeground617585}"/><Image Stretch="Uniform" Loaded="PartThumbnail_Loaded" Unloaded="PartThumbnail_Unloaded" DataContextChanged="PartThumbnail_DataContextChanged"/></Grid></Border><TextBlock Text="{Binding Description}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-     <TextBlock Text="{Binding AvailableDisplay}" Foreground="{Binding AvailableColor}" FontWeight="Bold" Margin="0,6,0,3"/>
-     <TextBlock TextWrapping="Wrap"><Run Text="{Binding InventoryLocationLabel, Mode=OneWay}"/><Run Text="{Binding InventoryLocationDisplay, Mode=OneWay}" FontWeight="Bold"/></TextBlock>
-     <TextBlock Text="{Binding PartNumber, StringFormat='Item ID: {0}'}" Foreground="{DynamicResource ThemeForeground617585}"/>
-    </StackPanel>
+   <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="0,8">
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="64"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Border Width="56" Height="56" Background="{DynamicResource SurfaceAlt}" CornerRadius="6" VerticalAlignment="Top"><Grid><TextBlock Text="&#xE719;" FontFamily="Segoe MDL2 Assets" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource InkSubtle}"/><Image Stretch="Uniform" Margin="2" Loaded="PartThumbnail_Loaded" Unloaded="PartThumbnail_Unloaded" DataContextChanged="PartThumbnail_DataContextChanged"/></Grid></Border>
+     <StackPanel Grid.Column="1">
+      <TextBlock Text="{Binding Description}" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap"/>
+      <TextBlock Text="{Binding AvailableDisplay}" Foreground="{Binding AvailableColor}" FontWeight="Bold" FontSize="13" Margin="0,3,0,1"/>
+      <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkMuted}"><Run Text="{Binding InventoryLocationLabel, Mode=OneWay}"/><Run Text="{Binding InventoryLocationDisplay, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Ink}"/><Run Text="  ·  Item "/><Run Text="{Binding PartNumber, Mode=OneWay}"/></TextBlock>
+     </StackPanel>
+    </Grid>
    </Border>
   </DataTemplate>
  </Window.Resources>
@@ -27,7 +30,7 @@
     <StackPanel Grid.Row="1" Margin="0,12,0,0">
      <Button x:Name="HomeNav" Style="{StaticResource NavButton}" Click="HomeNav_Click" AutomationProperties.Name="Find a unit"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Find a unit" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="SystemsNav" Style="{StaticResource NavButton}" Click="SystemsNav_Click" AutomationProperties.Name="Selected unit"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE890;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Selected unit" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="TroubleshootNav" Style="{StaticResource NavButton}" Click="TroubleshootNav_Click" AutomationProperties.Name="Troubleshoot"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Troubleshoot" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="TroubleshootNav" Style="{StaticResource NavButton}" Click="TroubleshootNav_Click" Visibility="Collapsed" AutomationProperties.Name="Troubleshoot"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Troubleshoot" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="ManualsNav" Style="{StaticResource NavButton}" Click="ManualsNav_Click" AutomationProperties.Name="Manuals"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Manuals" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="PartsNav" Style="{StaticResource NavButton}" Click="PartsNav_Click" AutomationProperties.Name="Parts catalog"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE719;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Parts catalog" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="PublishDriveNav" Style="{StaticResource NavButton}" Click="PublishDrive_Click" Visibility="Collapsed" AutomationProperties.Name="Publish &amp; print QR"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE749;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Publish &amp; print QR" VerticalAlignment="Center"/></StackPanel></Button>
@@ -73,17 +76,12 @@
     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
      <StackPanel>
       <DockPanel LastChildFill="True">
-       <Button Content="Close" Click="ClosePartsRail_Click" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="6,0,0,0"/>
-       <TextBlock x:Name="PartsRailTitle" Text="Replacement parts" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"/>
+       <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="11" Style="{StaticResource QuietButton}" Padding="8,6" MinHeight="0" Click="ClosePartsRail_Click" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="6,-4,-6,0" ToolTip="Close" AutomationProperties.Name="Close replacement parts"/>
+       <TextBlock x:Name="PartsRailTitle" Text="Replacement parts" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/>
       </DockPanel>
-      <StackPanel x:Name="RailStockroomControls">
-       <TextBlock Text="Stockroom plant" Margin="0,14,0,4"/>
-       <ComboBox x:Name="RailPlantBox" DisplayMemberPath="Name" SelectionChanged="RailPlant_SelectionChanged"/>
-       <WrapPanel Margin="0,6,0,0"><Button x:Name="RailRefreshStockroomButton" Content="Refresh stock" Click="CheckStoreroom_Click"/><Button x:Name="RailCancelStockroomButton" Content="Cancel check" Click="CancelStockroom_Click" Visibility="Collapsed"/><Button Content="Save stockroom report…" Click="SaveStockroomReport_Click"/></WrapPanel>
-      </StackPanel>
-      <TextBlock x:Name="RailStockStatus" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground617585}" Margin="0,8"/>
-      <WrapPanel><Button x:Name="ConfigureUnitPartsButton" Content="Choose unit parts…" Click="ConfigureUnitParts_Click" Visibility="Collapsed"/><Button Content="Browse catalog" Click="PartsNav_Click"/></WrapPanel>
-      <TextBlock x:Name="RailPartsEmpty" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground617585}" Margin="0,8"/>
+      <TextBlock x:Name="RailStockStatus" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkMuted}" Margin="0,4,0,0"/>
+      <WrapPanel Margin="-4,8,0,2"><Button x:Name="ConfigureUnitPartsButton" Content="Choose spare parts…" Click="ConfigureUnitParts_Click" Visibility="Collapsed"/><Button Content="Browse catalog" Click="PartsNav_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+      <TextBlock x:Name="RailPartsEmpty" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}" Margin="0,6"/>
      </StackPanel>
      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="RailPartsList" ItemTemplate="{StaticResource ReplacementPartCard}"/></ScrollViewer>
     </Grid>
@@ -191,6 +189,7 @@
         <ColumnDefinition Width="*"/><ColumnDefinition x:Name="UnitCardGap" Width="16"/><ColumnDefinition x:Name="UnitDrawingColumn" Width="*"/>
        </Grid.ColumnDefinitions>
        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+       <StackPanel x:Name="UnitLeftColumn" VerticalAlignment="Top">
        <Border Style="{StaticResource Card}" Padding="18" VerticalAlignment="Top">
         <StackPanel>
          <TextBlock Text="Identification photo" Style="{StaticResource SectionTitle}" Margin="0,0,0,12"/>
@@ -211,12 +210,24 @@
          </WrapPanel>
         </StackPanel>
        </Border>
+       <GroupBox x:Name="SharedNotesPanel" Header="Shared notes" Margin="0,14,0,0">
+        <StackPanel>
+         <TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="90" MaxHeight="220" VerticalContentAlignment="Top" TextChanged="SharedNotesBox_TextChanged"/>
+         <TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="{DynamicResource InkMuted}" FontSize="12" Margin="2,6,0,0"/>
+        </StackPanel>
+       </GroupBox>
+       </StackPanel>
        <Border x:Name="UnitDrawingCard" Grid.Column="2" Style="{StaticResource Card}" Padding="18" VerticalAlignment="Top">
         <StackPanel>
          <TextBlock Text="Drawings and guide PDFs" Style="{StaticResource SectionTitle}" Margin="0,0,0,12"/>
          <ComboBox x:Name="DrawingFileBox" DisplayMemberPath="Name" SelectionChanged="DrawingFile_Changed" Visibility="Collapsed" Margin="0,0,0,6" AutomationProperties.Name="Drawings and guide PDFs for this unit"/>
          <TextBlock x:Name="DrawingFileText" TextWrapping="Wrap" FontWeight="SemiBold"/>
          <TextBlock x:Name="DrawingCoverageText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12"/>
+         <StackPanel x:Name="NoDrawingPartsPanel" Visibility="Collapsed">
+          <TextBlock x:Name="NoDrawingText" Text="No electrical drawing is assigned yet. Spare parts for this unit:" Style="{StaticResource HelpText}" Margin="0,0,0,6"/>
+          <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="DrawingCardPartsList" ItemTemplate="{StaticResource ReplacementPartCard}"/></ScrollViewer>
+          <TextBlock x:Name="DrawingCardPartsEmpty" Style="{StaticResource HelpText}" Margin="0,6,0,0"/>
+         </StackPanel>
          <Border x:Name="DrawingPreviewSurface" Height="280" Background="{DynamicResource SurfaceAlt}" CornerRadius="8" Margin="0,8,0,0" Cursor="Hand" MouseLeftButtonUp="DrawingPreview_Click" ToolTip="Click to open the full drawing">
           <Grid><Image x:Name="DrawingImage" Stretch="Uniform"/><TextBlock x:Name="DrawingMessage" Text="Loading electrical drawing…" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16"/></Grid>
          </Border>
@@ -229,8 +240,7 @@
          <TextBlock x:Name="DrawingOrientationText" Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12" TextWrapping="Wrap"/>
          <TextBlock x:Name="DrawingAssignmentText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12"/>
          <WrapPanel Margin="0,8,0,0">
-          <Button x:Name="ReplaceDrawingButton" Content="Replace selected drawing…" Click="ReplaceDrawing_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False" Visibility="Collapsed"/>
-          <Button x:Name="UploadDrawingButton" Content="Add drawing pair…" Click="AddDrawing_Click"/>
+          <Button x:Name="UploadDrawingButton" Content="Upload drawing…" Click="UploadDrawing_Click" ToolTip="Upload a PDF and its DWG: a new revision of the drawing shown, or a different drawing"/>
           <Button x:Name="FilesButton" Content="Manage drawings…" Click="FindFiles_Click"/>
           <Button x:Name="RemoveGuidePdfButton" Content="Remove from this unit…" Click="RemoveGuidePdf_Click" Visibility="Collapsed" ToolTip="Take this guide PDF off this unit's guide. The file is archived, not deleted."/>
           <TextBlock FontSize="12" VerticalAlignment="Center" Margin="6,4"><Hyperlink x:Name="DownloadPdfLink" Click="DownloadDrawing_Click" IsEnabled="False">Download PDF</Hyperlink><Run Text="   ·   "/><Hyperlink x:Name="DownloadDwgLink" Click="DownloadDrawing_Click" IsEnabled="False">Download DWG</Hyperlink></TextBlock>
@@ -238,12 +248,6 @@
          <TextBlock x:Name="DrawingPublishStatus" TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}"/>
         </StackPanel>
        </Border>
-       <GroupBox x:Name="SharedNotesPanel" Header="Shared notes" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,12,0,0">
-        <StackPanel>
-         <TextBox x:Name="SharedNotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="90" MaxHeight="180" TextChanged="SharedNotesBox_TextChanged"/>
-         <TextBlock x:Name="SharedNotesStatusText" Text="Shared notes auto-save." Foreground="{DynamicResource ThemeForeground61788A}" FontSize="12" Margin="2,6,0,0"/>
-        </StackPanel>
-       </GroupBox>
       </Grid>
       <Grid x:Name="InlineToolPanel" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Button Content="← Unit overview" Click="UnitOverview_Click" HorizontalAlignment="Left"/><ContentControl x:Name="InlineToolContent" Grid.Row="1"/></Grid>
       </StackPanel>
@@ -320,7 +324,7 @@
       <TextBlock x:Name="PartRelatedText" Foreground="{DynamicResource ThemeForeground555555}" Margin="0,5,0,0" TextWrapping="Wrap"/>
       <TextBlock x:Name="PartNotesText" Margin="0,12,0,0" TextWrapping="Wrap"/>
       <Button Content="Open part document" Click="OpenPartDocument_Click" HorizontalAlignment="Left" Margin="0,12,0,0"/>
-      <WrapPanel x:Name="CatalogStockroomActions" Margin="0,6,0,0"><Button Content="Open stockroom" Click="OpenStoreroom_Click"/><Button x:Name="RefreshStockroomButton" Content="Refresh stock levels" Click="CheckStoreroom_Click"/><Button x:Name="CancelStockroomButton" Content="Cancel check" Click="CancelStockroom_Click" Visibility="Collapsed"/></WrapPanel>
+      <WrapPanel x:Name="CatalogStockroomActions" Margin="-4,6,0,0"><Button Content="Open stockroom" Click="OpenStoreroom_Click"/><Button x:Name="RefreshStockroomButton" Content="Check stock again" Click="CheckStoreroom_Click" ToolTip="Stock is checked when the app opens. Use this only if the stockroom was unavailable."/><Button x:Name="CancelStockroomButton" Content="Cancel check" Click="CancelStockroom_Click" Visibility="Collapsed"/><Button Content="Save stockroom report…" Click="SaveStockroomReport_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
       <TextBlock x:Name="StoreroomResultText" Text="Stockroom has not been checked." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground687A88}" Margin="0,8,0,0"/>
      </StackPanel></ScrollViewer>
     </Grid>

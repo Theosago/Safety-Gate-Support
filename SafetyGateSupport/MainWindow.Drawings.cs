@@ -78,6 +78,7 @@ public partial class MainWindow
         DrawingImage.Source = null; DrawingFileText.Text = ""; DrawingCoverageText.Text = ""; DrawingPageText.Text = ""; DrawingAssignmentText.Text = "";
         DrawingMessage.Text = "Select a unit to see its assigned electrical drawing."; DrawingMessage.Visibility = Visibility.Visible;
         DrawingFileBox.Visibility = Visibility.Collapsed;
+        ShowDrawingOrParts(true);
         UpdateDrawingUploadButtons(false);
         UpdateDrawingControls();
     }
@@ -107,8 +108,9 @@ public partial class MainWindow
             DrawingFileBox.Visibility = listing.Files.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
             _settingDrawingFiles = true; DrawingFileBox.ItemsSource = listing.Files; _settingDrawingFiles = false;
             if (listing.Files.Count == 0)
-                DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The drawing folder is unavailable. Check the shared library connection." : "No drawing assigned. Use Add drawing pair to upload the PDF and DWG.";
+                DrawingMessage.Text = listing.Unavailable.Count > 0 ? "The drawing folder is unavailable. Check the shared library connection." : "No drawing assigned. Use Upload drawing to add the PDF and DWG.";
             else DrawingFileBox.SelectedIndex = 0;
+            ShowDrawingOrParts(listing.Files.Count > 0 || listing.Unavailable.Count > 0);
             DrawingAssignmentText.Text = listing.Unavailable.Count > 0 ? "Unavailable files: " + string.Join(", ", listing.Unavailable)
                 : listing.Files.Count > 1 ? $"{listing.Files.Count} files assigned to this unit." : "";
         }
@@ -189,6 +191,12 @@ public partial class MainWindow
             source.Dispose();
         }
     }
+    private void ShowDrawingOrParts(bool drawing)
+    {
+        DrawingPreviewSurface.Visibility = drawing ? Visibility.Visible : Visibility.Collapsed;
+        NoDrawingPartsPanel.Visibility = drawing ? Visibility.Collapsed : Visibility.Visible;
+        if (!drawing) RefreshReplacementParts();
+    }
     private void UpdateDrawingControls()
     {
         bool idle = _drawingRendering is null;
@@ -258,9 +266,6 @@ public partial class MainWindow
     private void UpdateDrawingUploadButtons(bool enabled)
     {
         UploadDrawingButton.IsEnabled = enabled;
-        bool canReplace = DrawingFileBox.SelectedItem is AssignedDrawings.FileItem { Resource: { StorageMode: "Asset", AllowUserUpload: true } };
-        ReplaceDrawingButton.Visibility = canReplace ? Visibility.Visible : Visibility.Collapsed;
-        ReplaceDrawingButton.IsEnabled = enabled && canReplace;
         bool isGuide = DrawingFileBox.SelectedItem is AssignedDrawings.FileItem { GuideUnitIds: not null } && !_data.IsHomePreview;
         RemoveGuidePdfButton.Visibility = isGuide ? Visibility.Visible : Visibility.Collapsed;
         RemoveGuidePdfButton.IsEnabled = enabled && isGuide;
@@ -288,8 +293,17 @@ public partial class MainWindow
         }
     }
 
-    private async void AddDrawing_Click(object sender, RoutedEventArgs e) => await UploadDrawingAsync(replace: false);
-    private async void ReplaceDrawing_Click(object sender, RoutedEventArgs e) => await UploadDrawingAsync(replace: true);
+    // One upload button: when a replaceable drawing is showing, ask whether this is its new revision.
+    private async void UploadDrawing_Click(object sender, RoutedEventArgs e)
+    {
+        bool canReplace = DrawingFileBox.SelectedItem is AssignedDrawings.FileItem { Resource: { StorageMode: "Asset", AllowUserUpload: true } };
+        if (!canReplace) { await UploadDrawingAsync(replace: false); return; }
+        string shown = Path.GetFileName(_drawingPath);
+        int choice = ChoiceDialog.Ask(this, "Upload drawing", "What are you uploading?",
+            ($"A new revision of {shown}", "Replaces the PDF and DWG on every unit this drawing covers. The old pair is archived."),
+            ("A different drawing", "Adds a separate PDF and DWG pair. You choose which units it covers."));
+        if (choice >= 0) await UploadDrawingAsync(replace: choice == 0);
+    }
 
     private async Task UploadDrawingAsync(bool replace)
     {

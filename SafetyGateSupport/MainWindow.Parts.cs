@@ -14,6 +14,9 @@ public partial class MainWindow
     private StockroomService.Snapshot? _stockroomSnapshot;
     private CancellationTokenSource? _stockroomRefresh, _partPhotoLoad;
     private string _stockroomRequestedUrl = "", _stockroomMessage = "Current quantity has not been checked.";
+    // Item IDs covered by the last stock check; a newly added part triggers one fresh check.
+    private HashSet<string> _stockroomCheckedItems = new(StringComparer.OrdinalIgnoreCase);
+    private bool StockroomMissesNewParts => _parts.Any(p => !string.IsNullOrWhiteSpace(p.PartNumber) && !_stockroomCheckedItems.Contains(StockroomService.StockKey(p.PartNumber)));
     private bool _partPhotoSaving;
     private readonly Dictionary<Image, CancellationTokenSource> _partThumbnailLoads = new();
     private StockroomPlant? SelectedStockroomPlant => StockroomPlantBox.SelectedItem as StockroomPlant;
@@ -21,14 +24,12 @@ public partial class MainWindow
     {
         if (_data.IsOnboardingDemo)
         {
-            RailStockroomControls.Visibility = Visibility.Collapsed;
             CatalogStockroomSelector.Visibility = Visibility.Collapsed;
             CatalogStockroomActions.Visibility = Visibility.Collapsed;
             UpdatePartQuantity();
             return;
         }
 
-        RailPlantBox.ItemsSource = StockroomPlant.All;
         StockroomPlantBox.ItemsSource = StockroomPlant.All;
         StockroomPlantBox.SelectedItem = StockroomPlant.Find(_data.Settings.StockroomPlantId);
         UpdatePartQuantity();
@@ -39,7 +40,6 @@ public partial class MainWindow
         _stockroomRefresh?.Cancel(); _stockroomRefresh = null;
         _stockroomSnapshot = null; _stockroomRequestedUrl = "";
         var plant = SelectedStockroomPlant;
-        RailPlantBox.SelectedItem = plant;
         _data.Settings.StockroomPlantId = plant?.Id ?? "";
         try { _data.SaveLocalSettings(); }
         catch (Exception error) { MessageBox.Show(this, "The plant choice could not be saved on this computer: " + error.Message); }
@@ -53,6 +53,7 @@ public partial class MainWindow
         var plant = SelectedStockroomPlant;
         if (plant is null) { _stockroomMessage = "Choose a stockroom plant to check current quantities."; UpdatePartQuantity(); StockroomPlantBox.Focus(); return; }
         var source = new CancellationTokenSource(); _stockroomRefresh = source;
+        _stockroomCheckedItems = _parts.Select(p => StockroomService.StockKey(p.PartNumber)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         _stockroomSnapshot = null; _stockroomMessage = $"Checking {plant.Name} stockroom in the background…"; UpdatePartQuantity();
         try
         {
@@ -77,8 +78,8 @@ public partial class MainWindow
     private void UpdatePartQuantity()
     {
         bool busy = _stockroomRefresh is not null;
-        RefreshStockroomButton.IsEnabled = RailRefreshStockroomButton.IsEnabled = !busy;
-        CancelStockroomButton.Visibility = RailCancelStockroomButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        RefreshStockroomButton.IsEnabled = !busy;
+        CancelStockroomButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         var plant = SelectedStockroomPlant;
         var p = SelectedPart; var row = p is null || _stockroomSnapshot is null ? null : StockroomService.Find(_stockroomSnapshot, p, plantScoped: true);
         PartCurrentQuantityText.Text = row is null ? "Current quantity unavailable" : "Current quantity: " + PartRecord.FormatQuantity(row.Quantity);
@@ -92,7 +93,10 @@ public partial class MainWindow
         }
         PartStockroomStatusText.Text = row is not null ? $"{plant?.Name} • {row.QuantityLabel} • bin: {(row.Location.Length > 0 ? row.Location : "not provided")} • checked {_stockroomSnapshot!.CheckedUtc.LocalDateTime:g}" : _stockroomSnapshot is { QuantitiesConfirmed: true, Rows.Count: > 0 } && p is not null ? $"{plant?.Name}: no unique stockroom quantity matched this stock number." : plant is null ? "Choose a plant above. Reported quantities and locations are the original supplied snapshot, not current inventory for this plant." : _stockroomMessage;
         StockroomPlantHint.Text = plant is null ? "Choose a plant for current stock levels" : plant.Url + " • saved on this PC";
-        RailStockStatus.Text = plant is null ? "Select your plant to check live availability. Supplied quantities are snapshots only." : _stockroomMessage + " Updates every 2 minutes while open.";
+        RailStockStatus.Text = plant is null ? "Choose your stockroom in Parts catalog to see live stock."
+            : busy ? $"Checking {plant.Name} stock…"
+            : _stockroomSnapshot is { } checkedSnapshot ? $"{plant.Name} stock as of {checkedSnapshot.CheckedUtc.LocalDateTime:t}"
+            : $"{plant.Name} stock unavailable right now.";
         StoreroomResultText.Text = plant is null ? "Choose a stockroom plant. No plant has been checked." : _stockroomMessage;
     }
     private async void LoadPartPhoto(PartRecord part)

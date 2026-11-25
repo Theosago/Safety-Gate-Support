@@ -25,16 +25,6 @@ public partial class MainWindow
         }
         catch (Exception error) { MessageBox.Show(this, "Report could not be saved: " + error.Message); }
     }
-    private readonly DispatcherTimer _inventoryTimer = new() { Interval = TimeSpan.FromMinutes(2) };
-    private void InitializeReplacementParts()
-    {
-        _inventoryTimer.Tick += async (_, _) => { if (SelectedStockroomPlant is not null && _sharedDataReady) await RefreshStockroomAsync(); };
-        _inventoryTimer.Start(); Closed += (_, _) => _inventoryTimer.Stop();
-    }
-    private void RailPlant_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_data is not null && !Equals(StockroomPlantBox.SelectedItem, RailPlantBox.SelectedItem)) StockroomPlantBox.SelectedItem = RailPlantBox.SelectedItem;
-    }
     private void SetPartsRail(bool visible)
     {
         if (visible) SetCommonProblemsExpanded(false);
@@ -50,14 +40,16 @@ public partial class MainWindow
         var unitParts = unit is null ? [] : ReplacementPartsFor(unit);
         UnitPartsButton.Content = unit is null ? "Replacement parts" : $"Replacement parts ({unitParts.Count})";
         bool unitView = SystemsView.Visibility == Visibility.Visible && unit is not null;
-        PartsRailTitle.Text = unitView ? $"Replacement parts\n{GateFor(unit!)?.AssetDisplay} · {unit!.UnitDisplay}" : "Replacement parts";
+        PartsRailTitle.Text = unitView ? "Replacement parts" : "All parts";
         ConfigureUnitPartsButton.Visibility = unitView ? Visibility.Visible : Visibility.Collapsed;
         ConfigureUnitPartsButton.IsEnabled = _parts.Count > 0;
         var parts = unitView ? unitParts : _parts.OrderBy(p => p.Description).ToList();
         RailPartsList.ItemsSource = parts;
         RailPartsEmpty.Text = parts.Count > 0 ? "" : _parts.Count == 0
             ? "Add the first part in Plant setup → Parts."
-            : "No parts assigned to this unit. Choose from the catalog.";
+            : "No parts assigned to this unit yet. Use Choose spare parts.";
+        DrawingCardPartsList.ItemsSource = unitParts;
+        DrawingCardPartsEmpty.Text = unitParts.Count > 0 ? "" : "No spare parts assigned yet. Use Replacement parts → Choose spare parts.";
     }
     private async void ChooseUnitManuals_Click(object sender, RoutedEventArgs e)
     {

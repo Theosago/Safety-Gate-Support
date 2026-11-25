@@ -387,7 +387,8 @@ internal static class Program
         Require(search.TranslatePoint(new Point(0, 0), main) == before && search.IsVisible, "Gallery scrolling moved or hid search.");
         Control<ScrollViewer>(main, "HomeView").ScrollToTop();
         var troubleshoot = Control<Button>(main, "TroubleshootNav");
-        Require(troubleshoot.IsVisible, "Troubleshooting is unavailable from the main sidebar.");
+        // Troubleshooting is tabled: hidden from the sidebar but still reachable from code paths.
+        Require(!troubleshoot.IsVisible, "Troubleshooting should be hidden from the main sidebar.");
         await SelectGalleryUnit(main, fixture.BlueUnit);
         await WaitUntil(() => HasColor(Control<Image>(main, "GateImage").Source, Colors.Blue), "Selected unit photo failed to load.");
         main.Width = 1000; main.Height = 680; main.UpdateLayout();
@@ -955,12 +956,12 @@ internal static class Program
         }
         var main = Track(new MainWindow(fixture.Data, Fetch)); ShowOffscreen(main);
         await WaitUntil(() => main.IsEnabled && Control<ListBox>(main, "PartList").Items.Count > 0, "Parts not loaded.");
-        Control<ComboBox>(main, "RailPlantBox").SelectedItem = StockroomPlant.Find("02");
+        Control<ComboBox>(main, "StockroomPlantBox").SelectedItem = StockroomPlant.Find("02");
         await WaitUntil(() => requests == 1, "Lookup did not start.");
-        Require(!Control<Button>(main, "RailRefreshStockroomButton").IsEnabled && !Control<Button>(main, "RefreshStockroomButton").IsEnabled, "Refresh controls disagree while busy.");
-        Click(Control<Button>(main, "RailCancelStockroomButton"));
+        Require(!Control<Button>(main, "RefreshStockroomButton").IsEnabled && Control<TextBlock>(main, "RailStockStatus").Text.Contains("Checking"), "Stock check state is unclear while busy.");
+        Click(Control<Button>(main, "CancelStockroomButton"));
         await WaitUntil(() => Control<Button>(main, "RefreshStockroomButton").IsEnabled, "Cancel did not restore refresh.");
-        Require(Control<TextBlock>(main, "RailStockStatus").Text.Contains("check stopped"), "Cancellation has no retry guidance.");
+        Require(Control<TextBlock>(main, "StoreroomResultText").Text.Contains("check stopped"), "Cancellation has no retry guidance.");
         Click(Control<Button>(main, "RefreshStockroomButton"));
         await WaitUntil(() => requests == 2 && Control<Button>(main, "RefreshStockroomButton").IsEnabled, "Retry did not complete.");
         var list = Control<ListBox>(main, "PartList"); list.SelectedItem = list.Items.Cast<PartRecord>().Single(p => p.PartNumber == "0115639");
@@ -1037,17 +1038,29 @@ internal static class Program
         Require(main.WindowState == WindowState.Maximized, "App does not default to maximized.");
         ShowOffscreen(main); await WaitUntil(() => main.IsEnabled && Control<ItemsControl>(main, "UnitGallery").Items.Count > 0, "Gallery did not load.");
         Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Collapsed, "Parts rail must start collapsed.");
-        Control<ComboBox>(main, "RailPlantBox").SelectedItem = StockroomPlant.Find("02");
-        await WaitUntil(() => reads == 1 && Control<ListBox>(main, "PartList").Items.Cast<PartRecord>().Any(p => p.Id == part.Id && p.AvailableQuantity == 7), "Rail plant did not refresh live stock.");
+        Control<ComboBox>(main, "StockroomPlantBox").SelectedItem = StockroomPlant.Find("02");
+        await WaitUntil(() => reads == 1 && Control<ListBox>(main, "PartList").Items.Cast<PartRecord>().Any(p => p.Id == part.Id && p.AvailableQuantity == 7), "Plant choice did not read live stock.");
+        Require(main.FindName("RailPlantBox") is null && main.FindName("RailRefreshStockroomButton") is null, "The parts rail still has stockroom controls.");
+        // No timer: reloading shared data without new parts does not re-read the stockroom.
+        var reload = typeof(MainWindow).GetMethod("ReloadDataAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        await (Task)reload.Invoke(main, null)!; await DispatcherSettled();
+        Require(reads == 1, "Reloading data re-read the stockroom although no part was added.");
         await SelectGalleryUnit(main, fixture.RedUnit);
         await WaitUntil(() => Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible, "Unit workspace did not open.");
         Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Collapsed, "Unit parts opened before clicking Parts.");
+        await WaitUntil(() => Control<Button>(main, "UploadDrawingButton").IsEnabled, "Drawing listing did not finish.");
+        bool hasDrawing = Control<ComboBox>(main, "DrawingFileBox").Items.Count > 0;
+        Require(Control<StackPanel>(main, "NoDrawingPartsPanel").IsVisible == !hasDrawing && Control<Border>(main, "DrawingPreviewSurface").IsVisible == hasDrawing &&
+            (hasDrawing || Control<ItemsControl>(main, "DrawingCardPartsList").Items.Count == 1), "Spare parts did not take the place of a missing drawing.");
         Click(Control<Button>(main, "UnitPartsButton"));
         Require(Control<Border>(main, "PartsRail").Visibility == Visibility.Visible, "Parts button did not open the rail.");
         Require(Control<Grid>(main, "SystemsView").Visibility == Visibility.Visible && Control<Grid>(main, "PartsView").Visibility == Visibility.Collapsed && Control<ItemsControl>(main, "RailPartsList").Items.Count == 1, "Unit Parts navigated away or ignored the saved choice.");
-        Click(Control<Button>(main, "RefreshStockroomButton"));
-        await WaitUntil(() => Control<ItemsControl>(main, "RailPartsList").Items.Cast<PartRecord>().Single().AvailableQuantity == 0, "Refresh did not replace the quantity.");
+        // A part added in setup triggers one fresh stock read so its count is accurate.
+        fixture.Data.SaveParts([part, new() { Id = "rail-other", PartNumber = "0115638", Description = "Red module" }, new() { Id = "rail-new", PartNumber = "0115640", Description = "Green module" }]);
+        await (Task)reload.Invoke(main, null)!;
+        await WaitUntil(() => reads == 2 && Control<ItemsControl>(main, "RailPartsList").Items.Cast<PartRecord>().Single().AvailableQuantity == 0, "A newly added part did not trigger a fresh stock read.");
         Require(Control<ItemsControl>(main, "RailPartsList").Items.Cast<PartRecord>().Single().AvailableColor == "#BA2525", "Zero stock did not become red.");
+        Require(Control<Button>(main, "ConfigureUnitPartsButton").Content.Equals("Choose spare parts…"), "Rail actions were not simplified.");
     }
 
     private static async Task PartsPhotosAndStock()
@@ -1785,7 +1798,6 @@ internal static class Program
         Click(partsButton);
         var rail = Control<ItemsControl>(main, "RailPartsList");
         Require(Control<Border>(main, "PartsRail").IsVisible && rail.Items.Cast<PartRecord>().Single().Id == kit.Id &&
-                Control<FrameworkElement>(main, "RailStockroomControls").Visibility == Visibility.Collapsed &&
                 Control<TextBlock>(main, "RailStockStatus").Text.Contains("unavailable"),
             "The fictional parts rail did not show the assigned label kit without live stockroom controls.");
         await WaitUntil(() => Descendants<Image>(rail).Any(image => image.Source is not null),
