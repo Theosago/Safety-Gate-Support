@@ -2,6 +2,11 @@
 
 Release history for Safety Gate Support, newest first. This file consolidates the per-version notes that previously lived in separate files under `docs/`. Older entries describe behavior at the time of that release; the current behavior is in the [README](../README.md) and the [Windows quick start](WINDOWS_QUICK_START.md).
 
+## 8.8.1 — Signal column names and true colours
+
+- The signal column tab reads the names the Siemens configurator saves inside a `.signal` file. The input switches and the All states table show each input's wire colour (for example **Input 2 (brown)**), any renamed inputs and their descriptions, and the state's name when it was given one.
+- Colours now look the way they do in the Siemens configurator's simulator. The column stores mixed colours at reduced power (amber is stored as 134, 120, 0), so the app scales them back for display instead of showing a dark olive. Stored values in the file are unchanged.
+
 ## 8.8.0 — Simpler unit page, assets without units, and an easy signal column tab
 
 - **Spare parts:** the stockroom is read once when the app opens and again only when a part is added, so new parts show an accurate count. The parts panel keeps **Choose spare parts…** and **Browse catalog**; the stockroom picker and refresh buttons moved to the Parts catalog (**Check stock again**). Part cards are compact.
