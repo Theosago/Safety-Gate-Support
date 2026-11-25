@@ -2,6 +2,14 @@
 
 Release history for Safety Gate Support, newest first. This file consolidates the per-version notes that previously lived in separate files under `docs/`. Older entries describe behavior at the time of that release; the current behavior is in the [README](../README.md) and the [Windows quick start](WINDOWS_QUICK_START.md).
 
+## 8.9.0 — Title bar, pair-only uploads, column view and light column in QR guides
+
+- **Window:** the app draws its own dark title bar with the app icon. Maximized, it fills the screen exactly, so moving the mouse into the top-right corner and clicking closes Safety Gate Support rather than the window behind it.
+- **Uploads are pairs, and always ask which units:** drawings upload only as PDF + DWG and signal configurations only as `.signal` + PDF. Every upload asks which units the pair covers (a new revision starts with the units already linked). Single files can no longer be added to the light configuration collection.
+- **Signal column view:** each input combination is drawn as a vertical signal column, segment 1 next to the base (upside-down mounting is respected). Try inputs shows one large column with segment numbers and blink/flash/rotate labels. Amber now looks amber instead of lemon yellow.
+- **Scrolling:** the mouse wheel scrolls the unit page when the pointer is over the Light column tab or another tool that has nothing of its own to scroll.
+- **QR guides:** each unit's Unit guide gains a **Light column** chart for every configuration that covers it (inputs and wire colours, each state drawn as the column, state names, blinking and sound), followed by the configuration's PDF sheet. A sheet already attached to the guide by hand is not added twice. Uploading a configuration pair queues the covered units for publishing; existing Drive file IDs and QR links are unchanged.
+
 ## 8.8.2 — App icon
 
 - Safety Gate Support has its own icon (a boom barrier with a striped arm, in Gränges red and white) on `SafetyGateSupport.exe`, the taskbar, the title bar and Alt+Tab, replacing the generic Windows icon. The Siemens USB check tool uses the same icon. `tools/branding/make_icon.py` regenerates it.
