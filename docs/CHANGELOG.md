@@ -2,6 +2,15 @@
 
 Release history for Safety Gate Support, newest first. This file consolidates the per-version notes that previously lived in separate files under `docs/`. Older entries describe behavior at the time of that release; the current behavior is in the [README](../README.md) and the [Windows quick start](WINDOWS_QUICK_START.md).
 
+## 8.7.0 — A redesigned, consistent interface
+
+- **Every control restyled:** buttons have clear roles (blue primary, white secondary, quiet text actions, red delete), and rounded text fields highlight when focused. Dropdowns open as shadowed lists, checkboxes and radio buttons are custom, and lists highlight hover and selection. Scrollbars are slim, collapsible sections use arrows, and sections sit on cards. Tooltips, links and progress bars match.
+- **Dark mode reworked:** cards sit above a darker background, text is readable everywhere, and the theme picker lives at the foot of the sidebar.
+- **Main window:** wider sidebar with icons and Plant setup as a menu item, card-style unit and Common Problems tiles, and card sections on the unit page. Common Problems starts collapsed until problems exist.
+- **Plant setup rebuilt:** a left-hand section menu with icons (Start here, Units & assets, Common problems, Parts, Library & software), with advanced tools under a toggle at the bottom. Each page has a title and one-line explanation. Forms are laid out in columns with labelled fields, Start here is a numbered 1–5 checklist with plain wording, and task guidance shows in a banner. The unit editor puts the identification photo first and large.
+- Help, MaintainX, photo, support library and folder organisation windows share the same look.
+- No data, file or workflow changes. The build now saves screenshots of the main screens for design review.
+
 ## 8.6.1 — Remove guide PDFs
 
 - Guide PDFs (extra PDFs added to a unit's QR guide) show as **Guide PDF • name** in a unit's **Drawings and guide PDFs** list, so they are not mistaken for electrical drawings.

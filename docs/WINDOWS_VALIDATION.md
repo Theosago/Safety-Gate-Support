@@ -7,7 +7,7 @@ clipboard, shared-drive and plant-specific integrations. Use a disposable local
 data folder for a first-time test.
 
 1. Start `SafetyGateSupport.exe` or run the project. Open Setup Mode with
-   **Ctrl+Shift+Alt+A**, then select **Shared Data / Software**, choose an empty local folder,
+   **Ctrl+Shift+Alt+A**, then select **Library & software**, choose an empty local folder,
    and click **Initialize Starter Data**. Confirm the connection status updates
    and the three seeded areas can be browsed.
 2. Use the opening photo gallery to select a unit. Confirm its identification photo

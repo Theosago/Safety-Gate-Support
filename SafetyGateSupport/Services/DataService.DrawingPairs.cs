@@ -16,7 +16,7 @@ public partial class DataService
         var files = sources.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (files.Length != 2 || files.Count(p => Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) != 1 || files.Count(p => Path.GetExtension(p).Equals(".dwg", StringComparison.OrdinalIgnoreCase)) != 1)
             throw new InvalidOperationException("Select exactly one PDF and its DWG companion. Neither file has been published; add the missing companion and try again.");
-        if (view.StorageMode != "Asset") throw new InvalidOperationException("Run Setup → Shared Data / Software → Organize asset folders once before publishing paired drawing updates.");
+        if (view.StorageMode != "Asset") throw new InvalidOperationException("Run Plant setup → Library & software → Organize asset folders once before publishing paired drawing updates.");
         var records = LoadResources();
         var record = records.SingleOrDefault(r => r.Id == view.Id);
         if (record is null)

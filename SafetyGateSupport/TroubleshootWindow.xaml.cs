@@ -69,7 +69,9 @@ public partial class TroubleshootWindow : Window
         }
         if ((node.IsTerminal || node.Choices.Count == 0) && string.IsNullOrEmpty(node.Action))
         {
-            ChoicePanel.Children.Add(new TextBlock { Text = "Follow the documented checks before returning equipment to service.", Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(4, 8, 4, 0) });
+            var reminder = new TextBlock { Text = "Follow the documented checks before returning equipment to service.", Margin = new Thickness(4, 8, 4, 0) };
+            reminder.SetResourceReference(TextBlock.ForegroundProperty, "InkMuted");
+            ChoicePanel.Children.Add(reminder);
         }
 
         if (node.Action == "SignalColumn")

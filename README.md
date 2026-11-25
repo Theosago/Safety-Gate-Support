@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console for plant safety gates, version **8.6.1**.
+Windows WPF support console for plant safety gates, version **8.7.0**.
 
 Engineers and electricians pick a unit from a searchable photo gallery and get
 its identification photo, current electrical drawing, shared notes, replacement
@@ -47,7 +47,7 @@ folder. Choose **Plant setup** in the sidebar or press **Ctrl+Alt+Shift+A**.
 The **Start here** page connects an existing library or creates a blank plant in
 an empty folder, then guides one pilot unit through photo, PDF and Common Problem
 setup. A local folder works for the pilot. Huntingdon sample data is an explicit
-training option under Shared Data / Software.
+training option under Library & software.
 Local settings live in `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
 
 Production use requires access to the configured shared folder. Built-in Siemens

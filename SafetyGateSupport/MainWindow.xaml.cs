@@ -238,8 +238,8 @@ public partial class MainWindow : Window
             if (item.Section.Equals("Troubleshooting", StringComparison.OrdinalIgnoreCase)) TroubleshootingPanel.Children.Add(button);
             else QuickHelpPanel.Children.Add(button);
         }
-        if (QuickHelpPanel.Children.Count == 0) QuickHelpPanel.Children.Add(new TextBlock { Text = "No quick help topics configured.", Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(6) });
-        if (TroubleshootingPanel.Children.Count == 0) TroubleshootingPanel.Children.Add(new TextBlock { Text = "No troubleshooting topics configured.", Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(6) });
+        if (QuickHelpPanel.Children.Count == 0) { var empty = new TextBlock { Text = "No quick help topics configured.", Margin = new Thickness(6) }; empty.SetResourceReference(TextBlock.ForegroundProperty, "InkMuted"); QuickHelpPanel.Children.Add(empty); }
+        if (TroubleshootingPanel.Children.Count == 0) { var empty = new TextBlock { Text = "No troubleshooting topics configured.", Margin = new Thickness(6) }; empty.SetResourceReference(TextBlock.ForegroundProperty, "InkMuted"); TroubleshootingPanel.Children.Add(empty); }
     }
 
     private void HomeNav_Click(object sender, RoutedEventArgs e) => ShowHome();

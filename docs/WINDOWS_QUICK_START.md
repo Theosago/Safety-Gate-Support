@@ -73,7 +73,7 @@ Open a unit's UAM scanner resource and choose **Check UAM scanner…**. Version 
 
 ## PLC information and files
 
-Each unit page has a **PLC** button for its asset. Model, address/IP and notes are shared across that asset’s units. Enter them in **Setup Mode → Gates & Units → Asset information and PLC settings**, then **Save Gate Information**. **Open PLC files** shows that asset’s current files and supports archived same-name replacements. This page records connection details; it does not connect to or program the PLC.
+Each unit page has a **PLC** button for its asset. Model, address/IP and notes are shared across that asset’s units. Enter them in **Plant setup → Units & assets → Asset details → Manufacturer, search terms and PLC details**, then **Save asset**. **Open PLC files** shows that asset’s current files and supports archived same-name replacements. This page records connection details; it does not connect to or program the PLC.
 
 ## Scanner shortcut and Setup photos
 

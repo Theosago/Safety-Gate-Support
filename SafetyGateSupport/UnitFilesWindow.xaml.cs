@@ -78,7 +78,7 @@ public partial class UnitFilesWindow : Window
         {
             bool selected = Equals(button.Tag, _filter);
             button.FontWeight = selected ? FontWeights.Bold : FontWeights.Normal;
-            button.Background = selected ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(226, 242, 247)) : System.Windows.Media.Brushes.White;
+            button.SetResourceReference(BackgroundProperty, selected ? "AccentSoft" : "Surface");
         }
         StatusText.Text = matches.Count == 0 ? (_drawingOnly ? "No electrical schematics are assigned to this unit. Use Add / update drawings on the unit page." : "No matching current files assigned. Try All files, or use Import / assign files to review this unit’s assignments.") : $"{matches.Count} current file(s) • {_filter}";
         StatusText.Text += _unavailable;
