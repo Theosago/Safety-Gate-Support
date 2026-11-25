@@ -38,7 +38,6 @@
     <Compile Include="../../SafetyGateSupport/Services/OperatorDrivePublisher.cs" Link="Services/OperatorDrivePublisher.cs" />
     <Compile Include="../../SafetyGateSupport/Services/StockroomService.cs" Link="Services/StockroomService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.PartPhotos.cs" Link="Services/DataService.PartPhotos.cs" />
-    <Compile Include="../../SafetyGateSupport/Services/DataService.DrawingViews.cs" Link="Services/DataService.DrawingViews.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.PartsCatalog.cs" Link="Services/DataService.PartsCatalog.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.cs" Link="Services/DataService.cs" />
     <Compile Include="../../SafetyGateSupport/Services/PdfTextOrientation.cs" Link="Services/PdfTextOrientation.cs" />
