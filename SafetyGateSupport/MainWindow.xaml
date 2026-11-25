@@ -24,26 +24,43 @@
      <TextBlock Text="Safety Gate Support" Foreground="#F2F7FB" FontWeight="SemiBold" FontSize="18" TextWrapping="Wrap"/>
     </StackPanel>
     <StackPanel Grid.Row="1" Margin="0,12,0,0">
-     <Button x:Name="HomeNav" Style="{StaticResource NavButton}" Content="Find a unit" Click="HomeNav_Click"/>
-     <Button x:Name="SystemsNav" Style="{StaticResource NavButton}" Content="Selected unit" Click="SystemsNav_Click"/>
-     <Button x:Name="TroubleshootNav" Style="{StaticResource NavButton}" Content="Troubleshoot" Click="TroubleshootNav_Click"/>
-     <Button x:Name="ManualsNav" Style="{StaticResource NavButton}" Content="Manuals" Click="ManualsNav_Click"/>
-     <Button x:Name="PartsNav" Style="{StaticResource NavButton}" Content="Parts catalog" Click="PartsNav_Click"/>
-     <Button x:Name="PublishDriveNav" Style="{StaticResource NavButton}" Content="Publish &amp; print QR" Click="PublishDrive_Click" Visibility="Collapsed"/>
-     <Button x:Name="SupportLibraryNav" Style="{StaticResource NavButton}" Content="Support library" Click="SupportLibrary_Click"/>
+     <Button x:Name="HomeNav" Style="{StaticResource NavButton}" Click="HomeNav_Click" AutomationProperties.Name="Find a unit"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Find a unit" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="SystemsNav" Style="{StaticResource NavButton}" Click="SystemsNav_Click" AutomationProperties.Name="Selected unit"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE890;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Selected unit" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="TroubleshootNav" Style="{StaticResource NavButton}" Click="TroubleshootNav_Click" AutomationProperties.Name="Troubleshoot"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Troubleshoot" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="ManualsNav" Style="{StaticResource NavButton}" Click="ManualsNav_Click" AutomationProperties.Name="Manuals"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Manuals" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="PartsNav" Style="{StaticResource NavButton}" Click="PartsNav_Click" AutomationProperties.Name="Parts catalog"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE719;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Parts catalog" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="PublishDriveNav" Style="{StaticResource NavButton}" Click="PublishDrive_Click" Visibility="Collapsed" AutomationProperties.Name="Publish &amp; print QR"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE749;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Publish &amp; print QR" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="SupportLibraryNav" Style="{StaticResource NavButton}" Click="SupportLibrary_Click" AutomationProperties.Name="Support library"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="26" VerticalAlignment="Center"/><TextBlock Text="Support library" VerticalAlignment="Center"/></StackPanel></Button>
     </StackPanel>
     <StackPanel Grid.Row="2" Margin="16,10,12,18"><TextBlock Text="Appearance" Foreground="{DynamicResource ThemeForegroundAEC4D3}"/><ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" Margin="0,6,0,12"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
      <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap"/>
      <Button x:Name="SetupButton" Content="Plant setup" Click="SetupSharedData_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0" ToolTip="Open Plant setup (Ctrl+Alt+Shift+A)"/>
      <Button x:Name="CloseDemoButton" Content="Close demo" Click="CloseDemo_Click" Visibility="Collapsed" Padding="8,5" Margin="0,8,0,0"/>
-     <TextBlock Text="v8.5.7" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="v8.6.0" Foreground="{DynamicResource ThemeForeground999999}" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
 
   <Grid Grid.Column="1" Margin="22">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="PartsRailColumn" Width="0"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <Border x:Name="PartsRail" Visibility="Collapsed" Grid.Column="1" Background="{DynamicResource ThemeBackgroundFFFFFF}" CornerRadius="8" Padding="16" Margin="18,0,0,0">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <!-- One search bar for the whole app: filters the unit photos and finds documents, parts and notes. -->
+   <StackPanel x:Name="SearchHeader" Grid.ColumnSpan="3" Margin="0,0,0,16">
+    <Border x:Name="SearchBarSurface" Background="{DynamicResource ThemeBackgroundFFFFFF}" BorderThickness="1" CornerRadius="12" Padding="14,0,6,0" MinHeight="52">
+     <Border.Style><Style TargetType="Border"><Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrushCDD9E3}"/><Style.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush17859C}"/></Trigger></Style.Triggers></Style></Border.Style>
+     <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource ThemeForeground61788A}" IsHitTestVisible="False"/>
+      <TextBlock x:Name="SearchPlaceholder" Grid.Column="1" Text="Search units, drawings, manuals, parts and notes" FontSize="17" VerticalAlignment="Center" Margin="3,0,0,0" Foreground="{DynamicResource ThemeForeground8293A1}" IsHitTestVisible="False" TextTrimming="CharacterEllipsis"/>
+      <TextBox x:Name="UnitSearchBox" Grid.Column="1" MinHeight="48" FontSize="17" BorderThickness="0" Background="Transparent" Padding="0" VerticalContentAlignment="Center"
+               TextChanged="UnitSearch_Changed" PreviewKeyDown="UnitSearch_PreviewKeyDown"
+               ToolTip="Asset number, unit, location, model, drawing, manual, part or note (Ctrl+F)" AutomationProperties.Name="Search everything"/>
+      <Button x:Name="ClearSearchButton" Grid.Column="2" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12" Padding="10,8" Margin="4" Click="ClearSearch_Click" Visibility="Collapsed" ToolTip="Clear search (Esc)" AutomationProperties.Name="Clear search"/>
+     </Grid>
+    </Border>
+    <TextBlock x:Name="SearchHintText" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource ThemeForeground61788A}" Margin="6,6,0,0" Text="Type an asset number, location, part, manual or note. Press Ctrl+F from any page."/>
+   </StackPanel>
+   <Border Grid.Row="1" x:Name="PartsRail" Visibility="Collapsed" Grid.Column="1" Background="{DynamicResource ThemeBackgroundFFFFFF}" CornerRadius="8" Padding="16" Margin="18,0,0,0">
     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
      <StackPanel>
       <DockPanel LastChildFill="True">
@@ -62,7 +79,7 @@
      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="RailPartsList" ItemTemplate="{StaticResource ReplacementPartCard}"/></ScrollViewer>
     </Grid>
    </Border>
-   <Grid x:Name="CommonProblemsRail" Grid.Column="2" Width="300" Margin="12,0,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Grid Grid.Row="1" x:Name="CommonProblemsRail" Grid.Column="2" Width="300" Margin="12,0,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <Button x:Name="CommonProblemsToggle" Content="Common Problems ▶" Click="ToggleCommonProblems_Click" ToolTip="Collapse or expand Common Problems" AutomationProperties.Name="Toggle Common Problems"/>
     <Border x:Name="CommonProblemsBody" Grid.Row="1" Background="{DynamicResource ThemeBackgroundFFFFFF}"><Grid Margin="10"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
      <StackPanel><TextBlock Text="Does this look familiar?" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="Select a photo to see the fix." TextWrapping="Wrap" Margin="0,5,0,12"/><TextBlock x:Name="CommonProblemsEmpty" Text="No common problems have been added yet. Add photos and fix instructions in Setup → Home / Help." TextWrapping="Wrap"/></StackPanel>
@@ -74,15 +91,32 @@
      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
     </Grid></Border></Grid>
    <!-- HOME -->
-   <Grid x:Name="HomeShell"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Grid Grid.Row="1" x:Name="HomeShell"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <StackPanel>
      <StackPanel Margin="0,0,0,14">
       <TextBlock x:Name="HomeHeadingText" Text="Find a unit" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap"/>
-      <TextBlock x:Name="GalleryIntroText" Text="Search by asset number or location, then select the matching photo." Foreground="{DynamicResource ThemeForeground536E81}" FontSize="15" TextWrapping="Wrap" Margin="0,6,0,0"/>
+      <TextBlock x:Name="GalleryIntroText" Text="Select the unit’s photo, or search above for any unit, drawing, manual, part or note." Foreground="{DynamicResource ThemeForeground536E81}" FontSize="15" TextWrapping="Wrap" Margin="0,6,0,0"/>
      </StackPanel>
-     <TextBlock Text="Search units" FontWeight="SemiBold" Margin="0,4,0,5"/>
-     <TextBox x:Name="UnitSearchBox" MinHeight="46" FontSize="18" TextChanged="UnitSearch_Changed" KeyDown="UnitSearch_KeyDown" ToolTip="Asset number, unit, location, model or description" AutomationProperties.Name="Search units by asset number or location"/>
-     <WrapPanel Margin="0,12,0,8"><Button x:Name="AllAreasButton" HorizontalContentAlignment="Center" Content="All areas" Click="AllAreas_Click"/><WrapPanel x:Name="HomeCategoryPanel"/></WrapPanel>
+     <Border x:Name="SearchResultsPanel" Visibility="Collapsed" Background="{DynamicResource ThemeBackgroundFFFFFF}" BorderBrush="{DynamicResource ThemeBorderBrushDFE6ED}" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,12">
+      <StackPanel>
+       <TextBlock x:Name="SearchResultsHeading" Text="Matches" FontWeight="SemiBold" Foreground="{DynamicResource ThemeForeground405D70}" Margin="2,0,0,6"/>
+       <ListBox x:Name="GlobalSearchResults" MaxHeight="250" BorderThickness="0" KeyDown="GlobalSearchResults_KeyDown" AutomationProperties.Name="Search results">
+        <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}"><Setter Property="Padding" Value="6,6"/><Setter Property="Cursor" Value="Hand"/><EventSetter Event="PreviewMouseLeftButtonUp" Handler="SearchResultItem_Click"/></Style></ListBox.ItemContainerStyle>
+        <ListBox.ItemTemplate>
+         <DataTemplate>
+          <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+           <Border Background="{DynamicResource ThemeBackgroundEAF3F7}" CornerRadius="5" Padding="7,2" Margin="0,1,10,0" VerticalAlignment="Top" MinWidth="64"><TextBlock Text="{Binding KindLabel}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeForeground176B87}"/></Border>
+           <StackPanel Grid.Column="1">
+            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+            <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource ThemeForeground666666}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
+           </StackPanel>
+          </Grid>
+         </DataTemplate>
+        </ListBox.ItemTemplate>
+       </ListBox>
+      </StackPanel>
+     </Border>
+     <WrapPanel Margin="0,0,0,8"><Button x:Name="AllAreasButton" HorizontalContentAlignment="Center" Content="All areas" Click="AllAreas_Click"/><WrapPanel x:Name="HomeCategoryPanel"/></WrapPanel>
      <TextBlock x:Name="GalleryStatusText" Text="Loading units…" Foreground="{DynamicResource ThemeForeground536E81}" TextWrapping="Wrap" Margin="4,0,0,12"/>
     </StackPanel><ScrollViewer x:Name="HomeView" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <ItemsControl x:Name="UnitGallery"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -103,34 +137,12 @@
      <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,18"><Button x:Name="PreviousUnitsButton" Content="← Previous units" Click="PreviousUnits_Click"/><TextBlock x:Name="GalleryPageText" VerticalAlignment="Center" Margin="14,0"/><Button x:Name="NextUnitsButton" Content="More units →" Click="NextUnits_Click"/></WrapPanel>
      <TextBlock x:Name="HomeSubtitleText" Foreground="{DynamicResource ThemeForeground555555}" FontSize="15" Margin="0,4,0,10" TextWrapping="Wrap"/>
 
-     <GroupBox Header="Search everything">
-      <StackPanel Margin="12">
-       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <TextBox x:Name="GlobalSearchBox" Height="38" FontSize="16" VerticalContentAlignment="Center" ToolTip="Try: scanner, manual, asset 1226, drawing, part number..." TextChanged="GlobalSearchBox_TextChanged" KeyDown="GlobalSearchBox_KeyDown"/>
-        <Button Grid.Column="1" Content="Search" Click="GlobalSearch_Click" Padding="22,7"/>
-       </Grid>
-       <ListBox x:Name="GlobalSearchResults" Margin="0,8,0,0" MaxHeight="300" MouseDoubleClick="GlobalSearchResults_DoubleClick" Visibility="Collapsed">
-        <ListBox.ItemTemplate>
-         <DataTemplate>
-          <StackPanel Margin="4,5" MaxWidth="820">
-           <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
-           <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource ThemeForeground666666}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
-          </StackPanel>
-         </DataTemplate>
-        </ListBox.ItemTemplate>
-       </ListBox>
-       <TextBlock TextWrapping="Wrap" x:Name="SearchHintText" Foreground="{DynamicResource ThemeForeground666666}" Margin="4,5,0,0" Text="Start typing to search systems, notes, drawings, manuals, configs, and parts."/>
-      </StackPanel>
-     </GroupBox>
-
-
-
      <GroupBox Header="Quick help" Margin="0,12,0,0"><StackPanel x:Name="QuickHelpPanel" Margin="8"/></GroupBox>
     </StackPanel>
    </ScrollViewer>
 </Grid>
 
-   <ScrollViewer x:Name="TroubleshootView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+   <ScrollViewer Grid.Row="1" x:Name="TroubleshootView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <StackPanel>
      <TextBlock Text="Troubleshoot" FontSize="28" FontWeight="SemiBold"/>
      <TextBlock Text="Start with what you can observe. Check Common Problems for a known symptom, or choose a unit for guided checks." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground536E81}" Margin="0,6,0,18"/>
@@ -146,20 +158,20 @@
    </ScrollViewer>
 
    <!-- The unit workspace keeps the selected identity while tools open. -->
-   <Grid x:Name="SystemsView" Visibility="Collapsed">
+   <Grid Grid.Row="1" x:Name="SystemsView" Visibility="Collapsed">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <StackPanel Margin="0,0,0,16">
      <Button x:Name="ChangeUnitButton" Content="← All units" Click="HomeNav_Click" HorizontalAlignment="Left" Margin="0,0,0,8"/>
      <DockPanel LastChildFill="True">
       <Button x:Name="UnitPartsButton" Content="Replacement parts" Click="UnitParts_Click" DockPanel.Dock="Right"
               Style="{StaticResource PrimaryButton}" MinHeight="38" VerticalAlignment="Center" Margin="12,0,0,0" IsEnabled="False"/>
+      <Button x:Name="MaintainXWorkOrdersButton" Content="MaintainX work orders" Click="MaintainXWorkOrders_Click" DockPanel.Dock="Right"
+              MinHeight="38" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed"/>
       <StackPanel>
        <TextBlock x:Name="UnitTitleText" Text="Select a unit" FontSize="27" FontWeight="SemiBold" TextWrapping="Wrap"/>
        <TextBlock x:Name="UnitAreaText" Foreground="{DynamicResource ThemeForeground536E81}" Margin="0,4,0,0" TextWrapping="Wrap"/>
       </StackPanel>
      </DockPanel>
-     <Button x:Name="MaintainXWorkOrdersButton" Content="MaintainX work orders" Click="MaintainXWorkOrders_Click"
-             HorizontalAlignment="Left" Margin="0,8,0,0" Visibility="Collapsed"/>
     </StackPanel>
     <ScrollViewer x:Name="UnitWorkspaceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <StackPanel x:Name="NoUnitPanel" Margin="24"><TextBlock Text="Select a unit to see its photo, files and troubleshooting." FontSize="21" TextWrapping="Wrap"/><Button Content="Find a unit" Click="HomeNav_Click" HorizontalAlignment="Left" Margin="0,18,0,0"/></StackPanel>
@@ -226,13 +238,13 @@
       <Grid x:Name="InlineToolPanel" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Button Content="← Unit overview" Click="UnitOverview_Click" HorizontalAlignment="Left"/><ContentControl x:Name="InlineToolContent" Grid.Row="1"/></Grid>
       </StackPanel>
      <Expander Visibility="Collapsed" Header="Browse by asset and unit list" Margin="0,20,0,8"><StackPanel>
-      <Grid Margin="0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="AreaBox" SelectionChanged="AreaBox_SelectionChanged"/><TextBox x:Name="SystemSearchBox" Grid.Column="1" TextChanged="SystemSearchBox_TextChanged" Margin="10,0,0,0" ToolTip="Search within this area"/></Grid>
+      <Grid Margin="0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="AreaBox" SelectionChanged="AreaBox_SelectionChanged"/></Grid>
       <Grid Height="230"><Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ListBox x:Name="AssetList" DisplayMemberPath="Display" SelectionChanged="AssetList_SelectionChanged"/><ListBox x:Name="UnitList" Grid.Column="1" DisplayMemberPath="UnitDisplay" Margin="10,0,0,0" SelectionChanged="UnitList_SelectionChanged"/></Grid>
      </StackPanel></Expander>
     </StackPanel></ScrollViewer>
    </Grid>
 
-   <Grid x:Name="CommonProblemView" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Grid Grid.Row="1" x:Name="CommonProblemView" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <StackPanel><Button x:Name="CommonProblemBackButton" Content="← Back" Click="CommonProblemBack_Click" HorizontalAlignment="Left"/><TextBlock x:Name="CommonProblemTitle" FontSize="28" FontWeight="Bold" TextWrapping="Wrap" Margin="0,12"/></StackPanel>
     <ScrollViewer x:Name="CommonProblemScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
      <TextBlock Text="How to recognize and fix this problem" FontSize="20" FontWeight="SemiBold" Margin="0,8"/>
@@ -242,12 +254,11 @@
    </Grid>
 
    <!-- MANUALS -->
-   <Grid x:Name="ManualsView" Visibility="Collapsed">
+   <Grid Grid.Row="1" x:Name="ManualsView" Visibility="Collapsed">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <DockPanel><Button Content="Choose this unit’s manuals…" Click="ChooseUnitManuals_Click" DockPanel.Dock="Right"/><TextBlock Text="Manuals &amp; documents" FontSize="28" FontWeight="Bold"/></DockPanel>
+    <DockPanel><Button Content="Choose this unit’s manuals…" Click="ChooseUnitManuals_Click" DockPanel.Dock="Right"/><TextBlock Text="Manuals &amp; documents" FontSize="28" FontWeight="SemiBold"/></DockPanel>
     <StackPanel Grid.Row="1" Margin="0,8,0,12">
      <TextBlock x:Name="ManualsIntroText" Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
-     <TextBox x:Name="ManualSearchBox" Height="36" FontSize="16" Margin="0,10,0,0" VerticalContentAlignment="Center" TextChanged="ManualSearchBox_TextChanged" ToolTip="Search for a manual, parts list, or troubleshooting guide" AutomationProperties.Name="Search documents"/>
      <TextBlock x:Name="ManualImportStatus" TextWrapping="Wrap" Margin="0,4,0,0"/>
     </StackPanel>
     <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -261,14 +272,12 @@
    </Grid>
 
    <!-- PARTS -->
-   <Grid x:Name="PartsView" Visibility="Collapsed">
+   <Grid Grid.Row="1" x:Name="PartsView" Visibility="Collapsed">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <TextBlock Text="Parts catalog" FontSize="28" FontWeight="SemiBold"/>
     <StackPanel Grid.Row="1" Margin="0,8,0,12">
      <TextBlock x:Name="PartsIntroText" Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
      <WrapPanel x:Name="CatalogStockroomSelector" Margin="0,10,0,0"><TextBlock Text="Stockroom plant" VerticalAlignment="Center" Margin="0,0,10,0"/><ComboBox x:Name="StockroomPlantBox" Width="190" DisplayMemberPath="Name" SelectionChanged="StockroomPlant_SelectionChanged"/><TextBlock x:Name="StockroomPlantHint" Text="Choose a plant for current stock levels" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="{DynamicResource ThemeForeground566D7C}"/></WrapPanel>
-     <TextBlock Text="Search by part name or Item ID" FontWeight="SemiBold" Margin="0,10,0,4"/>
-     <TextBox x:Name="PartSearchBox" Height="36" FontSize="16" Margin="0,10,0,0" VerticalContentAlignment="Center" TextChanged="PartSearchBox_TextChanged" ToolTip="Search part number, description, manufacturer, keyword, or related asset" AutomationProperties.Name="Search parts"/>
      <TextBlock x:Name="PartCatalogEmpty" Visibility="Collapsed" TextWrapping="Wrap" Margin="0,8,0,0"/>
     </StackPanel>
     <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="4*" MinWidth="260"/><ColumnDefinition Width="12"/><ColumnDefinition Width="6*" MinWidth="360"/></Grid.ColumnDefinitions>

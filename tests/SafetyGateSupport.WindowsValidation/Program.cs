@@ -281,10 +281,17 @@ internal static class Program
             "The window did not render and finish asynchronous inventory startup.");
         Console.WriteLine($"INFO Main window rendered, dispatched input, and loaded seed inventory in {watch.ElapsedMilliseconds} ms.");
         Require(Control<TextBlock>(window, "ConnectionText").Text.Contains(fixture.Data.SharedRoot, StringComparison.OrdinalIgnoreCase), "Connection status does not identify the isolated root.");
-        Control<TextBox>(window, "GlobalSearchBox").Text = fixture.Gate.AssetNumber;
+        // One search bar: typing from another page returns to the unit photos and shows matches.
+        Click(Control<Button>(window, "PartsNav"));
+        Control<TextBox>(window, "UnitSearchBox").Text = fixture.Gate.AssetNumber;
+        Require(Control<Grid>(window, "HomeShell").Visibility == Visibility.Visible && Control<Grid>(window, "PartsView").Visibility == Visibility.Collapsed, "Searching from Parts did not show the search results page.");
         var results = Control<ListBox>(window, "GlobalSearchResults");
         await WaitUntil(() => results.Items.Count > 0, "Searching a seeded asset number returned no results.");
         Require(results.Items.Cast<GlobalSearchResult>().Any(result => result.Kind == "System" && result.Title.Contains(fixture.Gate.AssetNumber, StringComparison.OrdinalIgnoreCase)), "Search omitted the seeded gate/unit.");
+        Require(Control<Border>(window, "SearchResultsPanel").IsVisible && Control<Button>(window, "ClearSearchButton").IsVisible, "Search matches or the clear button were not shown.");
+        Require(window.FindName("GlobalSearchBox") is null && window.FindName("ManualSearchBox") is null && window.FindName("PartSearchBox") is null, "A separate search box remains.");
+        Click(Control<Button>(window, "ClearSearchButton"));
+        await WaitUntil(() => Control<TextBox>(window, "UnitSearchBox").Text.Length == 0 && !Control<Border>(window, "SearchResultsPanel").IsVisible, "Clearing search left stale matches.");
     }
 
     private static async Task HomePreviewStartup()
@@ -1589,7 +1596,7 @@ internal static class Program
         ShowOffscreen(window);
         await WaitUntil(() => window.IsEnabled && readyField.GetValue(window) is true,
             "The background index discarded inventory and notes after a managed-resource enumeration failure.");
-        Control<TextBox>(window, "GlobalSearchBox").Text = phrase;
+        Control<TextBox>(window, "UnitSearchBox").Text = phrase;
         var results = Control<ListBox>(window, "GlobalSearchResults");
         await WaitUntil(() => results.Items.Cast<GlobalSearchResult>().Any(result => result.Kind == "System" && result.SystemId == fixture.BlueUnit.Id && result.MatchSource == "SharedNotes"),
             "The note saved before a malformed resource folder was not searchable for its unit.");

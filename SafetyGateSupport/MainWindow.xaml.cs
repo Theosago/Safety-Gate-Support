@@ -140,7 +140,7 @@ public partial class MainWindow : Window
                 _searchIndex = new(); _searchIndexReady = false;
                 CommonProblemsList.ItemsSource = null; _commonProblemPhotos?.Cancel(); CommonProblemsEmpty.Visibility = Visibility.Visible;
                 AreaBox.ItemsSource = null; HomeCategoryPanel.Children.Clear(); QuickHelpPanel.Children.Clear(); TroubleshootingPanel.Children.Clear();
-                GlobalSearchResults.ItemsSource = null; GlobalSearchResults.Visibility = Visibility.Collapsed;
+                ShowSearchResults(null);
                 SearchHintText.Text = "Shared data is unavailable.";
                 UpdateConnectionStatus();
                 RefreshUnitGallery();
@@ -276,6 +276,7 @@ public partial class MainWindow : Window
     {
         var needed = ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.F && Keyboard.Modifiers == ModifierKeys.Control && !_loadingData) { e.Handled = true; FocusSearch(); return; }
         if (key != Key.A || (Keyboard.Modifiers & needed) != needed) return;
         e.Handled = true;
         if (_loadingData) return;
@@ -306,21 +307,39 @@ public partial class MainWindow : Window
     private async void SetupSharedData_Click(object sender, RoutedEventArgs e) => await OpenSetupAsync();
     private void CloseDemo_Click(object sender, RoutedEventArgs e) => Close();
 
-    private void GlobalSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    private const string SearchHintDefault = "Type an asset number, location, part, manual or note. Press Ctrl+F from any page.";
+
+    // The one search bar drives both the unit photo gallery and the "Matches" list.
+    private void QueueGlobalSearch()
     {
         _searchDebounceTimer.Stop();
-        var q = GlobalSearchBox.Text.Trim();
+        var q = UnitSearchBox.Text.Trim();
         if (q.Length < 2)
         {
-            GlobalSearchResults.ItemsSource = null; GlobalSearchResults.Visibility = Visibility.Collapsed;
-            SearchHintText.Text = q.Length == 0 ? "Start typing to search gates, units, notes, drawings, manuals, configs, parts, and custom resources." : "Type at least 2 characters to search.";
+            ShowSearchResults(null);
+            SearchHintText.Text = q.Length == 0 ? SearchHintDefault : "Type at least 2 characters to search documents, parts and notes.";
             return;
         }
         SearchHintText.Text = _searchIndexReady ? "Searching…" : "Searching available data while shared files finish indexing in the background…";
         _searchDebounceTimer.Start();
     }
-    private void GlobalSearchBox_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; _searchDebounceTimer.Stop(); RunGlobalSearch(); } }
-    private void GlobalSearch_Click(object sender, RoutedEventArgs e) { _searchDebounceTimer.Stop(); RunGlobalSearch(); }
+    private void ShowSearchResults(List<GlobalSearchResult>? results)
+    {
+        GlobalSearchResults.ItemsSource = results;
+        GlobalSearchResults.Visibility = SearchResultsPanel.Visibility = results is { Count: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        SearchResultsHeading.Text = results is { Count: > 0 } ? $"Matches ({results.Count})" : "Matches";
+    }
+    private void FocusSearch() { if (HomeShell.Visibility != Visibility.Visible) ShowHome(); UnitSearchBox.Focus(); UnitSearchBox.SelectAll(); }
+    private void ClearSearch_Click(object sender, RoutedEventArgs e) { UnitSearchBox.Clear(); UnitSearchBox.Focus(); }
+    private void SearchResultItem_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is ListBoxItem { DataContext: GlobalSearchResult result }) { e.Handled = true; OpenSearchResult(result); }
+    }
+    private void GlobalSearchResults_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && GlobalSearchResults.SelectedItem is GlobalSearchResult result) { e.Handled = true; OpenSearchResult(result); }
+        else if (e.Key == Key.Escape) { e.Handled = true; UnitSearchBox.Focus(); }
+    }
 
     private void BuildFastSearchIndex()
     {
@@ -415,8 +434,8 @@ public partial class MainWindow : Window
                 entry.SearchText = BuildSystemSearchText(gate, unit, notes);
             }
             _searchIndex = entries; _searchIndexReady = true;
-            if (GlobalSearchBox.Text.Trim().Length >= 2) RunGlobalSearch();
-            else SearchHintText.Text = "Start typing to search gates, units, notes, drawings, manuals, configs, parts, and custom resources.";
+            if (UnitSearchBox.Text.Trim().Length >= 2) RunGlobalSearch();
+            else SearchHintText.Text = SearchHintDefault;
         }
         catch (OperationCanceledException) { }
         catch { if (!_isClosed && generation == _dataGeneration) _searchIndexReady = false; }
@@ -429,26 +448,25 @@ public partial class MainWindow : Window
 
     private void RunGlobalSearch()
     {
-        if (!_sharedDataReady) { SearchHintText.Text = "Shared data is unavailable."; GlobalSearchResults.Visibility = Visibility.Collapsed; return; }
-        var q = GlobalSearchBox.Text.Trim(); if (q.Length < 2) { GlobalSearchResults.Visibility = Visibility.Collapsed; return; }
+        if (!_sharedDataReady) { SearchHintText.Text = "Shared data is unavailable."; ShowSearchResults(null); return; }
+        var q = UnitSearchBox.Text.Trim(); if (q.Length < 2) { ShowSearchResults(null); return; }
         var results = SearchService.Search(_searchIndex, q);
-        GlobalSearchResults.ItemsSource = results; GlobalSearchResults.Visibility = results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        SearchHintText.Text = results.Count == 0 ? $"No results for '{q}'." : $"{results.Count} result{(results.Count == 1 ? "" : "s")} • double-click to open";
+        ShowSearchResults(results);
+        SearchHintText.Text = results.Count == 0 ? $"No documents, parts or notes match '{q}'." : "Click a match to open it. Press ↓ to move into the list, Esc to clear.";
     }
 
     private static bool Contains(string? value, string q) => !string.IsNullOrWhiteSpace(value) && value.Contains(q, StringComparison.OrdinalIgnoreCase);
     private static string BuildSystemSearchText(SafetyGate g, SafetySystem u, string notes) => $"{g.AssetNumber} {g.AssetDisplay} {g.Manufacturer} {g.Model} {g.Location} {g.EquipmentType} {g.Keywords} {u.UnitNumber} {u.UnitDisplay} {g.Category} {notes}";
     private static string BuildSystemSubtitle(SafetyGate g) => string.Join(" • ", new[] { g.Category, g.Model, g.Location, g.EquipmentType }.Where(x => !string.IsNullOrWhiteSpace(x)));
-    private void GlobalSearchResults_DoubleClick(object sender, MouseButtonEventArgs e)
+    private void OpenSearchResult(GlobalSearchResult r)
     {
-        if (GlobalSearchResults.SelectedItem is not GlobalSearchResult r) return;
         switch (r.Kind)
         {
             case "System":
                 var u = _systems.FirstOrDefault(x => x.Id == r.SystemId); if (u is not null) NavigateToSystem(u, r.MatchSource == "SharedNotes" ? r.MatchText : null); break;
             case "File": if (File.Exists(r.Target)) FileLauncherService.Open(r.Target); break;
             case "Help": var h = _help.FirstOrDefault(x => x.Title == r.Title && x.Body == r.Body); if (h is not null) { if (h.Section.Equals("Common Problems", StringComparison.OrdinalIgnoreCase)) OpenCommonProblem(h); else new HelpWindow(h, _data) { Owner = this }.ShowDialog(); } break;
-            case "Part": var p = _parts.FirstOrDefault(x => x.Id == r.Target); ShowParts(); PartSearchBox.Text = p?.PartNumber ?? p?.Description ?? ""; PartList.SelectedItem = p; break;
+            case "Part": var p = _parts.FirstOrDefault(x => x.Id == r.Target); ShowParts(); if (p is not null) { PartList.SelectedItem = p; PartList.ScrollIntoView(p); } break;
             case "Manual": var m = _manuals.FirstOrDefault(x => x.Id == r.Target); if (m is not null) { var path = _data.Resolve(m.FilePath); if (File.Exists(path)) FileLauncherService.Open(path); } break;
             case "Resource": var resource = _resources.FirstOrDefault(x => x.Id == r.Target); if (resource is not null) NavigateToResource(resource); break;
         }
@@ -460,7 +478,7 @@ public partial class MainWindow : Window
     {
         if (InlineBusy) { MessageBox.Show(this, "Finish or cancel the current operation before changing units."); return; }
         var gate = GateFor(unit); if (gate is null) return;
-        ShowSystems(); _currentArea = gate.Category; SystemSearchBox.Text = ""; AreaBox.SelectedItem = gate.Category; RefreshGates(false);
+        ShowSystems(); _currentArea = gate.Category; AreaBox.SelectedItem = gate.Category; RefreshGates(false);
         var gateItem = (AssetList.ItemsSource as IEnumerable<SafetyGate>)?.FirstOrDefault(g => g.Id == gate.Id); if (gateItem is null) return;
         AssetList.SelectedItem = gateItem; AssetList.ScrollIntoView(gateItem);
         var units = UnitsForGate(gate.Id); UnitList.ItemsSource = units;
@@ -486,14 +504,12 @@ public partial class MainWindow : Window
     }
 
     private void AreaBox_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (AreaBox.SelectedItem is string area) { _currentArea = area; RefreshGates(false); } }
-    private void SystemSearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshGates(false);
 
     private void RefreshGates(bool preserveSelection)
     {
-        if (AssetList is null || SystemSearchBox is null || string.IsNullOrWhiteSpace(_currentArea)) return;
-        var oldId = preserveSelection ? SelectedGate?.Id : null; var q = SystemSearchBox.Text.Trim();
+        if (AssetList is null || string.IsNullOrWhiteSpace(_currentArea)) return;
+        var oldId = preserveSelection ? SelectedGate?.Id : null;
         var gates = _gates.Where(g => g.Category.Equals(_currentArea, StringComparison.OrdinalIgnoreCase))
-            .Where(g => string.IsNullOrWhiteSpace(q) || Contains($"{g.AssetNumber} {g.Display} {g.Manufacturer} {g.Model} {g.Location} {g.Keywords}", q))
             .OrderBy(g => AssetSortKey(g.AssetNumber)).ThenBy(g => g.Manufacturer, StringComparer.OrdinalIgnoreCase).ToList();
         AssetList.ItemsSource = gates; UnitList.ItemsSource = null; ClearUnit();
         if (oldId is not null) AssetList.SelectedItem = gates.FirstOrDefault(g => g.Id == oldId);
@@ -636,7 +652,7 @@ public partial class MainWindow : Window
     {
         var entry = _searchIndex.FirstOrDefault(x => x.Kind == "System" && x.SystemId == unit.Id); var gate = GateFor(unit); if (entry is null || gate is null) return;
         if (_searchIndexCancellation is not null) _searchNotesUpdates[unit.Id] = notes ?? "";
-        entry.NotesText = notes ?? ""; entry.SearchText = BuildSystemSearchText(gate, unit, entry.NotesText); if (GlobalSearchBox.Text.Trim().Length >= 2) { _searchDebounceTimer.Stop(); _searchDebounceTimer.Start(); }
+        entry.NotesText = notes ?? ""; entry.SearchText = BuildSystemSearchText(gate, unit, entry.NotesText); if (UnitSearchBox.Text.Trim().Length >= 2) { _searchDebounceTimer.Stop(); _searchDebounceTimer.Start(); }
     }
 
     private void CancelPhotoLoad()
@@ -701,15 +717,14 @@ public partial class MainWindow : Window
 
     private void RefreshManuals()
     {
-        if (ManualList is null) return; var q = ManualSearchBox?.Text.Trim() ?? "";
+        if (ManualList is null) return;
         IEnumerable<ManualRecord> source = _manuals;
         if (!string.IsNullOrWhiteSpace(_manualFilterGateId) && !string.IsNullOrWhiteSpace(_manualFilterUnitId)) source = source.Where(m => SelectedUnit?.ManualIds is { } ids ? ids.Contains(m.Id, StringComparer.OrdinalIgnoreCase) : m.AppliesTo(_manualFilterGateId, _manualFilterUnitId));
-        var items = source.Where(m => string.IsNullOrWhiteSpace(q) || Contains($"{m.Title} {m.Manufacturer} {m.Model} {m.Keywords}", q))
+        var items = source
             .Select(m => new ManualFileItem { Id = m.Id, Name = m.Display, Path = _data.Resolve(m.FilePath) }).OrderBy(m => m.Name).ToList();
         ManualList.ItemsSource = items;
         ManualsIntroText.Text = string.IsNullOrWhiteSpace(_manualFilterGateId) ? _content.ManualsIntro : "Showing manuals linked to the selected gate/unit. Use the Manuals navigation button to return to the full library.";
     }
-    private void ManualSearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshManuals();
     private void ManualList_DoubleClick(object sender, MouseButtonEventArgs e) => OpenSelectedManual();
     private void OpenManual_Click(object sender, RoutedEventArgs e) => OpenSelectedManual();
     private void OpenSelectedManual() { if (ManualList.SelectedItem is ManualFileItem m && File.Exists(m.Path)) FileLauncherService.Open(m.Path); }
@@ -734,7 +749,6 @@ public partial class MainWindow : Window
             var result = await Task.Run(() => SupportLibraryService.ImportDocuments(_data, files));
             if (_isClosed) return;
             _manualFilterGateId = _manualFilterUnitId = "";
-            ManualSearchBox.Clear();
             await ReloadDataAsync();
             if (_isClosed) return;
             var summary = $"{result.Added} imported. {result.Existing} already in the library.";
@@ -750,15 +764,14 @@ public partial class MainWindow : Window
     private void RefreshParts()
     {
         if (PartList is null) return;
-        string? selected = SelectedPart?.Id; var q = PartSearchBox?.Text.Trim() ?? "";
-        var items = _parts.Where(p => string.IsNullOrWhiteSpace(q) || Contains($"{p.PartNumber} {p.Description} {p.Manufacturer} {p.Keywords} {p.Notes} {p.RelatedAssets} {p.LocationValue} {p.SiteValue}", q)).OrderBy(p => p.Description).ThenBy(p => p.LocationValue).ThenBy(p => p.PartNumber).ToList();
+        string? selected = SelectedPart?.Id;
+        var items = _parts.OrderBy(p => p.Description).ThenBy(p => p.LocationValue).ThenBy(p => p.PartNumber).ToList();
         PartList.ItemsSource = items; PartList.SelectedItem = items.FirstOrDefault(p => p.Id == selected) ?? items.FirstOrDefault();
         PartCatalogEmpty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         PartCatalogEmpty.Text = !_sharedDataReady ? "Connect a plant library in Plant setup to see its parts."
             : _parts.Count == 0 ? "No parts saved. Add a part in Plant setup → Parts."
-            : "No matching parts. Try a shorter name or search by Item ID.";
+            : "No parts to show.";
     }
-    private void PartSearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshParts();
     private void PartList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         var p = SelectedPart;

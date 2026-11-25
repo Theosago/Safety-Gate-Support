@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console for plant safety gates, version **8.5.7**.
+Windows WPF support console for plant safety gates, version **8.6.0**.
 
 Engineers and electricians pick a unit from a searchable photo gallery and get
 its identification photo, current electrical drawing, shared notes, replacement
@@ -9,6 +9,9 @@ engineering library lives on a shared folder (normally the plant's Q: drive).
 
 Main features:
 
+- **One search bar** — at the top of every page. Typing filters the unit photos
+  and lists matching drawings, manuals, parts, notes and help topics; click a
+  match to open it. Ctrl+F focuses search from anywhere and Esc clears it.
 - **Drawings** — upload a PDF/DWG pair once, choose the units it covers, and
   replace it from the unit page. Prior revisions are archived on the shared drive.
 - **Publish & print QR** — publishes unit guides and electrical PDFs to Google

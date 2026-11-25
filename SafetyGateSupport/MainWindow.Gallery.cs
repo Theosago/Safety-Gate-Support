@@ -36,14 +36,35 @@ public partial class MainWindow
     }
     private void UnitSearch_Changed(object sender, TextChangedEventArgs e)
     {
+        bool empty = UnitSearchBox.Text.Length == 0;
+        if (SearchPlaceholder is not null) SearchPlaceholder.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        if (ClearSearchButton is not null) ClearSearchButton.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
         if (_unitSearchTimer is null || !_sharedDataReady) return;
+        // Searching from another page brings the results and matching unit photos into view.
+        if (!empty && HomeShell.Visibility != Visibility.Visible) ShowHome();
         _unitSearchTimer.Stop(); _unitSearchTimer.Start();
+        QueueGlobalSearch();
     }
-    private void UnitSearch_KeyDown(object sender, KeyEventArgs e)
+    private void UnitSearch_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter) return;
-        _unitSearchTimer.Stop(); _galleryPage = 0; RefreshUnitGallery(); HomeView.ScrollToTop();
-        // Enter filters; it never selects a potentially ambiguous unit automatically.
+        switch (e.Key)
+        {
+            case Key.Enter:
+                // Enter filters; it never selects a potentially ambiguous unit automatically.
+                e.Handled = true;
+                _unitSearchTimer.Stop(); _galleryPage = 0; RefreshUnitGallery(); HomeView.ScrollToTop();
+                _searchDebounceTimer.Stop(); RunGlobalSearch();
+                break;
+            case Key.Escape when UnitSearchBox.Text.Length > 0:
+                e.Handled = true; UnitSearchBox.Clear();
+                break;
+            case Key.Down when GlobalSearchResults.Items.Count > 0 && SearchResultsPanel.IsVisible:
+                e.Handled = true;
+                GlobalSearchResults.SelectedIndex = 0;
+                GlobalSearchResults.UpdateLayout();
+                (GlobalSearchResults.ItemContainerGenerator.ContainerFromIndex(0) as ListBoxItem)?.Focus();
+                break;
+        }
     }
     private void AllAreas_Click(object sender, RoutedEventArgs e) => SelectGalleryArea("");
     private void SelectGalleryArea(string area) { _galleryArea = area; _galleryPage = 0; RefreshUnitGallery(); HomeView.ScrollToTop(); }

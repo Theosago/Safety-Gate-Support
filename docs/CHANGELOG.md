@@ -2,6 +2,14 @@
 
 Release history for Safety Gate Support, newest first. This file consolidates the per-version notes that previously lived in separate files under `docs/`. Older entries describe behavior at the time of that release; the current behavior is in the [README](../README.md) and the [Windows quick start](WINDOWS_QUICK_START.md).
 
+## 8.6.0 — One search bar and a cleaner layout
+
+- A single search bar at the top of every page replaces the separate unit search, **Search everything**, Manuals and Parts search boxes. Typing filters the unit photo gallery and shows a **Matches** list of units, drawings, manuals, parts, notes and help topics. One click (or Enter) opens a match; searching from another page returns to the results.
+- Keyboard: **Ctrl+F** focuses search from any page, **↓** moves into the matches, **Esc** clears.
+- The search bar has a magnifier icon, hint text and a clear button. Each match shows its type (Unit, Manual, Part, Files, Help).
+- Sidebar sections have icons. **MaintainX work orders** sits beside **Replacement parts** in the unit header.
+- The duplicate search panel below the gallery is removed. Shared data, drawings, publishing and settings are unchanged.
+
 ## 8.5.7
 
 Shows current MaintainX work orders from a unit’s page. See [MaintainX setup](WINDOWS_QUICK_START.md#view-maintainx-work-orders).

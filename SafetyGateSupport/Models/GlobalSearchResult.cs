@@ -11,5 +11,16 @@ public class GlobalSearchResult
     public string MatchSource { get; set; } = "";
     public string MatchText { get; set; } = "";
 
+    public string KindLabel => Kind switch
+    {
+        "System" => "Unit",
+        "File" => "File",
+        "Help" => "Help",
+        "Part" => "Part",
+        "Manual" => "Manual",
+        "Resource" => "Files",
+        _ => Kind
+    };
+
     public string Display => string.IsNullOrWhiteSpace(Subtitle) ? Title : $"{Title}    —    {Subtitle}";
 }
