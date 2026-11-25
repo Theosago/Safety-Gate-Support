@@ -142,6 +142,7 @@ internal static class Program
             ("V7 unit files exclude other-unit and archived configurations", V7AssignedFiles),
             ("Normal light tool renders all 64 input combinations and retains upload gates", V7InputSwitches),
             ("Integrated column tool requires explicit assigned file selection and keeps observation state accurate", IntegratedColumnWindow),
+            ("Signal column tool chooses the only saved configuration automatically", SingleConfigurationSelected),
             ("Unit light resource exposes the built-in USB action", IntegratedLightResource),
             ("UAM diagnostics opens idle and manual lookup never changes USB status", UamDiagnosticsStartup),
 
@@ -1267,7 +1268,7 @@ internal static class Program
     {
         var root = NewDirectory();
         string first = Path.Combine(root, "Unit 1.signal"), second = Path.Combine(root, "Unit 2.signal");
-        File.WriteAllBytes(first, SyntheticColumnArchive()); File.Copy(first, second);
+        File.WriteAllBytes(first, SyntheticColumnArchive()); File.Copy(first, second); File.WriteAllText(Path.ChangeExtension(first, ".pdf"), "fixture sheet");
         var window = Track(new global::SiemensUsbCheck.MainWindow("Asset validation / Unit 2", new[] { first, second }));
         ShowOffscreen(window);
         await WaitUntil(() => Control<Button>(window, "RefreshButton").IsEnabled, "Integrated column detection did not settle.");
@@ -1278,6 +1279,9 @@ internal static class Program
         assigned.SelectedIndex = 1;
         await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(second), "Explicit unit configuration did not load.");
         Require(Control<TextBox>(window, "ResultText").Text.Contains("not been checked"), "File choice incorrectly reported a device configuration match.");
+        await WaitUntil(() => Control<StackPanel>(window, "StateTablePanel").Children.OfType<Button>().Any(), "The state table did not list the configured input states.");
+        await WaitUntil(() => Control<TextBlock>(window, "PairedPdfText").Text.Contains("No PDF"), "A configuration without a sheet did not say so.");
+        Require(Control<TextBlock>(window, "MatchText").Text.Length == 0, "A file choice alone showed a match result.");
         SetPreviewInputs(window, 7);
         Require(Control<TextBox>(window, "PreviewText").Text.Contains("RGB 255, 0, 0"), "Expected output did not use the selected state's stored values.");
         Control<ComboBox>(window, "ObservationCombo").SelectedIndex = 1;
@@ -1285,6 +1289,21 @@ internal static class Program
         SetPreviewInputs(window, 0);
         Equal(0, Control<ComboBox>(window, "ObservationCombo").SelectedIndex, "Changing the state must clear an obsolete observation");
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "A valid file alone enabled upload without a port.");
+        assigned.SelectedIndex = 0;
+        await WaitUntil(() => Control<TextBlock>(window, "PairedPdfText").Text.Contains("Unit 1.pdf"), "The PDF saved with the configuration was not found.");
+        Equal(Path.ChangeExtension(first, ".pdf"), global::SiemensUsbCheck.MainWindow.CompanionPdf(first), "Paired PDF lookup");
+        var table = Control<StackPanel>(window, "StateTablePanel").Children.OfType<Button>().ToArray();
+        Click(table[^1]);
+        Equal(1, Control<TabControl>(window, "WorkflowTabs").SelectedIndex, "Choosing a state did not open Try inputs");
+    }
+
+    private static async Task SingleConfigurationSelected()
+    {
+        var root = NewDirectory(); string only = Path.Combine(root, "Only.signal"); File.WriteAllBytes(only, SyntheticColumnArchive());
+        var window = Track(new global::SiemensUsbCheck.MainWindow("Asset validation / Unit 1", new[] { only }, previewOnly: true));
+        ShowOffscreen(window);
+        await WaitUntil(() => Control<TextBlock>(window, "SelectedSignalText").Text.Contains(only), "The only saved configuration was not chosen automatically.");
+        Require(!Control<Button>(window, "UploadButton").IsEnabled, "Preview enabled upload after the automatic choice.");
     }
 
     private static Task IntegratedLightResource()
@@ -1432,8 +1451,10 @@ internal static class Program
         Require(Control<TextBlock>(window, "StatusText").Text.Contains("does not open USB", StringComparison.Ordinal),
             "The idle tool should explain that detection has not opened USB.");
         var actions = Descendants<Button>(window).Where(button => button.IsVisible).Select(button => button.Name).Order().ToArray();
-        Require(actions.SequenceEqual(new[] { "UploadButton" }),
-            "The signal column tool must expose only Reupload as its primary action.");
+        Require(actions.Contains("UploadButton") && actions.All(new[] { "OpenPdfButton", "ReadButton", "RefreshButton", "UploadButton" }.Contains),
+            "The signal column tool shows unexpected actions: " + string.Join(", ", actions));
+        Require(Control<Button>(window, "UploadButton").Style == window.FindResource("PrimaryButton"), "Upload must be the one primary action.");
+        Require(Control<ComboBox>(window, "DeviceCombo").Visibility != Visibility.Visible || Control<ComboBox>(window, "DeviceCombo").Items.Count > 1, "The column picker appeared with fewer than two columns.");
         Control<ComboBox>(window, "DeviceCombo").ItemsSource = new[] { TestColumnPort() };
         Control<ComboBox>(window, "DeviceCombo").SelectedIndex = 0;
         Require(!Control<Button>(window, "UploadButton").IsEnabled, "Selecting a port without a valid file enabled upload.");

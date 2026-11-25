@@ -21,6 +21,22 @@ public partial class MainWindow : Window
     private readonly string _context;
     private string _comparison = "Stored configuration has not been checked against the selected file.";
     private sealed record AssignedFile(string Path, string Label);
+    private string? _selectedPath, _pairedPdf;
+    private CancellationTokenSource? _pdfLoad;
+
+    /// <summary>Renders the first page of the PDF saved with a configuration; supplied by the host app.</summary>
+    public Func<string, CancellationToken, Task<ImageSource?>>? RenderPdf { get; set; }
+    /// <summary>Opens a file in its default viewer; supplied by the host app.</summary>
+    public Action<string>? OpenFile { get; set; }
+    /// <summary>The configuration currently shown, so the host can offer to upload its next revision.</summary>
+    public string? SelectedConfigurationPath => _selectedPath;
+
+    /// <summary>A configuration's PDF sheet is stored beside it with the same name.</summary>
+    public static string? CompanionPdf(string signalPath)
+    {
+        string candidate = System.IO.Path.ChangeExtension(signalPath, ".pdf");
+        return System.IO.File.Exists(candidate) ? candidate : null;
+    }
 
     public MainWindow() : this("", Array.Empty<string>()) { }
     public MainWindow(string context, IEnumerable<string> assignedFiles, bool previewOnly = false)
@@ -31,12 +47,16 @@ public partial class MainWindow : Window
         if (context.Length > 0)
         {
             Title = "Safety Gate Support — Signal column";
-            ContextText.Text = context + " • confirm the connected column belongs to this unit";
+            ContextText.Text = context;
             ContextText.Visibility = Visibility.Visible;
-            AssignedFilesCombo.ItemsSource = assignedFiles.Select(p => new AssignedFile(p, System.IO.Path.GetFileName(p))).ToList();
+            AssignedFilesCombo.ItemsSource = assignedFiles.Select(p => new AssignedFile(p, System.IO.Path.GetFileName(p) + (CompanionPdf(p) is null ? "" : "  ·  with PDF"))).ToList();
             AssignedFilesCombo.Visibility = Visibility.Visible;
-            AssignedFilesCombo.Text = "Select this unit's approved configuration";
-            SelectedSignalText.Text = "Select an assigned file above, or browse for an approved .signal file. No file is selected automatically.";
+            SelectedSignalText.Text = AssignedFilesCombo.Items.Count switch
+            {
+                0 => "No configuration is saved for this unit yet. Upload a configuration pair, or choose a file under More options.",
+                1 => "",
+                _ => "Several configurations are saved for this unit. Choose the right one."
+            };
         }
         UpdatePreview();
     }
@@ -49,24 +69,85 @@ public partial class MainWindow : Window
     private async Task SelectFileAsync(string path)
     {
         if (_isRefreshing || _operationCancellation is not null) return;
-        _selectedUpload = null;
+        _selectedUpload = null; _selectedPath = null;
         ResetObservation();
+        MatchText.Text = "";
         _comparison = "Stored configuration has not been checked against the selected file.";
         try
         {
             _isRefreshing = true; UpdateControls();
             _selectedUpload = await Task.Run(() => PreparedSignalUpload.Load(path));
-            SelectedSignalText.Text = $"{_selectedUpload.FileName} • {_selectedUpload.Archive.ActiveStates.Count} active states\n{path}";
-            ResultText.Text = _comparison + "\nConfirm this file's asset/unit assignment before upload.";
-            StatusText.Text = _previewOnly || _selectedUpload.IsPreviewOnly ? "Preview only: explore the expected output below. This sample cannot be uploaded." : "File checked. Read the column to compare; upload saves a backup before writing.";
+            _selectedPath = path;
+            SelectedSignalText.Text = $"{_selectedUpload.Archive.ActiveStates.Count} input states configured · {path}";
+            ResultText.Text = _comparison;
+            StatusText.Text = _previewOnly || _selectedUpload.IsPreviewOnly ? "Preview only: this sample cannot be uploaded." : "Configuration ready.";
         }
         catch (Exception error)
         {
             SelectedSignalText.Text = "No valid configuration selected.";
             ResultText.Text = error.Message;
         }
-        finally { _isRefreshing = false; UpdateControls(); UpdatePreview(); }
+        finally { _isRefreshing = false; UpdateControls(); UpdatePreview(); BuildStateTable(); _ = LoadPairedPdfAsync(_selectedPath); }
     }
+
+    // One row per configured input combination, like the Siemens configurator's state list.
+    private void BuildStateTable()
+    {
+        StateTablePanel.Children.Clear();
+        if (_selectedUpload is not { } selected) { StateTablePanel.Children.Add(new TextBlock { Text = "Choose a configuration to see its states.", TextWrapping = TextWrapping.Wrap }); return; }
+        foreach (int state in selected.Archive.ActiveStates.Distinct().Order())
+        {
+            SignalStatePreview.Appearance look;
+            try { look = SignalStatePreview.ReadAppearance(selected, state); } catch (Exception) { continue; }
+            string inputs = string.Join(" + ", Enumerable.Range(1, 6).Where(i => (state & (1 << (i - 1))) != 0));
+            var row = new Grid { Margin = new Thickness(0, 1, 0, 1) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(128) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.Children.Add(new TextBlock { Text = inputs.Length == 0 ? "No inputs" : "Input " + inputs, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap });
+            var swatches = new WrapPanel { VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(swatches, 1); row.Children.Add(swatches);
+            foreach (var segment in look.Segments)
+            {
+                var color = segment.IsOff ? Color.FromRgb(228, 234, 239) : Color.FromRgb((byte)segment.Red, (byte)segment.Green, (byte)segment.Blue);
+                var cell = new StackPanel { Width = 34, Margin = new Thickness(0, 0, 4, 0) };
+                cell.Children.Add(new Border { Height = 22, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(color), BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(segment.IsOff ? 0.5 : 1),
+                    ToolTip = $"Segment {segment.Number}: {(segment.IsOff ? "off" : segment.EffectName)}" });
+                if (!segment.IsOff && segment.Effect != 10) cell.Children.Add(new TextBlock { Text = segment.Effect switch { >= 50 and < 90 => "blink", >= 90 and < 130 => "flash", 130 => "rotate", _ => "fx" }, FontSize = 10, HorizontalAlignment = HorizontalAlignment.Center });
+                swatches.Children.Add(cell);
+            }
+            if (look.SoundMode != 0 && look.SoundVolume != 0) swatches.Children.Add(new TextBlock { Text = "🔊 sound", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) });
+            int target = state;
+            var button = new Button { Content = row, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 6, 8, 6), Margin = new Thickness(0, 0, 0, 2), ToolTip = "Show this state under Try inputs" };
+            button.SetResourceReference(StyleProperty, "QuietButton");
+            button.SetResourceReference(ForegroundProperty, "Ink");
+            button.Click += (_, _) => { foreach (var (input, bit) in InputSwitches.Select((t, i) => (t, i))) input.IsChecked = (target & (1 << bit)) != 0; WorkflowTabs.SelectedIndex = 1; };
+            StateTablePanel.Children.Add(button);
+        }
+        if (StateTablePanel.Children.Count == 0) StateTablePanel.Children.Add(new TextBlock { Text = "This file has no configured states." });
+    }
+
+    private async Task LoadPairedPdfAsync(string? signalPath)
+    {
+        _pdfLoad?.Cancel(); var source = new CancellationTokenSource(); _pdfLoad = source;
+        PairedPdfImage.Source = null; OpenPdfButton.IsEnabled = false; _pairedPdf = null;
+        string? pdf = signalPath is null ? null : await Task.Run(() => CompanionPdf(signalPath));
+        if (source.IsCancellationRequested) return;
+        _pairedPdf = pdf; OpenPdfButton.IsEnabled = pdf is not null && OpenFile is not null;
+        PairedPdfText.Visibility = Visibility.Visible;
+        PairedPdfText.Text = signalPath is null ? "The PDF saved with this configuration shows here."
+            : pdf is null ? "No PDF is saved with this configuration. Upload it as a pair with the .signal file." : "Loading PDF…";
+        if (pdf is null || RenderPdf is null) { if (pdf is not null) PairedPdfText.Text = System.IO.Path.GetFileName(pdf); return; }
+        try
+        {
+            var image = await RenderPdf(pdf, source.Token);
+            if (source.IsCancellationRequested) return;
+            PairedPdfImage.Source = image;
+            PairedPdfText.Visibility = image is null ? Visibility.Visible : Visibility.Collapsed;
+            if (image is null) PairedPdfText.Text = "The PDF could not be shown here. Use Open PDF.";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) { if (!source.IsCancellationRequested) PairedPdfText.Text = "The PDF could not be shown here. Use Open PDF."; }
+    }
+    private void OpenPdf_Click(object sender, RoutedEventArgs e) { if (_pairedPdf is not null) OpenFile?.Invoke(_pairedPdf); }
 
     private ToggleButton[] InputSwitches => [Input1Toggle, Input2Toggle, Input3Toggle, Input4Toggle, Input5Toggle, Input6Toggle];
     private int PreviewState => InputSwitches.Select((input, bit) => input.IsChecked == true ? 1 << bit : 0).Sum();
@@ -79,7 +160,7 @@ public partial class MainWindow : Window
         InputStateText.Text = $"Inputs ON: {(on.Length == 0 ? "none" : on)}  •  stored combination {state}";
         SegmentPreviewPanel.Children.Clear();
         PreviewText.Text = _selectedUpload is null ? "Choose a configuration to view expected outputs." : SignalStatePreview.Describe(_selectedUpload, state);
-        if (_selectedUpload is null) { SoundPreviewText.Text = "Choose an assigned configuration to see its lights and sound."; return; }
+        if (_selectedUpload is null) { SoundPreviewText.Text = "Choose a configuration to see its lights and sound."; return; }
         var appearance = SignalStatePreview.ReadAppearance(_selectedUpload, state);
         foreach (var segment in appearance.Segments)
         {
@@ -90,17 +171,17 @@ public partial class MainWindow : Window
             panel.Children.Add(new TextBlock { Text = segment.IsOff ? "Off" : segment.EffectName, FontSize = 12, Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
             SegmentPreviewPanel.Children.Add(panel);
         }
-        SoundPreviewText.Text = appearance.SoundMode == 0 || appearance.SoundVolume == 0 ? "Sound: off" : $"Sound: configured • mode {appearance.SoundMode}, volume {appearance.SoundVolume}. Compare actual sound; this preview does not play it.";
+        SoundPreviewText.Text = appearance.SoundMode == 0 || appearance.SoundVolume == 0 ? "Sound: off" : $"Sound: configured • mode {appearance.SoundMode}, volume {appearance.SoundVolume}";
     }
-    private void ResetObservation() { if (ObservationCombo is not null) ObservationCombo.SelectedIndex = 0; if (ObservationText is not null) ObservationText.Text = "Physical function is unverified. Check all applicable states using the approved site test procedure."; }
+    private void ResetObservation() { if (ObservationCombo is not null) ObservationCombo.SelectedIndex = 0; if (ObservationText is not null) ObservationText.Text = ""; }
     private void Observation_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ObservationText is null) return;
         ObservationText.Text = ObservationCombo.SelectedIndex switch
         {
-            1 when _selectedUpload is not null => "You recorded a match for this input state only. " + _comparison + " Check the remaining applicable states before returning the equipment to service.",
-            2 when _selectedUpload is not null => "Physical mismatch recorded. Review supply, wiring, actual input signals, and the assigned configuration using the drawings. USB matching alone does not establish function.",
-            _ => "Physical function is unverified. Choose a file and inspect the real light and sound before recording an observation."
+            1 when _selectedUpload is not null => "Recorded for this input state only. Check the other states too.",
+            2 when _selectedUpload is not null => "Check the wiring and input signals against the drawing, and that this is the right file.",
+            _ => ""
         };
     }
 
@@ -119,13 +200,20 @@ public partial class MainWindow : Window
         if (_previewOnly)
         {
             Title = "Safety Gate Support — Home Preview • Signal column";
-            DetectionText.Text = "Home preview: device discovery, USB reads, and uploads are disabled. Explore a selected file and expected output below.";
-            ResultText.Text = "Preview only. Choose the assigned DEMO ONLY file, then turn on just input 1 (red), 2 (amber), 3 (green), or 4 (sound). No hardware is required.";
-            StatusText.Text = "Local preview • no USB access • illustrative configuration only";
+            DetectionText.Text = "Preview: connecting and uploading are turned off.";
+            ResultText.Text = "Preview only. No hardware is used.";
+            StatusText.Text = "Preview only • no USB access";
             UpdateControls();
+            SelectOnlyConfiguration();
             return;
         }
         await RefreshDevicesAsync();
+        SelectOnlyConfiguration();
+    }
+    // With exactly one configuration on file there is nothing to choose.
+    private void SelectOnlyConfiguration()
+    {
+        if (AssignedFilesCombo.Items.Count == 1 && AssignedFilesCombo.SelectedIndex < 0 && _selectedUpload is null) AssignedFilesCombo.SelectedIndex = 0;
     }
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await RefreshDevicesAsync();
@@ -152,15 +240,16 @@ public partial class MainWindow : Window
 
             DetectionText.Text = ports.Count switch
             {
-                0 => "No supported column detected. Check the data cable and Windows driver, then click Refresh. Bootloader devices are excluded.",
-                1 => "One supported USB device found. Detection has not opened it.",
-                _ => $"{ports.Count} supported USB devices found. Select the spare column before reading."
+                0 => "No column found. Check the cable, then Look again.",
+                1 => "✓ Column found: " + ports[0].DisplayName,
+                _ => $"{ports.Count} columns found. Choose the one to load:"
             };
+            DeviceCombo.Visibility = ports.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         }
         catch (Exception error)
         {
             DeviceCombo.ItemsSource = null;
-            DetectionText.Text = "Windows could not list the connected USB columns.";
+            DetectionText.Text = "Windows could not list connected columns. Look again.";
             ResultText.Text = error.Message;
         }
         finally
@@ -187,25 +276,11 @@ public partial class MainWindow : Window
         if (_previewOnly || _isRefreshing || _operationCancellation is not null || DeviceCombo.SelectedItem is not UsbColumnPort port)
             return;
 
-        var destination = new SaveFileDialog
-        {
-            Title = "Save Siemens USB diagnostic report",
-            Filter = "ZIP diagnostic report (*.zip)|*.zip",
-            DefaultExt = ".zip",
-            AddExtension = true,
-            CheckPathExists = true,
-            OverwritePrompt = true,
-            FileName = $"Siemens-8WD46-USB-check-{DateTime.Now:yyyyMMdd-HHmmss}.zip"
-        };
-        try
-        {
-            destination.InitialDirectory = LocalReportFolder();
-            if (destination.ShowDialog(Owner ?? this) != true)
-                return;
-        }
+        string reportFile;
+        try { reportFile = System.IO.Path.Combine(LocalReportFolder(), $"Siemens-8WD46-USB-check-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..4]}.zip"); }
         catch (Exception error)
         {
-            ResultText.Text = $"Windows could not choose a report destination:\n{error.Message}";
+            ResultText.Text = $"Windows could not create the report folder:\n{error.Message}";
             StatusText.Text = "No device was opened.";
             return;
         }
@@ -215,20 +290,21 @@ public partial class MainWindow : Window
         using var cancellation = new CancellationTokenSource();
         _operationCancellation = cancellation;
         UpdateControls();
-        ResultText.Text = $"Reading {port.DisplayName}\n\nReport destination:\n{destination.FileName}";
-        StatusText.Text = "Opening the selected spare column…";
+        ResultText.Text = $"Reading {port.DisplayName}\n\nReport:\n{reportFile}";
+        StatusText.Text = "Reading the column…"; MatchText.Text = "";
         var progress = new Progress<string>(message => StatusText.Text = message);
 
         try
         {
             var result = await Task.Run(() => UsbCheckSession.Run(
-                port, destination.FileName, cancellation.Token, ((IProgress<string>)progress).Report));
+                port, reportFile, cancellation.Token, ((IProgress<string>)progress).Report));
             if (result.Success && result.Configuration is not null && _selectedUpload is not null)
                 _comparison = SignalConfiguration.Equivalent(result.Configuration, _selectedUpload.GetBytes())
                     ? "MATCH: stored settings match the selected file. Physical operation is unverified."
                     : "DIFFERENT: stored settings differ from the selected file. Confirm the file assignment before changing the column.";
-            ResultText.Text = $"{result.Summary}\n\n{_comparison}\n\nReport:\n{destination.FileName}";
-            StatusText.Text = result.Success ? "USB read completed. Report saved." : "USB check finished. Review the report for details.";
+            ResultText.Text = $"{result.Summary}\n\n{_comparison}\n\nReport:\n{reportFile}";
+            StatusText.Text = result.Success ? "Column read." : "The column could not be read completely. See More options for details.";
+            SetMatch(_comparison);
         }
         catch (OperationCanceledException)
         {
@@ -276,21 +352,12 @@ public partial class MainWindow : Window
         string reportPath;
         try
         {
-            var destination = new SaveFileDialog
-            {
-                Title = "Choose a new upload report and backup location",
-                Filter = "Upload report (*.zip)|*.zip", DefaultExt = ".zip", AddExtension = true,
-                CheckPathExists = true, OverwritePrompt = true,
-                InitialDirectory = LocalReportFolder(),
-                FileName = $"Siemens-8WD46-upload-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..4]}.zip"
-            };
-            if (destination.ShowDialog(Owner ?? this) != true) return;
-            reportPath = destination.FileName;
+            reportPath = System.IO.Path.Combine(LocalReportFolder(), $"Siemens-8WD46-upload-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..4]}.zip");
             if (System.IO.File.Exists(reportPath) || System.IO.File.Exists(System.IO.Path.ChangeExtension(reportPath, ".before.signal")))
                 throw new System.IO.IOException("Choose a new filename so existing reports and backups are preserved.");
             if (MessageBox.Show(Owner ?? this,
-                $"Replace the settings on {port.DisplayName} with '{selected.FileName}'?\n{_context}\n\nIsolate equipment for servicing. Confirm this is the intended column and approved file.\n\nThe tool will save the current configuration first, upload the selected file, request a restart, and verify the stored settings.\n\nContinue?",
-                "Upload column configuration", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+                $"Upload {selected.FileName} to the column?\n{_context}\n\nThe column’s current settings are backed up first.",
+                "Upload to column", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         }
         catch (Exception error) { ResultText.Text = error.Message; StatusText.Text = "No upload was started."; return; }
 
@@ -306,10 +373,11 @@ public partial class MainWindow : Window
             var result = await Task.Run(() => UsbUploadSession.Run(port, selected, reportPath,
                 cancellation.Token, ((IProgress<string>)progress).Report));
             _comparison = result.Success ? "MATCH: selected settings were verified. Physical operation is unverified." : "Stored configuration is not fully verified; review the upload report.";
+            SetMatch(result.Success ? "MATCH" : "");
             ResultText.Text = $"{result.Summary}\n\nOriginal backup:\n{(result.BackupPath.Length == 0 ? "Not created; no upload was sent." : result.BackupPath)}\n\nReport:\n{result.ReportPath}";
-            StatusText.Text = result.Success ? "Settings verified. Keep the backup and check the spare column's behavior." :
-                result.ReadbackVerified ? "Stored settings matched, but the session did not finish cleanly. Keep the backup and report." :
-                "Upload not fully verified. Keep the backup and report; do not assume the old settings are still active.";
+            StatusText.Text = result.Success ? "✓ Uploaded and checked. Now check the lights and sound." :
+                result.ReadbackVerified ? "Uploaded, but the session didn’t finish cleanly. See More options for the report." :
+                "The upload couldn’t be confirmed. Try again; the previous settings were backed up first.";
         }
         catch (Exception error)
         {
@@ -317,6 +385,13 @@ public partial class MainWindow : Window
             StatusText.Text = "Upload could not be verified.";
         }
         finally { _operationCancellation = null; UpdateControls(); if (_closeWhenFinished) Close(); }
+    }
+
+    private void SetMatch(string comparison)
+    {
+        bool match = comparison.StartsWith("MATCH", StringComparison.Ordinal), differ = comparison.StartsWith("DIFFERENT", StringComparison.Ordinal);
+        MatchText.Text = match ? "✓ Stored settings match the selected file" : differ ? "✗ The column has different settings" : "";
+        MatchText.Foreground = new SolidColorBrush(match ? Color.FromRgb(30, 132, 73) : Color.FromRgb(183, 110, 0));
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)

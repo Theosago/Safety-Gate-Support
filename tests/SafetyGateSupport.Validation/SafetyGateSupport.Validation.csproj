@@ -19,6 +19,7 @@
     <Compile Include="../../SafetyGateSupport/Services/DataService.DrawingPairs.cs" Link="Services/DataService.DrawingPairs.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DrawingPairStatus.cs" Link="Services/DrawingPairStatus.cs" />
     <Compile Include="../../SafetyGateSupport/Services/DataService.AssetFiles.cs" Link="Services/DataService.AssetFiles.cs" />
+    <Compile Include="../../SafetyGateSupport/Services/DataService.SignalPairs.cs" Link="Services/DataService.SignalPairs.cs" />
     <Compile Include="../../SafetyGateSupport/Services/AssetFileLayout.cs" Link="Services/AssetFileLayout.cs" />
     <Compile Include="../../SafetyGateSupport/Services/AssetStorageMigration.cs" Link="Services/AssetStorageMigration.cs" />
     <Compile Include="../../SafetyGateSupport/Services/AssignedDrawings.cs" Link="Services/AssignedDrawings.cs" />

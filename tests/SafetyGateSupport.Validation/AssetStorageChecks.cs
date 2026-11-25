@@ -20,7 +20,8 @@ internal static class AssetStorageChecks
         ("Shared print unit changes apply to both companions without affecting separate prints", PairUnits),
         ("One upload can cover multiple units while other prints have their own coverage", SharedUploadCoverage),
         ("Reusing identical drawing companions adds links without duplicating the files", ReuseSharedPair),
-        ("Repeated folder organization preserves recorded nonmatching PDF and DWG filenames", RetainPair)
+        ("Repeated folder organization preserves recorded nonmatching PDF and DWG filenames", RetainPair),
+        ("Signal configuration pairs keep the PDF beside the .signal file and archive both on revision", SignalPair)
     ];
     private sealed class Fixture : IDisposable
     {
@@ -55,6 +56,33 @@ internal static class AssetStorageChecks
         public string[] FilesFor(int unit) => Data.GetResourceFiles(Drawings.ForUnit(Units[unit].Id), Data.LoadGates().Single());
         public void Convert() { var plan = AssetStorageMigration.Build(Data); Require(AssetStorageMigration.Validate(Data, plan).Count == 0, "Valid conversion has conflicts."); AssetStorageMigration.Apply(Data, plan); }
         public void Dispose() { if (Directory.Exists(Root)) Directory.Delete(Root, true); }
+    }
+    private static void SignalPair()
+    {
+        using var f = new Fixture(); f.Convert(); var gate = f.Data.LoadGates().Single();
+        ResourceDefinition Light() => f.Data.LoadResources().Single(r => r.GateId == gate.Id && AssetFileLayout.Category(r) == DataService.SignalCategory);
+        string[] FilesFor(int unit) => f.Data.GetResourceFiles(Light().ForUnit(f.Units[unit].Id), gate);
+        string current = FilesFor(0).Single(p => p.EndsWith(".signal", StringComparison.OrdinalIgnoreCase));
+        f.Data.AssignAssetFile(gate, f.Units[1], current, DataService.SignalCategory);
+        Require(FilesFor(1).Contains(current), "Fixture could not share the configuration with a second unit.");
+        string Write(string name, string text) { string path = Path.Combine(f.Root, name); File.WriteAllText(path, text); return path; }
+
+        var revB = f.Data.SaveSignalPair(gate, f.Units[0], Write("Rev B.signal", "config-b"), Write("column sheet.pdf", "sheet-b"), current);
+        Require(revB.Pdf is not null && Path.GetFileName(revB.Pdf) == "Rev B.pdf" && Path.GetDirectoryName(revB.Pdf) == Path.GetDirectoryName(revB.Signal),
+            "The PDF was not stored beside its configuration under the same name.");
+        Require(!File.Exists(current) && FilesFor(0).Contains(revB.Signal) && FilesFor(1).Contains(revB.Signal) && FilesFor(1).Contains(revB.Pdf),
+            "A new revision did not keep every linked unit on the configuration and its sheet.");
+        string archive = f.Data.ResourceArchiveFolder(Light(), gate);
+        Require(Directory.GetFiles(archive, "*", SearchOption.AllDirectories).Any(p => File.ReadAllText(p) == "unit-one-config"), "The previous configuration was not archived.");
+
+        var revC = f.Data.SaveSignalPair(gate, f.Units[1], Write("Rev C.signal", "config-c"), Write("sheet c.pdf", "sheet-c"), revB.Signal);
+        Require(!File.Exists(revB.Pdf) && File.ReadAllText(revC.Pdf!) == "sheet-c" && Path.GetFileName(revC.Pdf!) == "Rev C.pdf", "The sheet was not replaced with its configuration.");
+        Require(Directory.GetFiles(archive, "*", SearchOption.AllDirectories).Any(p => File.ReadAllText(p) == "sheet-b"), "The previous sheet was not archived.");
+
+        var other = f.Data.SaveSignalPair(gate, f.Units[2], Write("Other.signal", "config-other"), null);
+        Require(other.Pdf is null && FilesFor(2).Contains(other.Signal) && !FilesFor(0).Contains(other.Signal), "A different configuration leaked to another unit.");
+        bool refused = false; try { f.Data.SaveSignalPair(gate, f.Units[2], Write("Sheet only.pdf", "x"), null); } catch (InvalidOperationException) { refused = true; }
+        Require(refused, "A PDF was accepted as a configuration file.");
     }
     private static void PreviewOnly()
     {
