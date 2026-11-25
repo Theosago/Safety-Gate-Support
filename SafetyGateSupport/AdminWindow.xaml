@@ -1,340 +1,517 @@
 <Window x:Class="SafetyGateSupport.AdminWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Safety Gate Support - Plant setup" Height="780" Width="1260" MinHeight="640" MinWidth="1050" WindowStartupLocation="CenterOwner">
- <Grid Margin="16">
-  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <StackPanel>
-   <TextBlock Text="Plant setup" FontSize="26" FontWeight="Bold"/>
-   <TextBlock Text="Start with one useful unit. Add its photo, one approved document and one common fix, then try the operator view before expanding to the rest of the plant." Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
-   <CheckBox x:Name="AdvancedSetupCheck" Content="Show advanced tools" Click="AdvancedSetup_Click" Margin="0,8,0,0"/>
-   <TextBlock x:Name="SetupTaskText" TextWrapping="Wrap" Margin="0,6,0,0"/>
-   <Button x:Name="CancelPartImportButton" Content="Cancel stockroom import" Click="CancelPartImport_Click" Visibility="Collapsed" HorizontalAlignment="Left"/>
-   <TextBlock x:Name="StartGuideStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,4,0,0"/>
-  </StackPanel>
-  <TabControl x:Name="SetupTabs" Grid.Row="1" Margin="0,14,0,10" SelectionChanged="SetupTabs_SelectionChanged">
+ Title="Safety Gate Support - Plant setup" Height="820" Width="1320" MinHeight="640" MinWidth="1050" WindowStartupLocation="CenterOwner"
+ Background="{DynamicResource AppBackground}" Foreground="{DynamicResource Ink}" FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="14">
+ <Window.Resources>
+  <!-- Page layout helpers used by every setup section. -->
+  <Style x:Key="Page" TargetType="ScrollViewer"><Setter Property="VerticalScrollBarVisibility" Value="Auto"/><Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/><Setter Property="Padding" Value="28,22,28,28"/></Style>
+  <Style x:Key="PageHeading" TargetType="TextBlock" BasedOn="{StaticResource PageTitle}"><Setter Property="FontSize" Value="22"/></Style>
+  <Style x:Key="ListCard" TargetType="Border" BasedOn="{StaticResource Card}"><Setter Property="Padding" Value="12"/></Style>
+  <Style x:Key="ListHeading" TargetType="TextBlock"><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="FontSize" Value="13"/><Setter Property="Foreground" Value="{DynamicResource InkMuted}"/><Setter Property="Margin" Value="4,2,0,8"/></Style>
+  <Style x:Key="StepNumber" TargetType="Border"><Setter Property="Width" Value="30"/><Setter Property="Height" Value="30"/><Setter Property="CornerRadius" Value="15"/><Setter Property="Background" Value="{DynamicResource AccentSoft}"/><Setter Property="VerticalAlignment" Value="Top"/><Setter Property="Margin" Value="0,0,14,0"/></Style>
+  <Style x:Key="StepNumberText" TargetType="TextBlock"><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="{DynamicResource AccentInk}"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style x:Key="ActionRow" TargetType="WrapPanel"><Setter Property="Margin" Value="-4,12,0,0"/></Style>
+ </Window.Resources>
+ <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 
+  <!-- Header -->
+  <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="24,14">
+   <DockPanel>
+    <Button x:Name="CancelPartImportButton" DockPanel.Dock="Right" Content="Cancel stockroom import" Click="CancelPartImport_Click" Visibility="Collapsed" Style="{StaticResource DangerButton}" VerticalAlignment="Center"/>
+    <StackPanel Orientation="Horizontal">
+     <Border Width="40" Height="40" CornerRadius="10" Background="{DynamicResource AccentSoft}" Margin="0,0,14,0"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="{DynamicResource AccentInk}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+     <StackPanel VerticalAlignment="Center">
+      <TextBlock Text="Plant setup" FontSize="20" FontWeight="SemiBold"/>
+      <TextBlock Text="Set up equipment, photos, documents and parts that everyone on the floor will use." Foreground="{DynamicResource InkMuted}" FontSize="13"/>
+     </StackPanel>
+    </StackPanel>
+   </DockPanel>
+  </Border>
 
-   <TabItem x:Name="StartSetupTab" Header="Start here"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="20" MaxWidth="920">
-    <Border Background="{DynamicResource ThemeBackgroundF7F9FB}" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}"
-            BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+  <!-- Guidance and status from the current task; hidden when there is nothing to say. -->
+  <Border Grid.Row="1" Background="{DynamicResource AccentSoft}" Padding="24,9">
+   <Border.Style><Style TargetType="Border"><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Text, ElementName=SetupTaskText}" Value=""/><Condition Binding="{Binding Text, ElementName=StartGuideStatus}" Value=""/></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Collapsed"/></MultiDataTrigger></Style.Triggers></Style></Border.Style>
+   <StackPanel Orientation="Horizontal">
+    <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource AccentInk}" VerticalAlignment="Top" Margin="0,2,10,0"/>
+    <StackPanel MaxWidth="1100">
+     <TextBlock x:Name="SetupTaskText" TextWrapping="Wrap" Foreground="{DynamicResource Ink}"/>
+     <TextBlock x:Name="StartGuideStatus" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{DynamicResource AccentInk}"/>
+    </StackPanel>
+   </StackPanel>
+  </Border>
+
+  <TabControl x:Name="SetupTabs" Grid.Row="2" Style="{StaticResource SideNavTabs}" SelectionChanged="SetupTabs_SelectionChanged">
+   <TabControl.Tag>
+    <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="6,14,0,0" Margin="0,10,0,0">
      <StackPanel>
-      <TextBlock Text="See what operators will use" FontSize="21" FontWeight="SemiBold"/>
-      <TextBlock Text="Try identifying a unit, opening its PDF and finding a common fix. The demo uses fictional data. Close its window to return to setup." TextWrapping="Wrap" Margin="0,6,0,8"/>
-      <Button x:Name="TrySamplePilotButton" Content="Try the operator demo…" Click="TrySamplePilot_Click" HorizontalAlignment="Left"/>
+      <CheckBox x:Name="AdvancedSetupCheck" Content="Show advanced tools" Click="AdvancedSetup_Click"/>
+      <TextBlock Style="{StaticResource HelpText}" Margin="27,4,0,0" Text="Manuals, areas, resource buttons, troubleshooting flows and history."/>
      </StackPanel>
     </Border>
-    <GroupBox Header="1 · Connect a library, or start a new plant"><StackPanel Margin="12">
-     <TextBlock Text="A library is a folder containing this plant’s equipment, photos and guidance. A local folder works for a pilot; use a shared location when other computers need the same content." TextWrapping="Wrap"/>
-     <TextBlock Text="Library folder" Margin="0,10,0,3"/>
-     <DockPanel LastChildFill="True">
-      <Button Content="Browse…" Click="StartChooseFolder_Click" DockPanel.Dock="Right" Margin="8,0,0,0"/>
-      <TextBox x:Name="StartLibraryPathBox" MinHeight="34" AutomationProperties.Name="Library folder"/>
-     </DockPanel>
-     <Button x:Name="ConnectLibraryButton" Content="Use this existing library" Click="ConnectLibrary_Click" HorizontalAlignment="Left"/>
-     <Separator Margin="0,10"/><TextBlock Text="For a new plant, use Browse to create an empty folder, then name the first area. At home, you can create a Safety Gate Pilot folder in Documents." TextWrapping="Wrap"/>
-     <TextBlock Text="First area (for example, Packaging)" Margin="0,8,0,3"/><TextBox x:Name="StartAreaBox" MinHeight="34" AutomationProperties.Name="First plant area"/>
-     <Button x:Name="CreateBlankLibraryButton" Content="Create blank plant library" Click="CreateBlankLibrary_Click" HorizontalAlignment="Left"/>
-     <TextBlock x:Name="StartLibraryStatus" TextWrapping="Wrap" Margin="0,8"/>
-    </StackPanel></GroupBox>
-    <GroupBox x:Name="PilotEquipmentStep" Header="2 · Add the box and its unit"><StackPanel Margin="12"><TextBlock Text="An asset is the numbered gate or box on the floor. A unit is the assembly an operator selects inside that box. For a box with one assembly and no unit number on its label, use Unit 1." TextWrapping="Wrap"/>
-     <TextBlock x:Name="StartInventoryStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
-     <WrapPanel><Button x:Name="StartAddAssetButton" Content="Add an asset / box" Click="StartAddAsset_Click"/><Button Content="Manage areas" Click="StartAreas_Click"/></WrapPanel>
-     <TextBlock Text="Add the unit under this asset / box" Margin="0,10,0,3"/>
-     <ComboBox x:Name="PilotAssetBox" MinHeight="34" SelectionChanged="PilotAssetBox_SelectionChanged" AutomationProperties.Name="Asset for the new unit">
-      <ComboBox.ItemTemplate>
-       <DataTemplate>
-        <TextBlock TextTrimming="CharacterEllipsis"><Run Text="{Binding AssetDisplay, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Category, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Location, Mode=OneWay}"/></TextBlock>
-       </DataTemplate>
-      </ComboBox.ItemTemplate>
-     </ComboBox>
-     <Button x:Name="StartAddUnitButton" Content="Add unit to selected asset" Click="StartAddUnit_Click" HorizontalAlignment="Left" IsEnabled="False"/>
-     <TextBlock Text="Unit to use for the pilot" Margin="0,10,0,3"/><ComboBox x:Name="PilotUnitBox" DisplayMemberPath="AdminDisplay" MinHeight="34" SelectionChanged="PilotUnitBox_SelectionChanged" AutomationProperties.Name="Unit to use for the pilot"/>
-     <Button Content="Edit this unit and photo" Click="StartEditPilot_Click" HorizontalAlignment="Left"/>
-    </StackPanel></GroupBox>
-    <GroupBox x:Name="PilotContentStep" Header="3 · Give the operator something useful"><StackPanel Margin="12">
-     <TextBlock Text="Attach one approved PDF you already have, such as a drawing or manual. Setup copies it into the library. Add a photo and fix for one common problem. Published problems are visible across the plant." TextWrapping="Wrap"/>
-     <TextBlock x:Name="StartContentStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
-     <WrapPanel><Button Content="Attach a PDF to the pilot unit…" Click="StartAttachPdf_Click"/><Button x:Name="StartProblemButton" Content="Add a Common Problem" Click="StartProblem_Click"/></WrapPanel>
-     <Expander Header="Optional: replacement parts" Margin="0,8,0,0">
-      <StackPanel>
-       <TextBlock Text="Add part details once the pilot is ready. Stockroom lookup requires a supported plant and network access." TextWrapping="Wrap"/>
-       <Button Content="Add parts" Click="StartParts_Click" HorizontalAlignment="Left"/>
-      </StackPanel>
-     </Expander>
-    </StackPanel></GroupBox>
-    <GroupBox Header="4 · Try the operator’s job"><StackPanel Margin="12"><TextBlock Text="Open the pilot and ask a colleague to identify it by the photo, open Manuals / documents, and find the fix under Common Problems. If they can do those three things without coaching, you have a useful pilot. Use Plant setup in the sidebar to make corrections before adding more units." TextWrapping="Wrap"/>
-     <Button x:Name="StartOperatorButton" Content="Open the saved pilot in operator view" Click="StartOperator_Click" HorizontalAlignment="Left" Margin="0,10"/>
-    </StackPanel></GroupBox>
-    <GroupBox x:Name="PilotPhoneStep" Header="5 · Phone access"><StackPanel Margin="12">
-     <TextBlock Text="Use Publish &amp; print QR in the main app to publish unit folders and print Drive labels." TextWrapping="Wrap"/>
-     <Expander x:Name="OfflineLabelsExpander" Header="Offline label export" Margin="0,10,0,0">
-      <StackPanel>
-       <TextBlock x:Name="PilotQrStatus" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8"/>
-       <WrapPanel><Button x:Name="EditPilotQrButton" Content="Edit offline QR settings" Click="StartPhoneGuides_Click"/><Button Content="Export this pilot…" Click="ExportPilotPhoneGuide_Click"/></WrapPanel>
-       <TextBlock x:Name="PilotExportStatus" TextWrapping="Wrap"/>
-      </StackPanel>
-     </Expander>
-    </StackPanel></GroupBox>
-   </StackPanel></ScrollViewer></TabItem>
+   </TabControl.Tag>
 
-   <TabItem x:Name="UnitsSetupTab" Header="Gates &amp; Units">
-    <Grid Margin="12">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="240"/><ColumnDefinition Width="120"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Grid Grid.Column="0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <ComboBox x:Name="GateAreaFilterBox" Height="34" SelectionChanged="GateAreaFilterBox_SelectionChanged"/>
-      <WrapPanel Grid.Row="1" Margin="0,6,0,6"><Button Content="+ New Gate" Click="NewGate_Click"/><Button Content="Delete Gate" Click="DeleteGate_Click"/></WrapPanel>
-      <ListBox x:Name="GateList" Grid.Row="2" DisplayMemberPath="Display" SelectionChanged="GateList_SelectionChanged"/>
-     </Grid>
-     <Grid Grid.Column="1" Margin="10,0,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <WrapPanel><Button Content="+ Unit" Click="NewUnit_Click"/><Button Content="Delete" Click="DeleteUnit_Click"/></WrapPanel>
-      <ListBox x:Name="UnitListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="UnitDisplay" SelectionChanged="UnitListAdmin_SelectionChanged"/>
-     </Grid>
-     <ScrollViewer x:Name="GateUnitEditorScroll" Grid.Column="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
-      <GroupBox x:Name="UnitEditorGroup" Header="Selected unit" Margin="0,14,0,0"><Grid Margin="10">
-       <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-       <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-       <TextBlock Text="Unit Number" VerticalAlignment="Center"/><TextBox x:Name="UnitNumberBox" Grid.Column="1" Margin="3"/>
-       <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0"><TextBlock Text="Equipment on this unit" FontWeight="SemiBold"/><WrapPanel><CheckBox x:Name="UnitHasSignalColumnCheck" Content="Signal column" Margin="0,8,20,0"/><CheckBox x:Name="UnitHasScannerCheck" Content="Safety scanner" Margin="0,8,0,0"/></WrapPanel><TextBlock Text="Uncheck equipment this unit does not have. Files are retained; the unit-page action is hidden." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource ThemeForeground61788A}" Margin="0,6,0,0"/></StackPanel>
-       <TextBlock Grid.Row="2" Text="Identification Photo" VerticalAlignment="Center"/><StackPanel Grid.Row="2" Grid.Column="1"><WrapPanel><Button Content="Choose Photo..." Click="ChoosePhoto_Click"/><Button Content="Paste Image" Click="PastePhoto_Click" Margin="6,0,0,0"/></WrapPanel><TextBlock x:Name="UnitPhotoText" TextWrapping="Wrap" FontSize="12" Margin="4,4,0,0"/></StackPanel>
-       <Border x:Name="UnitPhotoPreviewBorder" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="10" Background="{DynamicResource ThemeBackgroundF7F9FB}" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}" BorderThickness="1" CornerRadius="4" Focusable="True" AllowDrop="True" PreviewKeyDown="UnitPhotoPreviewBorder_PreviewKeyDown" MouseLeftButtonDown="UnitPhotoPreviewBorder_MouseLeftButtonDown" DragOver="UnitPhotoPreviewBorder_DragOver" Drop="UnitPhotoPreviewBorder_Drop" ToolTip="Click this preview and press Ctrl+V to paste an image, or drag an image file here.">
+   <!-- START HERE -->
+   <TabItem x:Name="StartSetupTab" Header="Start here" Tag="&#xE7C1;">
+    <ScrollViewer Style="{StaticResource Page}"><StackPanel MaxWidth="900" HorizontalAlignment="Left">
+     <TextBlock Text="Start here" Style="{StaticResource PageHeading}"/>
+     <TextBlock Style="{StaticResource PageSubtitle}" Text="Get one unit fully working first: a photo to recognise it, one approved PDF and one common fix. Then try it the way an operator would before adding the rest of the plant." Margin="0,4,0,20"/>
+
+     <Border Style="{StaticResource Callout}" Margin="0,0,0,16">
+      <DockPanel>
+       <Button x:Name="TrySamplePilotButton" Content="Try the operator demo…" Click="TrySamplePilot_Click" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+       <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+        <TextBlock Text="New here? See what operators will use." FontWeight="SemiBold"/>
+        <TextBlock Style="{StaticResource HelpText}" Text="The demo uses fictional data in its own window. Close it to come back here."/>
+       </StackPanel>
+      </DockPanel>
+     </Border>
+
+     <Border Style="{StaticResource Card}" Margin="0,0,0,14"><DockPanel>
+      <Border Style="{StaticResource StepNumber}"><TextBlock Text="1" Style="{StaticResource StepNumberText}"/></Border>
+      <StackPanel>
+       <TextBlock Text="Connect a library, or start a new plant" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="The library is the folder holding this plant’s equipment, photos and documents, normally on the shared Q: drive so every PC sees the same content."/>
+       <TextBlock Text="Library folder" Style="{StaticResource FieldLabel}"/>
+       <DockPanel LastChildFill="True">
+        <Button Content="Browse…" Click="StartChooseFolder_Click" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+        <TextBox x:Name="StartLibraryPathBox" AutomationProperties.Name="Library folder"/>
+       </DockPanel>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="ConnectLibraryButton" Content="Use this existing library" Click="ConnectLibrary_Click" Style="{StaticResource PrimaryButton}"/></WrapPanel>
+       <Expander Header="Starting a brand-new plant instead?" Margin="-6,12,0,0">
         <StackPanel>
-         <TextBlock Text="Identification photo preview" FontWeight="SemiBold" Margin="0,0,0,2"/>
-         <TextBlock Text="Click the preview and press Ctrl+V, use Paste Image, or drag and drop an image file." Foreground="{DynamicResource ThemeForeground666666}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"/>
-         <Border Height="260" Background="{DynamicResource ThemeBackgroundECEFF2}" BorderBrush="{DynamicResource ThemeBorderBrushCDD3D9}" BorderThickness="1">
-          <Grid><Image x:Name="UnitPhotoPreview" Stretch="Uniform"/><TextBlock Text="{Binding Text, ElementName=UnitPhotoPreviewStatus}" TextWrapping="Wrap" TextAlignment="Center" Margin="20" Foreground="{DynamicResource ThemeForeground61788A}" VerticalAlignment="Center"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Source, ElementName=UnitPhotoPreview}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
-         </Border>
-         <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+         <TextBlock Style="{StaticResource HelpText}" Text="Browse to an empty folder above, name the first area, then create the library."/>
+         <TextBlock Text="First area (for example, Packaging)" Style="{StaticResource FieldLabel}"/>
+         <TextBox x:Name="StartAreaBox" AutomationProperties.Name="First plant area" MaxWidth="420" HorizontalAlignment="Stretch"/>
+         <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="CreateBlankLibraryButton" Content="Create blank plant library" Click="CreateBlankLibrary_Click"/></WrapPanel>
         </StackPanel>
-       </Border>
-      </Grid></GroupBox>
-      <Expander x:Name="MobileSettingsExpander" Header="Phone guide / QR label (optional)" Margin="0,10"><StackPanel>
-       <TextBlock Text="Offline text works without accounts or internet. Photos belong in the printable guide. If an approved document link becomes available, paste it below; that link takes priority over offline text in the QR code." TextWrapping="Wrap"/>
-       <TextBlock Text="Short offline instructions (700 characters maximum)" Margin="0,8,0,3"/><TextBox x:Name="MobileOfflineBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="85" MaxLength="700"/>
-       <TextBlock Text="Approved HTTPS document link (optional)" Margin="0,8,0,3"/><TextBox x:Name="MobileSupportUrlBox" TextWrapping="Wrap"/>
-       <TextBlock Text="Click Save Unit, then Return to phone pilot. Clear the document link to make the QR use offline text again." TextWrapping="Wrap" Margin="0,6"/>
-      </StackPanel></Expander>
-      <WrapPanel><Button x:Name="SaveUnitButton" Content="Save Unit" Click="SaveUnit_Click" Padding="18,8"/><Button Content="Next: pilot checklist" Click="ReturnStart_Click"/><Button x:Name="ReturnPhonePilotButton" Content="Return to phone pilot" Click="ReturnPhonePilot_Click"/></WrapPanel>
-      <Expander x:Name="GateInformationExpander" Header="Asset / box information" Margin="0,16,0,0"><StackPanel>      <GroupBox Header="Asset / box information — shared by its units"><Grid Margin="10">
-       <Grid.ColumnDefinitions><ColumnDefinition Width="175"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-       <TextBlock Text="Area" VerticalAlignment="Center"/><ComboBox x:Name="GateAreaBox" Grid.Column="1" Margin="3"/>
-       <TextBlock Grid.Row="1" Text="Asset / box number" VerticalAlignment="Center"/><TextBox x:Name="GateAssetBox" Grid.Row="1" Grid.Column="1" Margin="3"/>
-       <TextBlock Grid.Row="2" Text="Location / description" VerticalAlignment="Center"/><TextBox x:Name="GateLocationBox" Grid.Row="2" Grid.Column="1" Margin="3"/>
-       <Expander Grid.Row="3" Grid.ColumnSpan="2" Header="Manufacturer, search terms and PLC details (optional)" Margin="0,10"><StackPanel>
-        <TextBlock Text="Manufacturer / system"/><TextBox x:Name="GateManufacturerBox" Margin="0,3,0,8"/>
-        <TextBlock Text="Model"/><TextBox x:Name="GateModelBox" Margin="0,3,0,8"/>
-        <TextBlock Text="Equipment type"/><TextBox x:Name="GateTypeBox" Margin="0,3,0,8"/>
-        <TextBlock Text="Search keywords"/><TextBox x:Name="GateKeywordsBox" Margin="0,3,0,8"/>
-        <TextBlock Text="PLC address / IP"/><TextBox x:Name="PlcAddressBox" Margin="0,3,0,8"/>
-        <TextBlock Text="PLC model"/><TextBox x:Name="PlcModelBox" Margin="0,3,0,8"/>
-        <TextBlock Text="PLC notes"/><TextBox x:Name="PlcNotesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" Margin="0,3"/>
-       </StackPanel></Expander>
-      </Grid></GroupBox>
-      <WrapPanel><Button x:Name="SaveGateButton" Content="Save asset / box" Click="SaveGate_Click" Padding="18,8"/><Button Content="Next: add a unit to this asset" Click="NewUnit_Click"/></WrapPanel>
-</StackPanel></Expander>
-      <Border Background="{DynamicResource ThemeBackgroundF4F7FA}" BorderBrush="{DynamicResource ThemeBorderBrushD6DCE2}" BorderThickness="1" Padding="10" Margin="0,14,0,0">
-       <TextBlock Text="Drawings and other resources are configured on the Buttons / Resources tab. A single resource can be linked to multiple units, so paired units can share the exact same drawing and archive." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground444444}"/>
-      </Border>
-     </StackPanel></ScrollViewer>
-    </Grid>
-   </TabItem>
+       </Expander>
+       <TextBlock x:Name="StartLibraryStatus" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource InkMuted}"/>
+      </StackPanel>
+     </DockPanel></Border>
 
-   <TabItem x:Name="ResourcesSetupTab" Header="Buttons / Resources" Visibility="Collapsed">
-    <Grid Margin="12">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <ComboBox x:Name="ResourceGateBox" Height="34" DisplayMemberPath="Display" SelectionChanged="ResourceGateBox_SelectionChanged"/>
-      <WrapPanel Grid.Row="1" Margin="0,6"><Button Content="+ New Button" Click="NewResource_Click"/><Button Content="Delete" Click="DeleteResource_Click"/></WrapPanel>
-      <ListBox x:Name="ResourceList" Grid.Row="2" DisplayMemberPath="AdminDisplay" SelectionChanged="ResourceList_SelectionChanged"/>
-     </Grid>
-     <ScrollViewer Grid.Column="2"><StackPanel>
-      <TextBlock Text="Button / resource" FontSize="20" FontWeight="SemiBold"/>
-      <TextBlock Text="Button label" Margin="0,8,0,3"/><TextBox x:Name="ResourceLabelBox" Height="34"/>
-      <TextBlock Text="Type" Margin="0,8,0,3"/><ComboBox x:Name="ResourceKindBox" Height="34" SelectionChanged="ResourceKindBox_SelectionChanged"/>
-      <TextBlock Text="Show on these units" Margin="0,10,0,3"/>
-      <ListBox x:Name="ResourceUnitsList" Height="120" DisplayMemberPath="UnitDisplay" SelectionMode="Multiple"/>
-      <TextBlock Text="Select more than one unit to make one shared button/resource. Example: Units 4 and 5 can both point to one Electrical Drawings folder. Leave all units unselected to show the button on every unit under the gate." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-      <WrapPanel Margin="0,8,0,0"><CheckBox x:Name="ResourceVisibleCheck" Content="Visible" IsChecked="True" Margin="4,5,18,5"/><CheckBox x:Name="ResourceUploadCheck" Content="Regular users can upload / update files" Margin="4,5,18,5"/></WrapPanel>
-      <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-       <StackPanel><TextBlock Text="Archive rule"/><ComboBox x:Name="ResourceArchiveBox" Height="34"/></StackPanel>
-       <StackPanel Grid.Column="2"><TextBlock Text="Launch software"/><ComboBox x:Name="ResourceLaunchBox" Height="34"/></StackPanel>
-      </Grid>
-      <TextBlock Text="Managed folder / target" Margin="0,8,0,3"/><TextBox x:Name="ResourceTargetBox" Height="34" ToolTip="Managed Files: relative folder (leave blank for automatic). Folder: path. URL: http://..."/>
-      <TextBlock Text="Description" Margin="0,8,0,3"/><TextBox x:Name="ResourceDescriptionBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70"/>
-      <TextBlock Text="Search keywords" Margin="0,8,0,3"/><TextBox x:Name="ResourceKeywordsBox" Height="34"/>
-      <TextBlock Text="Sort order" Margin="0,8,0,3"/><TextBox x:Name="ResourceSortBox" Width="100" Height="34" HorizontalAlignment="Left"/>
-      <WrapPanel Margin="0,10,0,0"><Button Content="Save Button / Resource" Click="SaveResource_Click"/><Button Content="Open Current Folder" Click="OpenResourceCurrent_Click"/><Button Content="Open Archive" Click="OpenResourceArchive_Click"/></WrapPanel>
-     </StackPanel></ScrollViewer>
-    </Grid>
-   </TabItem>
+     <Border x:Name="PilotEquipmentStep" Style="{StaticResource Card}" Margin="0,0,0,14"><DockPanel>
+      <Border Style="{StaticResource StepNumber}"><TextBlock Text="2" Style="{StaticResource StepNumberText}"/></Border>
+      <StackPanel>
+       <TextBlock Text="Add the asset and its unit" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="An asset is the numbered gate or box on the floor. A unit is the assembly inside it that an operator picks. If the label shows no unit number, use Unit 1."/>
+       <TextBlock x:Name="StartInventoryStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,10,0,0"/>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="StartAddAssetButton" Content="Add an asset" Click="StartAddAsset_Click"/><Button Content="Manage areas" Click="StartAreas_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+       <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <StackPanel>
+         <TextBlock Text="Asset for a new unit" Style="{StaticResource FieldLabel}"/>
+         <ComboBox x:Name="PilotAssetBox" SelectionChanged="PilotAssetBox_SelectionChanged" AutomationProperties.Name="Asset for the new unit">
+          <ComboBox.ItemTemplate>
+           <DataTemplate>
+            <TextBlock TextTrimming="CharacterEllipsis"><Run Text="{Binding AssetDisplay, Mode=OneWay}" FontWeight="SemiBold"/><Run Text=" · "/><Run Text="{Binding Category, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Location, Mode=OneWay}"/></TextBlock>
+           </DataTemplate>
+          </ComboBox.ItemTemplate>
+         </ComboBox>
+         <Button x:Name="StartAddUnitButton" Content="Add unit to this asset" Click="StartAddUnit_Click" HorizontalAlignment="Left" IsEnabled="False" Margin="-4,8,0,0"/>
+        </StackPanel>
+        <StackPanel Grid.Column="2">
+         <TextBlock Text="Pilot unit" Style="{StaticResource FieldLabel}"/>
+         <ComboBox x:Name="PilotUnitBox" DisplayMemberPath="AdminDisplay" SelectionChanged="PilotUnitBox_SelectionChanged" AutomationProperties.Name="Unit to use for the pilot"/>
+         <Button Content="Edit this unit and photo" Click="StartEditPilot_Click" HorizontalAlignment="Left" Margin="-4,8,0,0"/>
+        </StackPanel>
+       </Grid>
+      </StackPanel>
+     </DockPanel></Border>
 
-   <TabItem x:Name="FlowsSetupTab" Header="Troubleshooting" Visibility="Collapsed">
-    <Grid Margin="12">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="280"/><ColumnDefinition Width="240"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <WrapPanel><Button Content="+ Flow" Click="NewFlow_Click"/><Button Content="Delete" Click="DeleteFlow_Click"/></WrapPanel>
-      <ListBox x:Name="FlowListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="AdminDisplay" SelectionChanged="FlowListAdmin_SelectionChanged"/>
-     </Grid>
-     <Grid Grid.Column="1" Margin="10,0,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <WrapPanel><Button Content="+ Step" Click="NewNode_Click"/><Button Content="Delete" Click="DeleteNode_Click"/></WrapPanel>
-      <ListBox x:Name="NodeListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="AdminDisplay" SelectionChanged="NodeListAdmin_SelectionChanged"/>
-     </Grid>
-     <ScrollViewer Grid.Column="3"><StackPanel>
-      <TextBlock Text="Troubleshooting flow" FontSize="19" FontWeight="SemiBold"/>
-      <TextBlock Text="Title" Margin="0,6,0,3"/><TextBox x:Name="FlowTitleBox" Height="34"/>
-      <TextBlock Text="Keywords" Margin="0,6,0,3"/><TextBox x:Name="FlowKeywordsBox" Height="34"/>
-      <TextBlock Text="Manufacturer filter (optional)" Margin="0,6,0,3"/><TextBox x:Name="FlowManufacturerBox" Height="34"/>
-      <TextBlock Text="Specific gate (optional)" Margin="0,6,0,3"/><ComboBox x:Name="FlowGateBox" Height="34" DisplayMemberPath="Display" SelectionChanged="FlowGateBox_SelectionChanged"/>
-      <Button Content="Save Flow" Click="SaveFlow_Click" HorizontalAlignment="Left" Margin="0,8,0,12"/>
-      <Separator/>
-      <TextBlock Text="Selected step" FontSize="19" FontWeight="SemiBold" Margin="0,12,0,0"/>
-      <TextBlock x:Name="NodeIdText" Foreground="{DynamicResource ThemeForeground777777}" Margin="0,3,0,5"/>
-      <TextBlock Text="Question / heading"/><TextBox x:Name="NodePromptBox" Height="34"/>
-      <TextBlock Text="Instructions" Margin="0,6,0,3"/><TextBox x:Name="NodeBodyBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"/>
-      <WrapPanel Margin="0,6,0,0"><CheckBox x:Name="NodeTerminalCheck" Content="End of path" Margin="4"/><CheckBox x:Name="NodeStartCheck" Content="Starting step" Margin="16,4,4,4"/></WrapPanel>
-      <TextBlock Text="Answer buttons" FontWeight="SemiBold" Margin="0,8,0,3"/>
-      <TextBlock Text="One per line: Button text => next-step-ID. The step IDs are shown under each selected step." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap"/>
-      <TextBox x:Name="NodeChoicesBox" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="90" VerticalScrollBarVisibility="Auto"/>
-      <TextBlock Text="Linked resource buttons" FontWeight="SemiBold" Margin="0,8,0,3"/>
-      <ListBox x:Name="NodeResourceList" Height="110" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
-      <Button Content="Save Step" Click="SaveNode_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
-     </StackPanel></ScrollViewer>
-    </Grid>
-   </TabItem>
+     <Border x:Name="PilotContentStep" Style="{StaticResource Card}" Margin="0,0,0,14"><DockPanel>
+      <Border Style="{StaticResource StepNumber}"><TextBlock Text="3" Style="{StaticResource StepNumberText}"/></Border>
+      <StackPanel>
+       <TextBlock Text="Give the operator something useful" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Attach one approved PDF (a drawing or manual) and add one common problem with a photo and its fix. Setup copies files into the library."/>
+       <TextBlock x:Name="StartContentStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,10,0,0"/>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Attach a PDF to the pilot unit…" Click="StartAttachPdf_Click"/><Button x:Name="StartProblemButton" Content="Add a common problem" Click="StartProblem_Click"/><Button Content="Add parts" Click="StartParts_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+      </StackPanel>
+     </DockPanel></Border>
 
-   <TabItem x:Name="HelpSetupTab" Header="Home / Help">
-    <Grid Margin="14"><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <WrapPanel><Button Content="+ New Topic" Click="NewHelp_Click"/><Button x:Name="NewCommonProblemButton" Content="+ Common Problem" Click="NewCommonProblem_Click"/><Button Content="Delete" Click="DeleteHelp_Click"/></WrapPanel>
-      <ListBox x:Name="HelpList" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="AdminDisplay" SelectionChanged="HelpList_SelectionChanged"/>
-     </Grid>
-     <ScrollViewer Grid.Column="2"><StackPanel>
-      <Expander Header="Home-page wording (optional)"><StackPanel>
-      <TextBlock Text="Home text" FontSize="18" FontWeight="SemiBold"/>
-      <TextBlock Text="Home subtitle" Margin="0,8,0,3"/><TextBox x:Name="HomeSubtitleBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="58"/>
-      <TextBlock Text="Manuals intro" Margin="0,8,0,3"/><TextBox x:Name="ManualsIntroBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50"/>
-      <TextBlock Text="Parts intro" Margin="0,8,0,3"/><TextBox x:Name="PartsIntroBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50"/>
-      <Button Content="Save Home Text" Click="SaveSharedContent_Click" HorizontalAlignment="Left" Margin="0,8,0,16"/>
-      <Separator/>
-      </StackPanel></Expander>
-      <TextBlock Text="Help / Common Problem" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,6"/>
-      <TextBlock Text="Section"/><ComboBox x:Name="HelpSectionBox" Height="34"><ComboBoxItem Content="Quick Help"/><ComboBoxItem Content="Troubleshooting"/><ComboBoxItem Content="Common Problems"/></ComboBox>
-      <TextBlock Text="Title" Margin="0,8,0,3"/><TextBox x:Name="HelpTitleBox" Height="34"/>
-      <CheckBox x:Name="HelpVisibleCheck" Content="Show this entry to users" IsChecked="True" Margin="0,10"/>
-      <TextBlock Text="Problem photos (optional)" Margin="0,8,0,3"/>
-      <WrapPanel><Button Content="Add photos…" Click="ChooseHelpPhoto_Click"/><Button Content="Remove selected photo" Click="RemoveHelpPhoto_Click"/></WrapPanel>
-      <ListBox x:Name="HelpPhotoList" DisplayMemberPath="Label" Height="90" SelectionChanged="HelpPhoto_SelectionChanged"/><Button Content="Use selected as cover" Click="CoverHelpPhoto_Click" HorizontalAlignment="Left"/><Image x:Name="HelpPhotoPreview" Height="160" Stretch="Uniform" HorizontalAlignment="Left"/>
-      <TextBlock x:Name="HelpPhotoStatus" TextWrapping="Wrap"/>
-      <TextBlock Text="How to recognize it and how to fix it" Margin="0,8,0,3"/><TextBox x:Name="HelpBodyBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="120"/>
-      <TextBlock Text="Keywords" Margin="0,8,0,3"/><TextBox x:Name="HelpKeywordsBox" Height="34"/>
-      <TextBlock Text="Sort order" Margin="0,8,0,3"/><TextBox x:Name="HelpSortBox" Height="34" Width="100" HorizontalAlignment="Left"/>
-      <WrapPanel Margin="0,10,0,0"><Button x:Name="SaveHelpButton" Content="Save Topic" Click="SaveHelp_Click"/><Button Content="Return to pilot checklist" Click="ReturnStart_Click"/></WrapPanel>
-     </StackPanel></ScrollViewer>
-    </Grid>
-   </TabItem>
+     <Border Style="{StaticResource Card}" Margin="0,0,0,14"><DockPanel>
+      <Border Style="{StaticResource StepNumber}"><TextBlock Text="4" Style="{StaticResource StepNumberText}"/></Border>
+      <StackPanel>
+       <TextBlock Text="Try it as an operator" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Ask a colleague to find the unit by its photo, open its document and find the fix under Common Problems. If they manage all three without help, the pilot is ready."/>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="StartOperatorButton" Content="Open the pilot in operator view" Click="StartOperator_Click" Style="{StaticResource PrimaryButton}"/></WrapPanel>
+      </StackPanel>
+     </DockPanel></Border>
 
-   <TabItem x:Name="ManualsSetupTab" Header="Manuals" Visibility="Collapsed">
-    <Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <WrapPanel><Button Content="+ Manual" Click="NewManual_Click"/><Button Content="Delete" Click="DeleteManual_Click"/></WrapPanel>
-      <ListBox x:Name="ManualListAdmin" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="Display" SelectionChanged="ManualListAdmin_SelectionChanged"/>
-     </Grid>
-     <ScrollViewer Grid.Column="2"><StackPanel>
-      <TextBlock Text="Title"/><TextBox x:Name="ManualTitleBox" Height="34"/>
-      <TextBlock Text="Manufacturer" Margin="0,7,0,3"/><TextBox x:Name="ManualManufacturerBox" Height="34"/>
-      <TextBlock Text="Model" Margin="0,7,0,3"/><TextBox x:Name="ManualModelBox" Height="34"/>
-      <TextBlock Text="Keywords" Margin="0,7,0,3"/><TextBox x:Name="ManualKeywordsBox" Height="34"/>
-      <TextBlock Text="Document" Margin="0,7,0,3"/><WrapPanel><Button Content="Choose / Replace File..." Click="ChooseManualFile_Click"/><TextBlock x:Name="ManualFileText" VerticalAlignment="Center" TextWrapping="Wrap"/></WrapPanel>
-      <TextBlock Text="Applies to gates" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="ManualGateAssignments" Height="120" DisplayMemberPath="Display" SelectionMode="Multiple"/>
-      <TextBlock Text="Applies to specific units (optional)" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="ManualUnitAssignments" Height="110" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
-      <TextBlock Text="Leave both assignment lists empty to make the manual global. Gate assignment applies it to every unit under that gate; unit assignment can be used for exceptions." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-      <WrapPanel Margin="0,10,0,0"><Button Content="Save Manual" Click="SaveManual_Click"/><Button Content="Open Document" Click="OpenManualAdmin_Click"/></WrapPanel>
-     </StackPanel></ScrollViewer>
-    </Grid>
-   </TabItem>
-
-   <TabItem x:Name="PartsSetupTab" Header="Parts">
-    <Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <WrapPanel><Button x:Name="NewPartButton" Content="+ Part" Click="NewPart_Click"/><Button Content="Delete" Click="DeletePart_Click"/></WrapPanel>
-      <ListBox x:Name="AdminPartList" Grid.Row="1" Margin="0,8,0,0" SelectionChanged="AdminPartList_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.ItemContainerStyle><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox>
-     </Grid>
-     <ScrollViewer Grid.Column="2"><StackPanel>
-      <TextBlock Text="Add a part by Item ID" FontSize="22" FontWeight="SemiBold"/>
-      <TextBlock Text="Choose the plant once, enter the stockroom Item ID, then import. Details and any supplied photo are saved to the shared library." TextWrapping="Wrap" Margin="0,6,0,12"/>
-      <ComboBox x:Name="ImportPlantBox" DisplayMemberPath="Name" Height="34"/>
-      <TextBlock Text="Item ID" Margin="0,10,0,4"/><TextBox x:Name="PartNumberBox" Height="38" FontSize="18" KeyDown="ImportItem_KeyDown"/>
-      <Button x:Name="ImportItemButton" Content="Import from stockroom" Click="ImportItem_Click" HorizontalAlignment="Left" Margin="0,8"/>
-      <TextBlock x:Name="ImportItemStatus" TextWrapping="Wrap" Margin="0,4,0,12"/>
-      <Expander Header="Bulk import by Item ID"><StackPanel><TextBlock Text="Paste up to 100 IDs separated by lines, commas or spaces. Duplicates are skipped. Items are saved to the shared catalog; choose unit assignments afterward." TextWrapping="Wrap"/><TextBox x:Name="BulkItemIdsBox" AcceptsReturn="True" TextWrapping="Wrap" Height="100" VerticalScrollBarVisibility="Auto"/><Button x:Name="BulkImportButton" Content="Import these Item IDs" Click="BulkImport_Click" HorizontalAlignment="Left"/></StackPanel></Expander>
-      <ListBox x:Name="ImportResultsList" MaxHeight="180" Margin="0,8"><ListBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="Wrap"><Run Text="{Binding ItemId, Mode=OneWay}" FontWeight="Bold"/><Run Text=" · "/><Run Text="{Binding Status, Mode=OneWay}"/></TextBlock></DataTemplate></ListBox.ItemTemplate></ListBox>
-
-      <Expander Header="Details / optional edits"><StackPanel>
-      <TextBlock Text="Item name"/><TextBox x:Name="PartDescriptionBox" MinHeight="60" AcceptsReturn="True" TextWrapping="Wrap"/>
-      <TextBlock Text="Stockroom description" Margin="0,8,0,3"/><TextBox x:Name="PartSourceDescriptionBox" IsReadOnly="True" TextWrapping="Wrap" MinHeight="60"/>
-      <TextBlock Text="Bin location" Margin="0,7,0,3"/><TextBox x:Name="PartBinBox" Height="34"/>
-
-      <TextBlock Text="Reported quantity (snapshot)" Margin="0,7,0,3"/><TextBox x:Name="PartQuantityBox" Height="34"/>
-      <TextBlock Text="Site" Margin="0,7,0,3"/><TextBox x:Name="PartSiteBox" Height="34"/>
-      <TextBlock Text="Manufacturer" Margin="0,7,0,3"/><TextBox x:Name="PartManufacturerBox" Height="34"/>
-      <TextBlock Text="Keywords" Margin="0,7,0,3"/><TextBox x:Name="PartKeywordsBox" Height="34"/>
-      <TextBlock Text="Legacy / freeform related assets" Margin="0,7,0,3"/><TextBox x:Name="PartAssetsBox" Height="34"/>
-      <TextBlock Text="Notes" Margin="0,7,0,3"/><TextBox x:Name="PartNotesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="75"/>
-      <TextBlock Text="Document" Margin="0,7,0,3"/><WrapPanel><Button Content="Choose / Replace Document..." Click="ChoosePartDocument_Click"/><TextBlock x:Name="PartDocumentText" VerticalAlignment="Center" TextWrapping="Wrap"/></WrapPanel>
-      </StackPanel></Expander>
-      <TextBlock Text="Applies to gates" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="PartGateAssignments" Height="110" DisplayMemberPath="Display" SelectionMode="Multiple"/>
-      <TextBlock Text="Applies to specific units (optional)" FontWeight="SemiBold" Margin="0,9,0,3"/><ListBox x:Name="PartUnitAssignments" Height="100" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
-      <TextBlock Text="Leave both assignment lists empty to make the part global." Foreground="{DynamicResource ThemeForeground666666}"/>
-      <Button x:Name="SavePartButton" Content="Save Part" Click="SavePart_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
-     </StackPanel></ScrollViewer>
-    </Grid>
-   </TabItem>
-
-   <TabItem x:Name="AreasSetupTab" Header="Areas" Visibility="Collapsed">
-    <Grid Margin="14"><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <ListBox x:Name="AreaList" SelectionChanged="AreaList_SelectionChanged"/>
-     <StackPanel Grid.Column="2"><TextBlock Text="Area name"/><TextBox x:Name="AreaNameBox" Height="34" Margin="0,4,0,8"/><WrapPanel><Button Content="Add" Click="AddArea_Click"/><Button x:Name="RenameAreaButton" Content="Rename" Click="RenameArea_Click"/><Button Content="Delete" Click="DeleteArea_Click"/></WrapPanel><TextBlock Text="An area cannot be deleted while gates are assigned to it." Foreground="{DynamicResource ThemeForeground666666}" TextWrapping="Wrap" Margin="4,12,0,0"/></StackPanel>
-    </Grid>
-   </TabItem>
-
-   <TabItem x:Name="LibrarySetupTab" Header="Shared Data / Software">
-    <ScrollViewer><StackPanel Margin="18" MaxWidth="820" HorizontalAlignment="Left">
-     <TextBlock Text="Shared data location" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Use Start here to connect or create a library. A local folder works for a pilot; computers sharing one plant’s content should use the same library." Foreground="{DynamicResource ThemeForeground555555}" Margin="0,4,0,6"/>
-     <TextBox x:Name="SharedRootBox" Height="34"/><WrapPanel><Button Content="Choose Folder..." Click="ChooseSharedRoot_Click"/></WrapPanel>
-     <Separator Margin="0,16"/>
-     <Expander Header="Huntingdon sample data (training only)" Margin="0,10"><StackPanel><TextBlock Text="For a different plant, use Start here → Create blank plant library. Install this sample only when you intend to use the supplied Huntingdon equipment and parts." TextWrapping="Wrap"/><Button Content="Install Huntingdon sample data" Click="Initialize_Click" HorizontalAlignment="Left"/></StackPanel></Expander>
-     <Button x:Name="OrganizeAssetFoldersButton" Content="Organize asset folders…" Click="OrganizeAssetFolders_Click" HorizontalAlignment="Left"/>
-     <TextBlock Text="Preview a readable asset folder layout, merge identical copies, and review conflicting revisions before applying. Existing files and metadata are backed up." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground61788A}" Margin="0,6,0,14"/>
-     <TextBlock Text="Phone guides and QR labels" FontWeight="SemiBold" FontSize="17"/>
-     <TextBlock Text="Export self-contained photo guides for printing or saving as PDF, plus labels for units with offline text or an approved document link. No server, login or internet is needed for text-only labels. Nothing is uploaded automatically." TextWrapping="Wrap" Margin="0,6"/>
-     <CheckBox x:Name="ExportIncludeNotesCheck" Content="Include shared notes in the exported guides" Margin="0,6"/>
-     <Button x:Name="ExportPhoneGuidesButton" Content="Export phone guides and QR labels…" Click="ExportPhoneGuides_Click" HorizontalAlignment="Left"/>
-     <TextBlock x:Name="PhoneExportStatus" TextWrapping="Wrap"/>
-     <Separator Margin="0,16"/>
-     <TextBlock Text="Application distribution" FontWeight="SemiBold" FontSize="17"/>
-     <TextBlock Text="Recommended: keep the published SafetyGateSupport.exe in Q:\SafetyGateSupport\Application and give users a shortcut to that master copy. This build does not self-modify or auto-update." Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap" Margin="0,4,0,6"/>
-     <Separator Margin="0,16"/>
-     <TextBlock Text="Storeroom database" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="Choose the stockroom plant on the Parts page. Each computer remembers its own choice." Foreground="{DynamicResource ThemeForeground555555}" Margin="0,3,0,4"/><TextBlock Text="First-time stockroom setup on each PC:" FontWeight="SemiBold" Margin="0,10,0,4"/>
-     <TextBlock Text="1. Install Microsoft Edge WebView2 Evergreen Runtime if it is missing.&#10;2. Connect to the plant network and open the stockroom in your browser. Confirm inventory access.&#10;3. In Parts, choose Huntingdon, Salisbury or Newport, then refresh stock. No shared-folder change is needed.&#10;4. Compare one known Item ID and its Available quantity with the stockroom. Zero means out of stock; unknown means the lookup has not been confirmed.&#10;5. If the check fails, save a stockroom report from the right panel. It contains inventory text; share it only with your support contact." TextWrapping="Wrap" Foreground="{DynamicResource ThemeForeground555555}" Margin="0,0,0,10"/>
-     <TextBox x:Name="StoreroomUrlBox" Visibility="Collapsed"/><Button Content="Save Shared Content Settings" Click="SaveSharedContent_Click" HorizontalAlignment="Left"/>
-     <Separator Margin="0,16"/>
-     <Expander Header="Vendor software paths (optional)"><StackPanel>
-     <TextBlock Text="Programming software on this computer" FontWeight="SemiBold" FontSize="17"/>
-     <TextBlock Text="Siemens 8WD46 Configurator" Margin="0,10,0,3"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="SiemensBox" Height="34"/><Button Grid.Column="1" Content="Browse..." Click="BrowseSiemens_Click"/></Grid>
-     <TextBlock Text="UAM Project Designer" Margin="0,10,0,3"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="UamBox" Height="34"/><Button Grid.Column="1" Content="Browse..." Click="BrowseUam_Click"/></Grid>
-     <Button Content="Save Local Software Paths" Click="SaveLocalSettings_Click" HorizontalAlignment="Left" Padding="18,8" Margin="0,12,0,0"/>
-     </StackPanel></Expander>
+     <Border x:Name="PilotPhoneStep" Style="{StaticResource Card}"><DockPanel>
+      <Border Style="{StaticResource StepNumber}"><TextBlock Text="5" Style="{StaticResource StepNumberText}"/></Border>
+      <StackPanel>
+       <TextBlock Text="Phone access (optional)" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Use Publish &amp; print QR in the main window to publish every unit to Google Drive and print its QR label."/>
+       <Expander x:Name="OfflineLabelsExpander" Header="Offline label export (older method)" Margin="-6,10,0,0">
+        <StackPanel>
+         <TextBlock x:Name="PilotQrStatus" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0"/>
+         <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="EditPilotQrButton" Content="Edit offline QR settings" Click="StartPhoneGuides_Click"/><Button Content="Export this pilot…" Click="ExportPilotPhoneGuide_Click"/></WrapPanel>
+         <TextBlock x:Name="PilotExportStatus" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}"/>
+        </StackPanel>
+       </Expander>
+      </StackPanel>
+     </DockPanel></Border>
     </StackPanel></ScrollViewer>
    </TabItem>
 
-   <TabItem x:Name="AuditSetupTab" Header="Audit / History" Visibility="Collapsed">
-    <Grid Margin="14"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-     <WrapPanel><Button Content="Refresh" Click="RefreshAudit_Click"/><TextBlock Text="Recent setup and file changes. Shared notes are intentionally not logged on every autosave." VerticalAlignment="Center" Foreground="{DynamicResource ThemeForeground666666}" Margin="10,0,0,0"/></WrapPanel>
-     <ListBox x:Name="AuditList" Grid.Row="1" Margin="0,8,0,0" DisplayMemberPath="Display"/>
+   <!-- UNITS & ASSETS -->
+   <TabItem x:Name="UnitsSetupTab" Header="Units &amp; assets" Tag="&#xE8B7;">
+    <Grid Margin="24,20,24,16">
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <Grid.ColumnDefinitions><ColumnDefinition Width="250"/><ColumnDefinition Width="12"/><ColumnDefinition Width="150"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel Grid.ColumnSpan="5" Margin="0,0,0,14">
+      <TextBlock Text="Units &amp; assets" Style="{StaticResource PageHeading}"/>
+      <TextBlock Style="{StaticResource PageSubtitle}" Text="Pick an asset, then a unit, to edit its number, identification photo and equipment."/>
+     </StackPanel>
+     <Border Grid.Row="1" Style="{StaticResource ListCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="ASSETS" Style="{StaticResource ListHeading}"/>
+      <ComboBox x:Name="GateAreaFilterBox" Grid.Row="1" SelectionChanged="GateAreaFilterBox_SelectionChanged" AutomationProperties.Name="Area"/>
+      <ListBox x:Name="GateList" Grid.Row="2" Margin="0,8,0,0" BorderThickness="0" Padding="0" DisplayMemberPath="Display" SelectionChanged="GateList_SelectionChanged"/>
+      <UniformGrid Grid.Row="3" Columns="2" Margin="-4,6,-4,-4"><Button Content="+ New asset" Click="NewGate_Click"/><Button Content="Delete" Click="DeleteGate_Click" Style="{StaticResource DangerButton}"/></UniformGrid>
+     </Grid></Border>
+     <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource ListCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="UNITS" Style="{StaticResource ListHeading}"/>
+      <ListBox x:Name="UnitListAdmin" Grid.Row="1" BorderThickness="0" Padding="0" DisplayMemberPath="UnitDisplay" SelectionChanged="UnitListAdmin_SelectionChanged"/>
+      <StackPanel Grid.Row="2" Margin="-4,6,-4,-4"><Button Content="+ Unit" Click="NewUnit_Click"/><Button Content="Delete" Click="DeleteUnit_Click" Style="{StaticResource DangerButton}"/></StackPanel>
+     </Grid></Border>
+     <ScrollViewer x:Name="GateUnitEditorScroll" Grid.Row="1" Grid.Column="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+      <GroupBox x:Name="UnitEditorGroup" Header="Selected unit"><StackPanel>
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="12"/><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <TextBlock Text="Unit number" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource InkMuted}"/>
+        <TextBox x:Name="UnitNumberBox" Grid.Column="2" AutomationProperties.Name="Unit number"/>
+       </Grid>
+       <Border x:Name="UnitPhotoPreviewBorder" Margin="0,12,0,0" Padding="12" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Focusable="True" AllowDrop="True" PreviewKeyDown="UnitPhotoPreviewBorder_PreviewKeyDown" MouseLeftButtonDown="UnitPhotoPreviewBorder_MouseLeftButtonDown" DragOver="UnitPhotoPreviewBorder_DragOver" Drop="UnitPhotoPreviewBorder_Drop" ToolTip="Click here and press Ctrl+V to paste an image, or drag an image file onto it.">
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="200"/></Grid.ColumnDefinitions>
+         <Border Height="250" Background="{DynamicResource Surface}" CornerRadius="8" BorderBrush="{DynamicResource Line}" BorderThickness="1">
+          <Grid><Image x:Name="UnitPhotoPreview" Stretch="Uniform" Margin="4"/><TextBlock Text="{Binding Text, ElementName=UnitPhotoPreviewStatus}" TextWrapping="Wrap" TextAlignment="Center" Margin="20" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Source, ElementName=UnitPhotoPreview}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
+         </Border>
+         <StackPanel Grid.Column="1" Margin="14,0,0,0">
+          <TextBlock Text="Identification photo" FontWeight="SemiBold"/>
+          <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,8" Text="Choose a file, paste (Ctrl+V after clicking the preview) or drag an image here."/>
+          <Button Content="Choose photo…" Click="ChoosePhoto_Click" HorizontalAlignment="Stretch" Margin="0,0,0,6"/>
+          <Button Content="Paste image" Click="PastePhoto_Click" HorizontalAlignment="Stretch" Margin="0"/>
+          <TextBlock x:Name="UnitPhotoText" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkMuted}" Margin="0,8,0,0"/>
+          <TextBlock x:Name="UnitPhotoPreviewStatus" Text="Choose, paste, or drop a photo to preview it before saving the unit." Style="{StaticResource HelpText}" Margin="0,6,0,0"/>
+         </StackPanel>
+        </Grid>
+       </Border>
+       <TextBlock Text="Equipment on this unit" Style="{StaticResource FieldLabel}"/>
+       <WrapPanel><CheckBox x:Name="UnitHasSignalColumnCheck" Content="Signal column" Margin="0,2,24,0"/><CheckBox x:Name="UnitHasScannerCheck" Content="Safety scanner" Margin="0,2,0,0"/></WrapPanel>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,6,0,0" Text="Untick equipment the unit doesn’t have. Its files are kept; only the unit-page button is hidden."/>
+       <Expander x:Name="MobileSettingsExpander" Header="Offline QR label (older method, optional)" Margin="-6,12,0,0"><StackPanel>
+        <TextBlock Style="{StaticResource HelpText}" Text="Offline text works without accounts or internet. An approved document link, if filled in, takes priority over the offline text in the QR code."/>
+        <TextBlock Text="Short offline instructions (700 characters maximum)" Style="{StaticResource FieldLabel}"/><TextBox x:Name="MobileOfflineBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="85" MaxLength="700" VerticalContentAlignment="Top"/>
+        <TextBlock Text="Approved HTTPS document link (optional)" Style="{StaticResource FieldLabel}"/><TextBox x:Name="MobileSupportUrlBox" TextWrapping="Wrap"/>
+        <TextBlock Style="{StaticResource HelpText}" Margin="0,6,0,0" Text="Save the unit, then use Return to phone pilot. Clear the link to go back to offline text."/>
+       </StackPanel></Expander>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="SaveUnitButton" Content="Save unit" Click="SaveUnit_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Next: pilot checklist" Click="ReturnStart_Click" Style="{StaticResource QuietButton}"/><Button x:Name="ReturnPhonePilotButton" Content="Return to phone pilot" Click="ReturnPhonePilot_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+      </StackPanel></GroupBox>
+
+      <Expander x:Name="GateInformationExpander" Header="Asset details — shared by all its units" Margin="-6,0,0,0"><StackPanel Margin="0,4,6,0">
+       <Border Style="{StaticResource Card}"><StackPanel>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+         <StackPanel><TextBlock Text="Area" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><ComboBox x:Name="GateAreaBox" AutomationProperties.Name="Area"/></StackPanel>
+         <StackPanel Grid.Column="2"><TextBlock Text="Asset number" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><TextBox x:Name="GateAssetBox" AutomationProperties.Name="Asset number"/></StackPanel>
+        </Grid>
+        <TextBlock Text="Location / description" Style="{StaticResource FieldLabel}"/><TextBox x:Name="GateLocationBox" AutomationProperties.Name="Location"/>
+        <Expander Header="Manufacturer, search terms and PLC details (optional)" Margin="-6,12,0,0"><StackPanel>
+         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+          <StackPanel><TextBlock Text="Manufacturer / system" Style="{StaticResource FieldLabel}"/><TextBox x:Name="GateManufacturerBox"/></StackPanel>
+          <StackPanel Grid.Column="2"><TextBlock Text="Model" Style="{StaticResource FieldLabel}"/><TextBox x:Name="GateModelBox"/></StackPanel>
+          <StackPanel Grid.Row="1"><TextBlock Text="Equipment type" Style="{StaticResource FieldLabel}"/><TextBox x:Name="GateTypeBox"/></StackPanel>
+          <StackPanel Grid.Row="1" Grid.Column="2"><TextBlock Text="Search keywords" Style="{StaticResource FieldLabel}"/><TextBox x:Name="GateKeywordsBox"/></StackPanel>
+          <StackPanel Grid.Row="2"><TextBlock Text="PLC address / IP" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PlcAddressBox"/></StackPanel>
+          <StackPanel Grid.Row="2" Grid.Column="2"><TextBlock Text="PLC model" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PlcModelBox"/></StackPanel>
+         </Grid>
+         <TextBlock Text="PLC notes" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PlcNotesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" VerticalContentAlignment="Top"/>
+        </StackPanel></Expander>
+        <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="SaveGateButton" Content="Save asset" Click="SaveGate_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Next: add a unit to this asset" Click="NewUnit_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+       </StackPanel></Border>
+      </StackPanel></Expander>
+      <TextBlock Style="{StaticResource HelpText}" Margin="2,12,0,0" Text="Drawings are added from each unit’s page in the main window (Add drawing pair). One drawing can cover several units."/>
+     </StackPanel></ScrollViewer>
     </Grid>
    </TabItem>
 
+   <!-- COMMON PROBLEMS & HELP -->
+   <TabItem x:Name="HelpSetupTab" Header="Common problems &amp; help" Tag="&#xE897;">
+    <Grid Margin="24,20,24,16"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="320"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel Grid.ColumnSpan="3" Margin="0,0,0,14">
+      <TextBlock Text="Common problems &amp; help" Style="{StaticResource PageHeading}"/>
+      <TextBlock Style="{StaticResource PageSubtitle}" Text="Common problems appear as photo cards beside every unit. Quick help topics appear on the home page."/>
+     </StackPanel>
+     <Border Grid.Row="1" Style="{StaticResource ListCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="TOPICS" Style="{StaticResource ListHeading}"/>
+      <ListBox x:Name="HelpList" Grid.Row="1" BorderThickness="0" Padding="0" DisplayMemberPath="AdminDisplay" SelectionChanged="HelpList_SelectionChanged"/>
+      <WrapPanel Grid.Row="2" Margin="-4,6,-4,-4"><Button x:Name="NewCommonProblemButton" Content="+ Common problem" Click="NewCommonProblem_Click"/><Button Content="+ Help topic" Click="NewHelp_Click"/><Button Content="Delete" Click="DeleteHelp_Click" Style="{StaticResource DangerButton}"/></WrapPanel>
+     </Grid></Border>
+     <ScrollViewer Grid.Row="1" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+      <Border Style="{StaticResource Card}"><StackPanel>
+       <TextBlock Text="Topic" Style="{StaticResource SectionTitle}"/>
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
+        <StackPanel><TextBlock Text="Title" Style="{StaticResource FieldLabel}"/><TextBox x:Name="HelpTitleBox"/></StackPanel>
+        <StackPanel Grid.Column="2"><TextBlock Text="Shown in" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="HelpSectionBox"><ComboBoxItem Content="Quick Help"/><ComboBoxItem Content="Troubleshooting"/><ComboBoxItem Content="Common Problems"/></ComboBox></StackPanel>
+       </Grid>
+       <TextBlock Text="How to recognise it and how to fix it" Style="{StaticResource FieldLabel}"/><TextBox x:Name="HelpBodyBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="130" VerticalContentAlignment="Top"/>
+       <TextBlock Text="Photos (optional)" Style="{StaticResource FieldLabel}"/>
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
+        <StackPanel>
+         <ListBox x:Name="HelpPhotoList" DisplayMemberPath="Label" Height="120" SelectionChanged="HelpPhoto_SelectionChanged"/>
+         <WrapPanel Margin="-4,6,0,0"><Button Content="Add photos…" Click="ChooseHelpPhoto_Click"/><Button Content="Use as cover" Click="CoverHelpPhoto_Click" Style="{StaticResource QuietButton}"/><Button Content="Remove" Click="RemoveHelpPhoto_Click" Style="{StaticResource DangerButton}"/></WrapPanel>
+        </StackPanel>
+        <Border Grid.Column="2" Height="160" Background="{DynamicResource SurfaceAlt}" CornerRadius="8" VerticalAlignment="Top"><Image x:Name="HelpPhotoPreview" Stretch="Uniform" Margin="4"/></Border>
+       </Grid>
+       <TextBlock x:Name="HelpPhotoStatus" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}" Margin="0,4,0,0"/>
+       <CheckBox x:Name="HelpVisibleCheck" Content="Show this to users" IsChecked="True" Margin="0,14,0,0"/>
+       <Expander Header="Search keywords and order" Margin="-6,10,0,0"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
+        <StackPanel><TextBlock Text="Keywords" Style="{StaticResource FieldLabel}"/><TextBox x:Name="HelpKeywordsBox"/></StackPanel>
+        <StackPanel Grid.Column="2"><TextBlock Text="Sort order" Style="{StaticResource FieldLabel}"/><TextBox x:Name="HelpSortBox"/></StackPanel>
+       </Grid></Expander>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="SaveHelpButton" Content="Save topic" Click="SaveHelp_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Back to pilot checklist" Click="ReturnStart_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+      </StackPanel></Border>
+      <Expander Header="Home page wording (optional)" Margin="-6,14,0,0"><Border Style="{StaticResource Card}" Margin="6,4,6,0"><StackPanel>
+       <TextBlock Text="Home subtitle" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><TextBox x:Name="HomeSubtitleBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="58" VerticalContentAlignment="Top"/>
+       <TextBlock Text="Manuals page introduction" Style="{StaticResource FieldLabel}"/><TextBox x:Name="ManualsIntroBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50" VerticalContentAlignment="Top"/>
+       <TextBlock Text="Parts page introduction" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartsIntroBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50" VerticalContentAlignment="Top"/>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Save home text" Click="SaveSharedContent_Click"/></WrapPanel>
+      </StackPanel></Border></Expander>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <!-- PARTS -->
+   <TabItem x:Name="PartsSetupTab" Header="Parts" Tag="&#xE719;">
+    <Grid Margin="24,20,24,16"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel Grid.ColumnSpan="3" Margin="0,0,0,14">
+      <TextBlock Text="Parts" Style="{StaticResource PageHeading}"/>
+      <TextBlock Style="{StaticResource PageSubtitle}" Text="Import parts from the stockroom by Item ID, then choose which assets or units use them."/>
+     </StackPanel>
+     <Border Grid.Row="1" Style="{StaticResource ListCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="CATALOG" Style="{StaticResource ListHeading}"/>
+      <ListBox x:Name="AdminPartList" Grid.Row="1" BorderThickness="0" Padding="0" SelectionChanged="AdminPartList_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" TextWrapping="Wrap" FontSize="13"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+      <UniformGrid Grid.Row="2" Columns="2" Margin="-4,6,-4,-4"><Button x:Name="NewPartButton" Content="+ Part" Click="NewPart_Click"/><Button Content="Delete" Click="DeletePart_Click" Style="{StaticResource DangerButton}"/></UniformGrid>
+     </Grid></Border>
+     <ScrollViewer Grid.Row="1" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+      <Border Style="{StaticResource Card}" Margin="0,0,0,14"><StackPanel>
+       <TextBlock Text="Add or refresh a part by Item ID" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Details and any supplied photo are saved to the shared library."/>
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <StackPanel><TextBlock Text="Stockroom" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="ImportPlantBox" DisplayMemberPath="Name" AutomationProperties.Name="Stockroom plant"/></StackPanel>
+        <StackPanel Grid.Column="2"><TextBlock Text="Item ID" Style="{StaticResource FieldLabel}"/>
+         <DockPanel><Button x:Name="ImportItemButton" Content="Import" Click="ImportItem_Click" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"/><TextBox x:Name="PartNumberBox" FontSize="16" KeyDown="ImportItem_KeyDown" AutomationProperties.Name="Item ID"/></DockPanel>
+        </StackPanel>
+       </Grid>
+       <TextBlock x:Name="ImportItemStatus" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource InkMuted}"/>
+       <Expander Header="Bulk import by Item ID" Margin="-6,8,0,0"><StackPanel>
+        <TextBlock Style="{StaticResource HelpText}" Text="Paste up to 100 IDs separated by lines, commas or spaces. Duplicates are skipped. Choose unit assignments afterwards."/>
+        <TextBox x:Name="BulkItemIdsBox" AcceptsReturn="True" TextWrapping="Wrap" Height="100" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Margin="0,8,0,0"/>
+        <Button x:Name="BulkImportButton" Content="Import these Item IDs" Click="BulkImport_Click" HorizontalAlignment="Left" Margin="-4,8,0,0"/>
+       </StackPanel></Expander>
+       <ListBox x:Name="ImportResultsList" MaxHeight="180" Margin="0,8,0,0"><ListBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="Wrap"><Run Text="{Binding ItemId, Mode=OneWay}" FontWeight="Bold"/><Run Text=" · "/><Run Text="{Binding Status, Mode=OneWay}"/></TextBlock></DataTemplate></ListBox.ItemTemplate></ListBox>
+      </StackPanel></Border>
+
+      <Border Style="{StaticResource Card}"><StackPanel>
+       <TextBlock Text="Where this part is used" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Leave both lists empty to show the part everywhere. An asset applies it to all of its units; pick units for exceptions."/>
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <StackPanel><TextBlock Text="Assets" Style="{StaticResource FieldLabel}"/><ListBox x:Name="PartGateAssignments" Height="150" DisplayMemberPath="Display" SelectionMode="Multiple"/></StackPanel>
+        <StackPanel Grid.Column="2"><TextBlock Text="Specific units (optional)" Style="{StaticResource FieldLabel}"/><ListBox x:Name="PartUnitAssignments" Height="150" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/></StackPanel>
+       </Grid>
+       <Expander Header="Part details (optional edits)" Margin="-6,12,0,0"><StackPanel Margin="0,0,6,0">
+        <TextBlock Text="Item name" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><TextBox x:Name="PartDescriptionBox" MinHeight="60" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"/>
+        <TextBlock Text="Stockroom description" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartSourceDescriptionBox" IsReadOnly="True" TextWrapping="Wrap" MinHeight="60" VerticalContentAlignment="Top"/>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+         <StackPanel><TextBlock Text="Bin location" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartBinBox"/></StackPanel>
+         <StackPanel Grid.Column="2"><TextBlock Text="Reported quantity" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartQuantityBox"/></StackPanel>
+         <StackPanel Grid.Column="4"><TextBlock Text="Site" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartSiteBox"/></StackPanel>
+        </Grid>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+         <StackPanel><TextBlock Text="Manufacturer" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartManufacturerBox"/></StackPanel>
+         <StackPanel Grid.Column="2"><TextBlock Text="Keywords" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartKeywordsBox"/></StackPanel>
+        </Grid>
+        <TextBlock Text="Related assets (free text, older records)" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartAssetsBox"/>
+        <TextBlock Text="Notes" Style="{StaticResource FieldLabel}"/><TextBox x:Name="PartNotesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="75" VerticalContentAlignment="Top"/>
+        <TextBlock Text="Document" Style="{StaticResource FieldLabel}"/><DockPanel><Button Content="Choose / replace document…" Click="ChoosePartDocument_Click" Margin="-4,0,8,0"/><TextBlock x:Name="PartDocumentText" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}"/></DockPanel>
+       </StackPanel></Expander>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="SavePartButton" Content="Save part" Click="SavePart_Click" Style="{StaticResource PrimaryButton}"/></WrapPanel>
+      </StackPanel></Border>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <!-- LIBRARY & SOFTWARE -->
+   <TabItem x:Name="LibrarySetupTab" Header="Library &amp; software" Tag="&#xE8F1;">
+    <ScrollViewer Style="{StaticResource Page}"><StackPanel MaxWidth="860" HorizontalAlignment="Left">
+     <TextBlock Text="Library &amp; software" Style="{StaticResource PageHeading}"/>
+     <TextBlock Style="{StaticResource PageSubtitle}" Text="Where this plant’s content lives, plus maintenance tools and settings for this computer." Margin="0,4,0,20"/>
+     <Border Style="{StaticResource Card}" Margin="0,0,0,14"><StackPanel>
+      <TextBlock Text="Shared library location" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Every PC for this plant should point at the same folder. Use Start here to connect or create one."/>
+      <DockPanel Margin="0,10,0,0"><Button Content="Choose folder…" Click="ChooseSharedRoot_Click" DockPanel.Dock="Right" Margin="8,0,0,0"/><TextBox x:Name="SharedRootBox" AutomationProperties.Name="Shared library folder"/></DockPanel>
+     </StackPanel></Border>
+     <Border Style="{StaticResource Card}" Margin="0,0,0,14"><StackPanel>
+      <TextBlock Text="Maintenance" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Preview a tidy folder layout for each asset, merge identical copies and review conflicting revisions before applying. Existing files are backed up."/>
+      <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="OrganizeAssetFoldersButton" Content="Organize asset folders…" Click="OrganizeAssetFolders_Click"/></WrapPanel>
+      <Expander Header="Huntingdon sample data (training only)" Margin="-6,10,0,0"><StackPanel>
+       <TextBlock Style="{StaticResource HelpText}" Text="Only install this if you intend to use the supplied Huntingdon equipment and parts. For another plant, use Start here → Create blank plant library."/>
+       <Button Content="Install Huntingdon sample data" Click="Initialize_Click" HorizontalAlignment="Left" Margin="-4,8,0,0"/>
+      </StackPanel></Expander>
+     </StackPanel></Border>
+     <Border Style="{StaticResource Card}" Margin="0,0,0,14"><StackPanel>
+      <TextBlock Text="Stockroom" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Each PC chooses its own stockroom plant on the Parts page. Nothing here needs to change for that."/>
+      <Expander Header="First-time stockroom check on a new PC" Margin="-6,8,0,0">
+       <TextBlock Style="{StaticResource HelpText}" Text="1. Install Microsoft Edge WebView2 Runtime if it is missing.&#10;2. Connect to the plant network and open the stockroom in a browser to confirm inventory access.&#10;3. In Parts, choose Huntingdon, Salisbury or Newport, then refresh stock.&#10;4. Compare one known Item ID and its Available quantity with the stockroom. Zero means out of stock; unknown means the lookup hasn’t been confirmed.&#10;5. If it fails, save a stockroom report from the parts panel and share it with your support contact."/>
+      </Expander>
+      <TextBox x:Name="StoreroomUrlBox" Visibility="Collapsed"/>
+      <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Save shared settings" Click="SaveSharedContent_Click"/></WrapPanel>
+     </StackPanel></Border>
+     <Border Style="{StaticResource Card}" Margin="0,0,0,14"><StackPanel>
+      <TextBlock Text="Vendor software on this computer (optional)" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Only needed for the “open in vendor software” shortcuts. The built-in signal column tool doesn’t need these."/>
+      <TextBlock Text="Siemens 8WD46 Configurator" Style="{StaticResource FieldLabel}"/><DockPanel><Button Content="Browse…" Click="BrowseSiemens_Click" DockPanel.Dock="Right" Margin="8,0,0,0"/><TextBox x:Name="SiemensBox"/></DockPanel>
+      <TextBlock Text="UAM Project Designer" Style="{StaticResource FieldLabel}"/><DockPanel><Button Content="Browse…" Click="BrowseUam_Click" DockPanel.Dock="Right" Margin="8,0,0,0"/><TextBox x:Name="UamBox"/></DockPanel>
+      <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Save software paths" Click="SaveLocalSettings_Click"/></WrapPanel>
+     </StackPanel></Border>
+     <Border Style="{StaticResource Card}" Margin="0,0,0,14"><StackPanel>
+      <TextBlock Text="Offline phone guides (older method)" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Export printable photo guides and text-only QR labels with no server or login. For Google Drive QR folders, use Publish &amp; print QR in the main window instead."/>
+      <CheckBox x:Name="ExportIncludeNotesCheck" Content="Include shared notes in the exported guides" Margin="0,10,0,0"/>
+      <WrapPanel Style="{StaticResource ActionRow}"><Button x:Name="ExportPhoneGuidesButton" Content="Export phone guides and QR labels…" Click="ExportPhoneGuides_Click"/></WrapPanel>
+      <TextBlock x:Name="PhoneExportStatus" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}"/>
+     </StackPanel></Border>
+     <TextBlock Style="{StaticResource HelpText}" Text="Distribution: keep the published SafetyGateSupport.exe in Q:\SafetyGateSupport\Application and give users a shortcut to it. The app never updates itself."/>
+    </StackPanel></ScrollViewer>
+   </TabItem>
+
+   <!-- ADVANCED: MANUALS -->
+   <TabItem x:Name="ManualsSetupTab" Header="Manuals" Tag="&#xE8A5;" Visibility="Collapsed">
+    <Grid Margin="24,20,24,16"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel Grid.ColumnSpan="3" Margin="0,0,0,14"><TextBlock Text="Manuals" Style="{StaticResource PageHeading}"/><TextBlock Style="{StaticResource PageSubtitle}" Text="Edit manual details and where they apply. For quick imports, use Manuals → Import documents in the main window."/></StackPanel>
+     <Border Grid.Row="1" Style="{StaticResource ListCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="MANUALS" Style="{StaticResource ListHeading}"/>
+      <ListBox x:Name="ManualListAdmin" Grid.Row="1" BorderThickness="0" Padding="0" DisplayMemberPath="Display" SelectionChanged="ManualListAdmin_SelectionChanged"/>
+      <UniformGrid Grid.Row="2" Columns="2" Margin="-4,6,-4,-4"><Button Content="+ Manual" Click="NewManual_Click"/><Button Content="Delete" Click="DeleteManual_Click" Style="{StaticResource DangerButton}"/></UniformGrid>
+     </Grid></Border>
+     <ScrollViewer Grid.Row="1" Grid.Column="2" VerticalScrollBarVisibility="Auto"><Border Style="{StaticResource Card}"><StackPanel>
+      <TextBlock Text="Title" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><TextBox x:Name="ManualTitleBox"/>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <StackPanel><TextBlock Text="Manufacturer" Style="{StaticResource FieldLabel}"/><TextBox x:Name="ManualManufacturerBox"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Model" Style="{StaticResource FieldLabel}"/><TextBox x:Name="ManualModelBox"/></StackPanel>
+      </Grid>
+      <TextBlock Text="Keywords" Style="{StaticResource FieldLabel}"/><TextBox x:Name="ManualKeywordsBox"/>
+      <TextBlock Text="Document" Style="{StaticResource FieldLabel}"/><DockPanel><Button Content="Choose / replace file…" Click="ChooseManualFile_Click" Margin="-4,0,8,0"/><TextBlock x:Name="ManualFileText" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}"/></DockPanel>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <StackPanel><TextBlock Text="Applies to assets" Style="{StaticResource FieldLabel}"/><ListBox x:Name="ManualGateAssignments" Height="140" DisplayMemberPath="Display" SelectionMode="Multiple"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Specific units (optional)" Style="{StaticResource FieldLabel}"/><ListBox x:Name="ManualUnitAssignments" Height="140" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/></StackPanel>
+      </Grid>
+      <TextBlock Style="{StaticResource HelpText}" Margin="0,6,0,0" Text="Leave both lists empty to make the manual available everywhere."/>
+      <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Save manual" Click="SaveManual_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Open document" Click="OpenManualAdmin_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+     </StackPanel></Border></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <!-- ADVANCED: AREAS -->
+   <TabItem x:Name="AreasSetupTab" Header="Areas" Tag="&#xE707;" Visibility="Collapsed">
+    <Grid Margin="24,20,24,16"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="320"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel Grid.ColumnSpan="3" Margin="0,0,0,14"><TextBlock Text="Areas" Style="{StaticResource PageHeading}"/><TextBlock Style="{StaticResource PageSubtitle}" Text="Areas group assets on the home page filter, for example East Side or Packaging."/></StackPanel>
+     <Border Grid.Row="1" Style="{StaticResource ListCard}"><ListBox x:Name="AreaList" BorderThickness="0" Padding="0" SelectionChanged="AreaList_SelectionChanged"/></Border>
+     <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Card}" VerticalAlignment="Top"><StackPanel>
+      <TextBlock Text="Area name" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><TextBox x:Name="AreaNameBox" MaxWidth="420" HorizontalAlignment="Stretch"/>
+      <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Add" Click="AddArea_Click" Style="{StaticResource PrimaryButton}"/><Button x:Name="RenameAreaButton" Content="Rename" Click="RenameArea_Click"/><Button Content="Delete" Click="DeleteArea_Click" Style="{StaticResource DangerButton}"/></WrapPanel>
+      <TextBlock Style="{StaticResource HelpText}" Margin="0,10,0,0" Text="An area can’t be deleted while assets are assigned to it."/>
+     </StackPanel></Border>
+    </Grid>
+   </TabItem>
+
+   <!-- ADVANCED: RESOURCE BUTTONS -->
+   <TabItem x:Name="ResourcesSetupTab" Header="Resource buttons" Tag="&#xE71D;" Visibility="Collapsed">
+    <Grid Margin="24,20,24,16"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel Grid.ColumnSpan="3" Margin="0,0,0,14"><TextBlock Text="Resource buttons" Style="{StaticResource PageHeading}"/><TextBlock Style="{StaticResource PageSubtitle}" Text="Folders, links and managed files shown for an asset’s units. One resource can be shared by several units."/></StackPanel>
+     <Border Grid.Row="1" Style="{StaticResource ListCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <ComboBox x:Name="ResourceGateBox" DisplayMemberPath="Display" SelectionChanged="ResourceGateBox_SelectionChanged" AutomationProperties.Name="Asset"/>
+      <ListBox x:Name="ResourceList" Grid.Row="1" Margin="0,8,0,0" BorderThickness="0" Padding="0" DisplayMemberPath="AdminDisplay" SelectionChanged="ResourceList_SelectionChanged"/>
+      <UniformGrid Grid.Row="2" Columns="2" Margin="-4,6,-4,-4"><Button Content="+ New button" Click="NewResource_Click"/><Button Content="Delete" Click="DeleteResource_Click" Style="{StaticResource DangerButton}"/></UniformGrid>
+     </Grid></Border>
+     <ScrollViewer Grid.Row="1" Grid.Column="2" VerticalScrollBarVisibility="Auto"><Border Style="{StaticResource Card}"><StackPanel>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
+       <StackPanel><TextBlock Text="Button label" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><TextBox x:Name="ResourceLabelBox"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Type" Style="{StaticResource FieldLabel}" Margin="0,0,0,5"/><ComboBox x:Name="ResourceKindBox" SelectionChanged="ResourceKindBox_SelectionChanged"/></StackPanel>
+      </Grid>
+      <TextBlock Text="Show on these units" Style="{StaticResource FieldLabel}"/>
+      <ListBox x:Name="ResourceUnitsList" Height="120" DisplayMemberPath="UnitDisplay" SelectionMode="Multiple"/>
+      <TextBlock Style="{StaticResource HelpText}" Margin="0,4,0,0" Text="Pick several units to share one resource (for example, Units 4 and 5 sharing one drawing folder). Pick none to show it on every unit of the asset."/>
+      <WrapPanel Margin="0,10,0,0"><CheckBox x:Name="ResourceVisibleCheck" Content="Visible" IsChecked="True" Margin="0,4,24,4"/><CheckBox x:Name="ResourceUploadCheck" Content="Regular users can upload / update files" Margin="0,4"/></WrapPanel>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <StackPanel><TextBlock Text="Archive rule" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="ResourceArchiveBox"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Launch software" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="ResourceLaunchBox"/></StackPanel>
+      </Grid>
+      <TextBlock Text="Managed folder / target" Style="{StaticResource FieldLabel}"/><TextBox x:Name="ResourceTargetBox" ToolTip="Managed files: relative folder (blank for automatic). Folder: path. Link: https://…"/>
+      <TextBlock Text="Description" Style="{StaticResource FieldLabel}"/><TextBox x:Name="ResourceDescriptionBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" VerticalContentAlignment="Top"/>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
+       <StackPanel><TextBlock Text="Search keywords" Style="{StaticResource FieldLabel}"/><TextBox x:Name="ResourceKeywordsBox"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Sort order" Style="{StaticResource FieldLabel}"/><TextBox x:Name="ResourceSortBox"/></StackPanel>
+      </Grid>
+      <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Save button" Click="SaveResource_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Open current folder" Click="OpenResourceCurrent_Click" Style="{StaticResource QuietButton}"/><Button Content="Open archive" Click="OpenResourceArchive_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+     </StackPanel></Border></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <!-- ADVANCED: TROUBLESHOOTING FLOWS -->
+   <TabItem x:Name="FlowsSetupTab" Header="Troubleshooting flows" Tag="&#xE90F;" Visibility="Collapsed">
+    <Grid Margin="24,20,24,16"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="250"/><ColumnDefinition Width="12"/><ColumnDefinition Width="230"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel Grid.ColumnSpan="5" Margin="0,0,0,14"><TextBlock Text="Troubleshooting flows" Style="{StaticResource PageHeading}"/><TextBlock Style="{StaticResource PageSubtitle}" Text="Step-by-step guides: each step asks a question and its answers lead to the next step."/></StackPanel>
+     <Border Grid.Row="1" Style="{StaticResource ListCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="FLOWS" Style="{StaticResource ListHeading}"/>
+      <ListBox x:Name="FlowListAdmin" Grid.Row="1" BorderThickness="0" Padding="0" DisplayMemberPath="AdminDisplay" SelectionChanged="FlowListAdmin_SelectionChanged"/>
+      <UniformGrid Grid.Row="2" Columns="2" Margin="-4,6,-4,-4"><Button Content="+ Flow" Click="NewFlow_Click"/><Button Content="Delete" Click="DeleteFlow_Click" Style="{StaticResource DangerButton}"/></UniformGrid>
+     </Grid></Border>
+     <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource ListCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="STEPS" Style="{StaticResource ListHeading}"/>
+      <ListBox x:Name="NodeListAdmin" Grid.Row="1" BorderThickness="0" Padding="0" DisplayMemberPath="AdminDisplay" SelectionChanged="NodeListAdmin_SelectionChanged"/>
+      <UniformGrid Grid.Row="2" Columns="2" Margin="-4,6,-4,-4"><Button Content="+ Step" Click="NewNode_Click"/><Button Content="Delete" Click="DeleteNode_Click" Style="{StaticResource DangerButton}"/></UniformGrid>
+     </Grid></Border>
+     <ScrollViewer Grid.Row="1" Grid.Column="4" VerticalScrollBarVisibility="Auto"><StackPanel>
+      <Border Style="{StaticResource Card}" Margin="0,0,0,14"><StackPanel>
+       <TextBlock Text="Flow" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Text="Title" Style="{StaticResource FieldLabel}"/><TextBox x:Name="FlowTitleBox"/>
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <StackPanel><TextBlock Text="Keywords" Style="{StaticResource FieldLabel}"/><TextBox x:Name="FlowKeywordsBox"/></StackPanel>
+        <StackPanel Grid.Column="2"><TextBlock Text="Manufacturer filter (optional)" Style="{StaticResource FieldLabel}"/><TextBox x:Name="FlowManufacturerBox"/></StackPanel>
+       </Grid>
+       <TextBlock Text="Specific asset (optional)" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="FlowGateBox" DisplayMemberPath="Display" SelectionChanged="FlowGateBox_SelectionChanged"/>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Save flow" Click="SaveFlow_Click" Style="{StaticResource PrimaryButton}"/></WrapPanel>
+      </StackPanel></Border>
+      <Border Style="{StaticResource Card}"><StackPanel>
+       <DockPanel><TextBlock x:Name="NodeIdText" DockPanel.Dock="Right" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center"/><TextBlock Text="Selected step" Style="{StaticResource SectionTitle}"/></DockPanel>
+       <TextBlock Text="Question / heading" Style="{StaticResource FieldLabel}"/><TextBox x:Name="NodePromptBox"/>
+       <TextBlock Text="Instructions" Style="{StaticResource FieldLabel}"/><TextBox x:Name="NodeBodyBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" VerticalContentAlignment="Top"/>
+       <WrapPanel Margin="0,10,0,0"><CheckBox x:Name="NodeStartCheck" Content="Starting step" Margin="0,0,24,0"/><CheckBox x:Name="NodeTerminalCheck" Content="End of path"/></WrapPanel>
+       <TextBlock Text="Answer buttons" Style="{StaticResource FieldLabel}"/>
+       <TextBlock Style="{StaticResource HelpText}" Text="One per line: Button text => next-step-ID. Step IDs are shown at the top right of each selected step."/>
+       <TextBox x:Name="NodeChoicesBox" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="90" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Margin="0,6,0,0" FontFamily="Cascadia Mono, Consolas"/>
+       <TextBlock Text="Linked resource buttons" Style="{StaticResource FieldLabel}"/>
+       <ListBox x:Name="NodeResourceList" Height="110" DisplayMemberPath="AdminDisplay" SelectionMode="Multiple"/>
+       <WrapPanel Style="{StaticResource ActionRow}"><Button Content="Save step" Click="SaveNode_Click" Style="{StaticResource PrimaryButton}"/></WrapPanel>
+      </StackPanel></Border>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <!-- ADVANCED: HISTORY -->
+   <TabItem x:Name="AuditSetupTab" Header="History" Tag="&#xE81C;" Visibility="Collapsed">
+    <Grid Margin="24,20,24,16"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <DockPanel Margin="0,0,0,14"><Button Content="Refresh" Click="RefreshAudit_Click" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+      <StackPanel><TextBlock Text="History" Style="{StaticResource PageHeading}"/><TextBlock Style="{StaticResource PageSubtitle}" Text="Recent setup and file changes. Shared-note autosaves aren’t logged."/></StackPanel></DockPanel>
+     <Border Grid.Row="1" Style="{StaticResource ListCard}"><ListBox x:Name="AuditList" BorderThickness="0" Padding="0" DisplayMemberPath="Display"/></Border>
+    </Grid>
+   </TabItem>
   </TabControl>
-  <TextBlock x:Name="AdminStatusText" Grid.Row="2" Foreground="{DynamicResource ThemeForeground555555}" TextWrapping="Wrap"/>
+
+  <Border Grid.Row="3" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="24,8">
+   <TextBlock x:Name="AdminStatusText" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" FontSize="13"/>
+  </Border>
  </Grid>
 </Window>

@@ -27,6 +27,7 @@ public sealed class SupportLibraryWindow : Window
 
     public SupportLibraryWindow(DataService data, SafetyGate? gate = null, SafetySystem? unit = null)
     {
+        SetResourceReference(StyleProperty, typeof(Window));
         _data = data;
         Title = "Safety Gate Support — Support library"; Width = 1100; Height = 740; MinWidth = 850; MinHeight = 580;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;

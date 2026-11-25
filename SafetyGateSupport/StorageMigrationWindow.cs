@@ -16,6 +16,7 @@ public sealed class StorageMigrationWindow : Window
     private CancellationTokenSource? _operation;
     public StorageMigrationWindow(DataService data)
     {
+        SetResourceReference(StyleProperty, typeof(Window));
         _data = data; Title = "Organize asset folders"; Width = 1180; Height = 780; MinWidth = 850; MinHeight = 600; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var grid = new Grid { Margin = new Thickness(20) }; grid.RowDefinitions.Add(new() { Height = GridLength.Auto }); grid.RowDefinitions.Add(new()); grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var header = new StackPanel(); header.Children.Add(new TextBlock { Text = "One readable folder per asset", FontSize = 26, FontWeight = FontWeights.SemiBold });

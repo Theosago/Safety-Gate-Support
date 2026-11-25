@@ -26,6 +26,8 @@ public partial class MainWindow
             .OrderBy(h => h.SortOrder).ThenBy(h => h.Title).Select(h => new CommonProblemCard { Topic = h }).ToList();
         CommonProblemsList.ItemsSource = cards;
         CommonProblemsEmpty.Visibility = cards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        // An empty panel only takes space; start it collapsed until problems exist or the user opens it.
+        if (!_commonProblemsUserChoice) SetCommonProblemsExpanded(cards.Count > 0);
         var cancel = new CancellationTokenSource(); _commonProblemPhotos = cancel;
         _ = LoadCommonProblemPhotosAsync(cards, cancel);
     }
@@ -55,6 +57,7 @@ public partial class MainWindow
         if (sender is Button { Tag: HelpItem item }) OpenCommonProblem(item);
     }
     private bool _commonProblemsExpanded = true;
+    private bool _commonProblemsUserChoice;
     private FrameworkElement? _problemOrigin;
     private CancellationTokenSource? _problemDetailPhotos;
     public sealed class ProblemPhoto : INotifyPropertyChanged
@@ -67,6 +70,7 @@ public partial class MainWindow
     }
     private void ToggleCommonProblems_Click(object sender, RoutedEventArgs e)
     {
+        _commonProblemsUserChoice = true;
         SetCommonProblemsExpanded(!_commonProblemsExpanded);
         if (_commonProblemsExpanded) SetPartsRail(false);
     }
