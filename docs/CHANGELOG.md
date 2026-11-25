@@ -2,6 +2,18 @@
 
 Release history for Safety Gate Support, newest first. This file consolidates the per-version notes that previously lived in separate files under `docs/`. Older entries describe behavior at the time of that release; the current behavior is in the [README](../README.md) and the [Windows quick start](WINDOWS_QUICK_START.md).
 
+## 8.8.0 — Simpler unit page, assets without units, and an easy signal column tab
+
+- **Spare parts:** the stockroom is read once when the app opens and again only when a part is added, so new parts show an accurate count. The parts panel keeps **Choose spare parts…** and **Browse catalog**; the stockroom picker and refresh buttons moved to the Parts catalog (**Check stock again**). Part cards are compact.
+- **Unit page:** shared notes sit under the photo to use the open space. A unit with no electrical drawing shows its spare parts where the drawing would be.
+- **Drawings:** one **Upload drawing…** button replaces Add drawing pair and Replace selected drawing. It asks whether the files are a new revision of the drawing shown or a different drawing.
+- **Assets without units:** a new asset starts as a single **whole asset** and needs no unit number. Adding the first numbered unit turns that record into Unit 1, keeping its files, photo and links.
+- **Assigning manuals and parts:** one searchable checklist picks a unit's manuals or spare parts, with **Only this unit** or **Every unit on this asset**. In Setup, a part's or manual's units are chosen from an asset → unit tree.
+- **Plant setup:** Start here and Resource buttons are removed. Setup opens on Library & software until a library is connected, then on Units & assets with the current unit selected.
+- **Manuals & files:** the separate Support library tab is now **Software & configuration files** inside Manuals & files. The Troubleshoot tab is hidden for now.
+- **Signal column:** three short steps (connect, choose the configuration, upload) with instructions in place of warnings. The only saved configuration is chosen automatically, the comparison says **Stored settings match the selected file**, and an **All states** table shows every input combination. **Upload configuration pair…** saves a `.signal` file together with the PDF that shows it; the PDF appears beside the configuration and both are archived together on revision. Reports save automatically without a file dialog.
+- Existing drawings, files, links, archives, QR folders and Drive IDs are unchanged.
+
 ## 8.7.0 — A redesigned, consistent interface
 
 - **Every control restyled:** buttons have clear roles (blue primary, white secondary, quiet text actions, red delete), and rounded text fields highlight when focused. Dropdowns open as shadowed lists, checkboxes and radio buttons are custom, and lists highlight hover and selection. Scrollbars are slim, collapsible sections use arrows, and sections sit on cards. Tooltips, links and progress bars match.

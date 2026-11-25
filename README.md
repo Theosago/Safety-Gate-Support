@@ -1,6 +1,6 @@
 # Safety Gate Support
 
-Windows WPF support console for plant safety gates, version **8.7.0**.
+Windows WPF support console for plant safety gates, version **8.8.0**.
 
 Engineers and electricians pick a unit from a searchable photo gallery and get
 its identification photo, current electrical drawing, shared notes, replacement
@@ -12,8 +12,10 @@ Main features:
 - **One search bar** — at the top of every page. Typing filters the unit photos
   and lists matching drawings, manuals, parts, notes and help topics; click a
   match to open it. Ctrl+F focuses search from anywhere and Esc clears it.
-- **Drawings** — upload a PDF/DWG pair once, choose the units it covers, and
-  replace it from the unit page. Prior revisions are archived on the shared drive.
+- **Drawings** — **Upload drawing…** takes a PDF/DWG pair and asks whether it is a
+  new revision of the drawing shown or a different drawing. Choose the units it
+  covers; prior revisions are archived on the shared drive. A unit with no drawing
+  shows its spare parts in the drawing's place.
 - **Publish & print QR** — publishes unit guides and electrical PDFs to Google
   Drive folders, keeps them updated after drawing changes, optionally syncs
   shared notes with phones, and prints every unit's QR code in one PDF. See the
@@ -22,8 +24,10 @@ Main features:
   availability, Item ID import, and dated spare-parts PDFs for the QR folders.
 - **MaintainX** — read-only view of open work orders for a unit's linked
   MaintainX asset. See [MaintainX setup](docs/WINDOWS_QUICK_START.md#view-maintainx-work-orders).
-- **Equipment tools** — built-in Siemens signal-column USB backup, comparison
-  and verified upload; read-only Hokuyo UAM USB diagnostics; PLC files.
+- **Equipment tools** — the Siemens signal-column tab takes three steps (connect,
+  choose the configuration, upload), shows every input state's lights and the PDF
+  saved with the `.signal` file, and verifies the upload. Read-only Hokuyo UAM USB
+  diagnostics; PLC files.
 
 Start with the [Windows quick start](docs/WINDOWS_QUICK_START.md). Release history
 is in the [changelog](docs/CHANGELOG.md).
@@ -44,9 +48,9 @@ workflow** to create a fresh build when needed. The executable is not stored in 
 
 An existing installation keeps using its local settings and configured shared
 folder. Choose **Plant setup** in the sidebar or press **Ctrl+Alt+Shift+A**.
-The **Start here** page connects an existing library or creates a blank plant in
-an empty folder, then guides one pilot unit through photo, PDF and Common Problem
-setup. A local folder works for the pilot. Huntingdon sample data is an explicit
+Setup opens on **Library & software** until a library is connected (connect an
+existing library or create a blank plant in an empty folder), then on **Units &
+assets**. A local folder works for a trial. Huntingdon sample data is an explicit
 training option under Library & software.
 Local settings live in `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
 

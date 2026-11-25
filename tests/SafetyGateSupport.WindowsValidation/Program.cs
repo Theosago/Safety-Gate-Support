@@ -2007,7 +2007,6 @@ internal static class Program
         await DispatcherSettled(); await Task.Delay(600); Snap(main, output, "03-unit");
         Click(Control<Button>(main, "PartsNav")); await DispatcherSettled(); Snap(main, output, "04-parts");
         Click(Control<Button>(main, "ManualsNav")); await DispatcherSettled(); Snap(main, output, "05-manuals");
-        Click(Control<Button>(main, "TroubleshootNav")); await DispatcherSettled(); Snap(main, output, "06-troubleshoot");
         Control<ComboBox>(main, "ThemeBox").SelectedIndex = 1;
         Click(Control<Button>(main, "HomeNav")); await DispatcherSettled(); Snap(main, output, "07-home-dark");
         Click(Control<Button>(main, "SystemsNav")); await DispatcherSettled(); Snap(main, output, "08-unit-dark");
@@ -2040,6 +2039,14 @@ internal static class Program
         var publishing = Track(new OperatorDriveWindow(fixture.Data, fixture.BlueUnit.Id)); ShowOffscreen(publishing);
         await DispatcherSettled(); await Task.Delay(400); Snap(publishing, output, "30-publish");
         publishing.Close();
+
+        string signal = Path.Combine(NewDirectory(), "Unit 1 column.signal"); File.WriteAllBytes(signal, SyntheticColumnArchive());
+        var column = Track(new global::SiemensUsbCheck.MainWindow($"{fixture.Gate.Display} / Unit 1", new[] { signal }, previewOnly: true)); ShowOffscreen(column);
+        column.Width = 1440; column.Height = 900;
+        await WaitUntil(() => Control<StackPanel>(column, "StateTablePanel").Children.OfType<Button>().Any(), "Snapshot signal states did not load.");
+        await DispatcherSettled(); Snap(column, output, "40-signal-column");
+        SetPreviewInputs(column, 1); await DispatcherSettled(); Snap(column, output, "41-signal-try-inputs");
+        column.Close();
     }
 
     private static void Snap(Window window, string folder, string name)

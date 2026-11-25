@@ -7,9 +7,10 @@
 3. Check the version in the sidebar. The app reuses the existing local settings and shared library.
 
 On a new PC, choose **Set up this plant** or press **Ctrl+Shift+Alt+A**. Setup opens
-**Start here**. Connect an existing library, or select an empty folder and create
-a blank plant with its first area. Follow the pilot-unit steps before configuring
-more equipment. A local folder works for a pilot; other PCs need a shared location
+**Library & software**. Choose **Connect** for an existing library, or select an
+empty folder and create a blank plant with its first area. Then add assets and
+units under **Units & assets**. A new asset starts as a single **whole asset**;
+add numbered units only where the asset has more than one. A local folder works for a pilot; other PCs need a shared location
 for the same library. Huntingdon sample data is an optional training choice, not
 the new-plant default. See [the guided setup walkthrough](CHANGELOG.md#841--a-guided-first-plant-pilot).
 Local settings live at `%LOCALAPPDATA%\SafetyGateSupport\settings.json`.
@@ -33,24 +34,23 @@ From **Manuals → Import documents…**, select the PDFs and Word files togethe
 The app copies the originals to the connected shared library. Coworkers can
 find them in **Manuals** or the search bar at the top of the app by their titles.
 
-1. Click **Support library → Import files / ZIPs**. Select the original manuals, parts PDFs, troubleshooting DOCX, **Schematics and Light Config - Copy.zip**, **Omni Sensors - Copy.zip**, and **BusLink 2 M2 - Copy.zip** from the PC. Multiple selections are supported.
+1. Open **Manuals & files** and choose **Software & configuration files → Import files / ZIPs**. Select the original manuals, parts PDFs, troubleshooting DOCX, **Schematics and Light Config - Copy.zip**, **Omni Sensors - Copy.zip**, and **BusLink 2 M2 - Copy.zip** from the PC. Multiple selections are supported.
 2. Wait for the import summary. Exact duplicate sources are recognized by SHA-256, even if renamed. Different revisions are retained separately. The large schematics ZIP can be imported on the PC despite the cloud attachment transfer limit.
 3. Search the imported filenames for the asset/unit. Select the intended `.signal`, `.hux`, or PDF drawing, select the **exact unit** below the list, and click **Assign to selected unit**. Check the source drawing/file label before confirming. No assignment is inferred from inconsistent filenames. Files for paired units require an explicit assignment to each unit.
 4. Return to Units & files and open that unit's imported resource. Existing resources remain available. Replacing an imported assignment archives its previous file.
 
 Imports are stored under `<shared folder>\Library\Imports`, including the original source and a manifest; portable software folders retain DLLs and resources. The importer accepts up to 2 GiB per source ZIP, 30,000 entries, 512 MiB per expanded file and 4 GiB total expansion. It rejects unsafe paths, encrypted entries, symlinks, duplicate paths, and CRC errors. Failed/canceled imports are discarded; completed earlier imports remain.
 
-Standalone PDF/DOCX imports become searchable manuals. ZIP documents are available from Support library; assign unit drawings explicitly. Search works on filenames/source names, not document contents. The provided Omni archive contains nine `.hux` scanner configurations and one report PDF, **not** UAM Project Designer. Vendor programs are never launched by importing or selecting a file.
+Standalone PDF/DOCX imports become searchable manuals. ZIP documents are available from Software & configuration files; assign unit drawings explicitly. Search works on filenames/source names, not document contents. The provided Omni archive contains nine `.hux` scanner configurations and one report PDF, **not** UAM Project Designer. Vendor programs are never launched by importing or selecting a file.
 
 ## Check or configure a signal column
 
-1. On the opening photo gallery, search the asset or location and select the correct unit’s card. Confirm its large photo and identity. Choose **Light is dark or wrong**, then **Check stored settings / upload an approved file**. For a file directly, use **Light column** beside the photo, or **Files & drawings → Light configs**.
-2. Confirm the displayed asset/unit and isolate equipment for servicing before USB connection. Close Siemens Configurator. Connect the Siemens **8WD4613-5JH37** using a USB data cable, then select its detected port. Opening USB can restart it. Detection alone does not open it.
-3. Explicitly select the unit's approved `.signal` file, or browse for an approved file. Multiple assigned files are not resolved automatically.
-4. For a diagnostic read, expand **Advanced diagnostics** and click **Read & compare**. The report contains `column-backup.signal`. A **MATCH** means the stored settings match the selected file; **DIFFERENT** means review the file assignment before deciding to change settings. Neither result measures physical function.
-5. If needed, click **Reupload signal column configuration**, choose a **new local report filename**, and confirm the target/file. The tool saves a separate `.before.signal` backup before writing, checks the upload, restarts the column, reconnects to the same device, and verifies stored settings. Upload requires variant 21, firmware **v1.0.3**, and a validated schema-5, nine-segment sound configuration (file limit 1 MiB).
-6. Keep the backup and report. Reports default to `%LOCALAPPDATA%\SiemensUsbCheck\Reports` to avoid share permissions/locks. If verification fails, settings may already have changed: read/compare before retrying. Restoration is an explicit upload of the saved `.before.signal`; there is no automatic rollback.
-7. Under **Advanced diagnostics → Expected lights & sound**, set the six ON/OFF input switches to the safely observed combination (input 1 = bit 0, input 6 = bit 5). Compare real light and sound against the stored segment/color/effect/sound values and record the observation. This preview does not force outputs or measure inputs. Check all applicable states using the approved site procedure before returning equipment to service.
+1. Open the unit and choose **Light column**. The tab shows three steps.
+2. **Connect the column.** Isolate the equipment for servicing, close Siemens Configurator, and connect the Siemens **8WD4613-5JH37** with a USB data cable. The tab shows **✓ Column found**; choose **Look again** after plugging in. A column picker appears only when more than one column is connected. Finding a column does not open USB.
+3. **Choose the configuration.** If one `.signal` file is saved for the unit it is chosen for you; with several, pick the right one. **Compare with the column** reads the column (saving a backup) and shows **✓ Stored settings match the selected file** or that the column has different settings.
+4. **Upload to column.** Confirm, and the tool backs up the current settings, uploads, restarts the column and verifies the stored settings. Upload requires variant 21, firmware **v1.0.3**, and a validated schema-5, nine-segment sound configuration (file limit 1 MiB). Reports and backups are saved automatically to `%LOCALAPPDATA%\SiemensUsbCheck\Reports`.
+5. **All states** lists every configured input combination with its segment colors, blink/flash/rotate effects and sound. Click a row, or use **Try inputs**, to see one state in detail and record whether the real column matches it.
+6. **Configuration sheet** shows the PDF saved with the configuration. To save a new configuration, choose **Upload configuration pair…** and select the `.signal` file and its PDF together. If a configuration is already shown, the app asks whether this is a new revision of it (the old `.signal` and PDF are archived and every unit using it gets the new one) or a different configuration for this unit. **Manage saved files…** covers renaming, archiving and which units use each file.
 
 USB read/upload has succeeded on the user's hardware, including a later readback and confirmed physical behavior. Automated regressions cover transport, backup, verification and desktop integration. The new integrated UI and local-library workflow still require an initial check on a disconnected spare at the site; cloud tests cannot inspect field wiring, supply, or physical outputs.
 

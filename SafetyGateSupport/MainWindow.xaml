@@ -43,7 +43,7 @@
       <StackPanel>
        <TextBlock x:Name="ConnectionText" FontSize="12" TextWrapping="Wrap" Foreground="#9FB6C8"/>
        <DockPanel Margin="0,10,0,0">
-        <TextBlock Text="v8.7.0" Foreground="#6F889C" FontSize="11" VerticalAlignment="Center" DockPanel.Dock="Right"/>
+        <TextBlock Text="v8.8.0" Foreground="#6F889C" FontSize="11" VerticalAlignment="Center" DockPanel.Dock="Right"/>
         <TextBlock Text="Theme" Foreground="#9FB6C8" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
         <ComboBox x:Name="ThemeBox" SelectionChanged="Theme_Changed" MinHeight="30" Padding="9,4,30,4" Width="96" HorizontalAlignment="Left" AutomationProperties.Name="Theme"><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
        </DockPanel>
